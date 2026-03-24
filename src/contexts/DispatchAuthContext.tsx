@@ -1,0 +1,85 @@
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { dispatchApi } from '../lib/api';
+
+const TOKEN_KEY = 'dispatch_token';
+const USER_KEY = 'dispatch_user';
+
+interface OfficerUser {
+  id: number;
+  full_name: string;
+  badge_number: string;
+  role: string;
+  email: string;
+  station?: any;
+}
+
+interface DispatchAuthContextType {
+  officer: OfficerUser | null;
+  loading: boolean;
+  login: (email: string, password: string, badge_number: string) => Promise<void>;
+  logout: () => void;
+}
+
+const DispatchAuthContext = createContext<DispatchAuthContextType | null>(null);
+
+function saveSession(token: string, user: OfficerUser) {
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  localStorage.setItem('safesignal_officer_token', token);
+  localStorage.setItem('safesignal_officer_data', JSON.stringify(user));
+}
+
+function clearSession() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem('safesignal_officer_token');
+  localStorage.removeItem('safesignal_officer_data');
+}
+
+export function DispatchAuthProvider({ children }: { children: ReactNode }) {
+  const [officer, setOfficer] = useState<OfficerUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem(TOKEN_KEY)
+      || localStorage.getItem('safesignal_officer_token');
+    const storedUser = localStorage.getItem(USER_KEY)
+      || localStorage.getItem('safesignal_officer_data');
+
+    if (token && storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser) as OfficerUser;
+        setOfficer(parsedUser);
+        localStorage.setItem(TOKEN_KEY, token);
+        localStorage.setItem(USER_KEY, storedUser);
+        localStorage.setItem('safesignal_officer_token', token);
+      } catch {
+        clearSession();
+      }
+    }
+    setLoading(false);
+  }, []);
+
+  const login = async (email: string, password: string, badge_number: string) => {
+    const data: any = await dispatchApi.login({ email, password, badge_number });
+    saveSession(data.token, data.officer);
+    setOfficer(data.officer);
+  };
+
+  const logout = () => {
+    clearSession();
+    setOfficer(null);
+  };
+
+  return (
+    <DispatchAuthContext.Provider value={{ officer, loading, login, logout }}>
+      {children}
+    </DispatchAuthContext.Provider>
+  );
+}
+
+export function useDispatchAuth() {
+  const ctx = useContext(DispatchAuthContext);
+  if (!ctx) throw new Error('useDispatchAuth must be used within DispatchAuthProvider');
+  return ctx;
+}
