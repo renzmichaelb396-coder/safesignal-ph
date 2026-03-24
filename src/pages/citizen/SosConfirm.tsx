@@ -223,7 +223,7 @@ export default function SosConfirm() {
       <div className="w-full mb-6">
         <div className="grid grid-cols-3 gap-3 mb-4">
           {numpadButtons.map(btn => (
-            btn !== '*' && btn !== '#&& (
+            btn !== '*' && btn !== '#' && (
               <button
                 key={btn}
                 onClick={() => handleNumpadClick(btn)}
@@ -255,7 +255,7 @@ export default function SosConfirm() {
           ))}
         </div>
 
-        <!-- Backspace -->
+        {/* Backspace */}
         <button
           onClick={handleBackspace}
           disabled={loading || pin.length === 0}
