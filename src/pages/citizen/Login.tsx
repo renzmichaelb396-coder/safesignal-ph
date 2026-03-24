@@ -21,7 +21,8 @@ export default function Login() {
 
     if (!/^\d{4}$/.test(pin)) {
       setError('PIN must be exactly 4 digits');
-      return;J    }
+      return;
+    }
 
     setLoading(true);
     try {
@@ -109,8 +110,8 @@ export default function Login() {
             className="w-full py-4 rounded-2xl font-bold text-white text-lg mt-2"
             style={{ background: loading ? '#555' : 'var(--sos-red)', boxShadow: '0 4px 20px rgba(230,57,70,0.3)', cursor: loading ? 'not-allowed' : 'pointer' }}
           >
-              {loading ? 'Logging in...' : 'Login'}
-            </button>
+            {loading ? 'Logging in...' : 'Login'}
+          </button>
 
           <p className="text-center text-sm" style={{ color: '#888' }}>
             Don't have an account?{' '}
