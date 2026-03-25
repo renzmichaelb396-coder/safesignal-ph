@@ -62,7 +62,7 @@ export default function Login() {
       <div className="w-full">
         <div className="flex items-center gap-3 mb-6">
           <Link href="/">
-            <button style={{ color: '#aaa', background: 'none', border: 'none', fontSize: 20 }}>â</button>
+            <button style={{ color: '#aaa', background: 'none', border: 'none', fontSize: 20 }}>←</button>
           </Link>
           <div>
             <h1 style={{ color: '#fff', fontSize: 20, fontWeight: 700, margin: 0 }}>Welcome Back</h1>
@@ -99,7 +99,7 @@ export default function Login() {
             <input
               type="password"
               style={inputStyle}
-              placeholder="â¢â¢â¢â¢"
+              placeholder="••••"
               value={pin}
               maxLength={4}
               onChange={e => setPin(e.target.value.replace(/\D/g, ''))}
