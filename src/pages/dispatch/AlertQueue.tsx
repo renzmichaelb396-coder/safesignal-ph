@@ -376,6 +376,5 @@ export default function AlertQueue() {
         />
       )}
     </div>
-  
-  }
+  );
 }
