@@ -180,9 +180,10 @@ export default function Dashboard() {
 
         if (markersRef.current.has(alert.id)) {
           const marker = markersRef.current.get(alert.id);
-          marker.setLatLng([alert.lat, alert.lng]);
+          if (alert.lat != null && alert.lng != null) marker.setLatLng([alert.lat, alert.lng]);
           marker.setIcon(icon);
         } else {
+          if (alert.lat == null || alert.lng == null) return;
           const marker = L.marker([alert.lat, alert.lng], { icon })
             .addTo(leafletMapRef.current)
             .on('click', () => panToAlert(alert));
@@ -195,7 +196,7 @@ export default function Dashboard() {
       }
 
       if (newestActive) {
-        leafletMapRef.current.setView([newestActive.lat, newestActive.lng], 15);
+        if (newestActive.lat != null && newestActive.lng != null) leafletMapRef.current.setView([newestActive.lat, newestActive.lng], 15);
       }
     });
   };
@@ -219,7 +220,7 @@ export default function Dashboard() {
   const panToAlert = async (alert: any) => {
     // Pan map immediately
     if (leafletMapRef.current) {
-      leafletMapRef.current.setView([alert.lat, alert.lng], 16);
+      if (alert.lat != null && alert.lng != null) leafletMapRef.current.setView([alert.lat, alert.lng], 16);
     }
     // Open modal immediately with list data (fast feedback)
     setSelectedAlert(alert);
