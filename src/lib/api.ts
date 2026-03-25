@@ -109,5 +109,5 @@ export function getStatusBadgeClass(status: string): string {
 }
 
 export function getInitials(name: string): string {
-  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  return (name || 'UN').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 }
