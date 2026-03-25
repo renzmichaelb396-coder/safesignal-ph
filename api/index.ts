@@ -120,7 +120,9 @@ async function initializeDatabase(): Promise<void> {
   if (dbInitialized) return;
 
   if (!SQL) {
-    SQL = await initSqlJs();
+    SQL = await initSqlJs({
+      locateFile: (file: string) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`
+    });
   }
 
   db = new SQL.Database();
