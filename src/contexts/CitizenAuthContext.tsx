@@ -17,6 +17,7 @@ interface CitizenUser {
 
 interface CitizenAuthContextType {
   citizen: CitizenUser | null;
+  user: CitizenUser | null;
   loading: boolean;
   login: (phone: string, pin: string) => Promise<void>;
   logout: () => void;
@@ -87,7 +88,7 @@ export function CitizenAuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <CitizenAuthContext.Provider value={{ citizen, loading, login, logout, refreshProfile }}>
+    <CitizenAuthContext.Provider value={{ citizen, user: citizen, loading, login, logout, refreshProfile }}>
       {children}
     </CitizenAuthContext.Provider>
   );
