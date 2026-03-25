@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useDispatchAuth } from '../../contexts/DispatchAuthContext';
 
@@ -31,6 +31,10 @@ export default function DispatchLogin() {
     setPassword('password123');
     setBadgeNumber('PNP-001');
   };
+
+  useEffect(() => {
+    fillDemoCredentials();
+  }, []);
 
   return (
     <div
@@ -65,7 +69,7 @@ export default function DispatchLogin() {
               justifyContent: 'center',
             }}
           >
-            🛡️
+            ð¡ï¸
           </div>
           <h1
             style={{
@@ -191,7 +195,7 @@ export default function DispatchLogin() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="â¢â¢â¢â¢â¢â¢â¢â¢"
               required
               style={{
                 width: '100%',
