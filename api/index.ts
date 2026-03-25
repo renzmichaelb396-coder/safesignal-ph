@@ -803,6 +803,7 @@ app.get('/api/dispatch/alerts', requireOfficerAuth, (req: Request, res: Response
     const { status } = req.query;
     let query = `
       SELECT a.*, c.name, c.phone_number, c.barangay,
+      c.latitude as lat, c.longitude as lng,
       t.score as trust_score
       FROM sos_alerts a
       JOIN citizens c ON a.citizen_id = c.id
