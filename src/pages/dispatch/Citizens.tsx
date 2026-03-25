@@ -270,8 +270,8 @@ export default function Citizens() {
         {!loading && filteredCitizens.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {filteredCitizens.map((citizen) => {
-              const trustColor = getTrustColor(citizen.trust.score);
-              const trustBg = getTrustBg(citizen.trust.score);
+              const trustColor = getTrustColor((citizen.trust?.score ?? 0));
+              const trustBg = getTrustBg((citizen.trust?.score ?? 0));
 
               return (
                 <div
@@ -353,7 +353,7 @@ export default function Citizens() {
                             fontWeight: 700,
                           }}
                         >
-                          Trust: {citizen.trust.score}%
+                          Trust: {(citizen.trust?.score ?? 0)}%
                         </div>
                         <div
                           style={{
