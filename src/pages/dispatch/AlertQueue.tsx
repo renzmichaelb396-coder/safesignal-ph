@@ -26,16 +26,18 @@ export default function AlertQueue() {
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
 
   useEffect(() => {
-    fetchAlerts();
+    fetchAlerts(true);
+    const interval = setInterval(() => fetchAlerts(false), 4000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     filterAlerts();
   }, [alerts, activeFilter]);
 
-  const fetchAlerts = async () => {
+  const fetchAlerts = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       setError('');
       const response = await dispatchApi.getAlerts();
       setAlerts(response.alerts || []);
