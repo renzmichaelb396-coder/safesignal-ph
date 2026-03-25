@@ -79,7 +79,7 @@ export default function DispatchLogin() {
               justifyContent: 'center',
             }}
           >
-            🛡️
+            =�
           </div>
           <h1
             style={{
@@ -205,7 +205,7 @@ export default function DispatchLogin() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Ã¢ÂÂ¢Ã¢ÂÂ¢Ã¢ÂÂ¢Ã¢ÂÂ¢Ã¢ÂÂ¢Ã¢ÂÂ¢Ã¢ÂÂ¢Ã¢ÂÂ¢"
+              placeholder="••••••••"
               required
               style={{
                 width: '100%',
