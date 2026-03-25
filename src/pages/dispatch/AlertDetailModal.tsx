@@ -111,8 +111,9 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
     return '#f44336';
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatDate = (dateString: string | number) => {
+    const ts = typeof dateString === 'number' && dateString < 10000000000 ? dateString * 1000 : dateString;
+    const date = new Date(ts);
     return date.toLocaleDateString('en-PH', {
       year: 'numeric',
       month: 'short',
@@ -124,7 +125,8 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
 
   const statusColor = getStatusColor(alert.status);
   const trustColor = getTrustColor(alert.trust_score);
-  const elapsed = formatElapsed(new Date(alert.triggered_at));
+  const triggeredMs = typeof alert.triggered_at === 'number' && alert.triggered_at < 10000000000 ? alert.triggered_at * 1000 : new Date(alert.triggered_at).getTime();
+  const elapsed = formatElapsed(Date.now() - triggeredMs);
 
   return (
     <div
@@ -197,7 +199,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
         >
           <div>
             <h2 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 600 }}>
-              {alert.full_name}
+              {alert.full_name || (alert as any).name || 'Unknown'}
             </h2>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <span
@@ -257,7 +259,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
               e.currentTarget.style.color = 'var(--dispatch-border, #8b949e)';
             }}
           >
-            ✕
+            
           </button>
         </div>
 
@@ -295,7 +297,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                 Phone
               </p>
               <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--dispatch-border, #e6edf3)' }}>
-                {alert.phone || '—'}
+                {alert.phone || (alert as any).phone_number || '—'}
               </p>
             </div>
             <div>
