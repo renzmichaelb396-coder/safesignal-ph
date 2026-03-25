@@ -176,7 +176,7 @@ export default function History() {
                       {alert.barangay}
                     </p>
                     <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#666' }}>
-                      {alert.lat.toFixed(4)}, {alert.lng.toFixed(4)}
+                      {alert.lat?.toFixed(4) ?? "N/A"}, {alert.lng?.toFixed(4) ?? "N/A"}
                     </p>
                   </div>
 
