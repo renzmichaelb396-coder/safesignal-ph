@@ -213,7 +213,7 @@ export default function SosConfirm() {
                 color: 'var(--sos-red)',
               }}
             >
-              {pin[i] ? 'â' : ''}
+              {pin[i] ? '●' : ''}
             </div>
           ))}
         </div>
@@ -282,7 +282,7 @@ export default function SosConfirm() {
             e.currentTarget.style.background = 'rgba(255,255,255,0.07)';
           }}
         >
-          â Backspace
+          ← Backspace
         </button>
 
         {/* Submit Button */}
