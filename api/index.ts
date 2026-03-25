@@ -485,7 +485,16 @@ app.post('/api/citizen/login', (req: Request, res: Response) => {
       return;
     }
 
-    const citizen = dbExec('SELECT * FROM citizens WHERE phone_number = ?', [phone]);
+    // Normalize phone: strip non-digits, try both formats
+    const digits = phone.replace(/\D/g, '');
+    let citizen = dbExec('SELECT * FROM citizens WHERE phone_number = ?', [phone]);
+    if (citizen.length === 0 && digits.length >= 10) {
+      const intl = '+63-' + digits.slice(-10, -7) + '-' + digits.slice(-7);
+      citizen = dbExec('SELECT * FROM citizens WHERE phone_number = ?', [intl]);
+    }
+    if (citizen.length === 0 && digits.length >= 10) {
+      citizen = dbExec("SELECT * FROM citizens WHERE REPLACE(REPLACE(REPLACE(phone_number, '+', ''), '-', ''), ' ', '') LIKE ?", ['%' + digits.slice(-10)]);
+    }
     if (citizen.length === 0) {
       res.status(401).json({ error: 'Invalid phone or PIN' });
       return;
