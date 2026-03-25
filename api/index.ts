@@ -3,6 +3,8 @@ import cors from 'cors';
 import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import initSqlJs from 'sql.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'safesignal-ph-secret-key-2024';
@@ -120,9 +122,9 @@ async function initializeDatabase(): Promise<void> {
   if (dbInitialized) return;
 
   if (!SQL) {
-    SQL = await initSqlJs({
-      locateFile: (file: string) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`
-    });
+    const wasmPath = require.resolve('sql.js/dist/sql-wasm.wasm');
+    const wasmBinary = fs.readFileSync(wasmPath);
+    SQL = await initSqlJs({ wasmBinary });
   }
 
   db = new SQL.Database();
