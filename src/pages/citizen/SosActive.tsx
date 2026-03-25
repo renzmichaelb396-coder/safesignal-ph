@@ -43,8 +43,10 @@ export default function SosActive() {
 
     const fetchStatus = async () => {
       try {
-        const status = await citizenApi.getSosStatus(parseInt(sosId));
-        setSosStatus(status);
+        const data = await citizenApi.getActiveAlert();
+        if (data && data.alert) {
+          setSosStatus(data.alert);
+        }
       } catch (err) {
         setError('Failed to fetch status');
       }
@@ -59,7 +61,7 @@ export default function SosActive() {
   useEffect(() => {
     if (!sosStatus) return;
 
-    const startTime = new Date(sosStatus.created_at).getTime();
+    const startTime = (sosStatus.triggered_at || sosStatus.created_at) * 1000;
     const timer = setInterval(() => {
       const now = new Date().getTime();
       setElapsedTime(Math.floor((now - startTime) / 1000));
@@ -123,17 +125,18 @@ export default function SosActive() {
         return;
       }
 
+      const loc = sosStatus.location_history?.[sosStatus.location_history.length - 1] || { lat: 14.5794, lng: 120.9749 };
       const map = window.L.map(mapRef.current).setView(
-        [sosStatus.latitude, sosStatus.longitude],
+        [loc.lat, loc.lng],
         15
       );
 
       window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
+        attribution: 'Â© OpenStreetMap contributors',
         maxZoom: 19,
       }).addTo(map);
 
-      const marker = window.L.marker([sosStatus.latitude, sosStatus.longitude], {
+      const marker = window.L.marker([loc.lat, loc.lng], {
         icon: window.L.icon({
           iconUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="red" width="32" height="32"><circle cx="12" cy="12" r="8"/></svg>',
           iconSize: [32, 32],
@@ -158,7 +161,7 @@ export default function SosActive() {
 
     setLoading(true);
     try {
-      await citizenApi.cancelSos(parseInt(sosId), cancelReason);
+      await citizenApi.cancelSos(cancelReason);
       localStorage.removeItem('active_sos_id');
       navigate('/home');
     } catch (err: any) {
@@ -223,7 +226,7 @@ export default function SosActive() {
       {sosStatus?.citizen_strikes >= 2 && (
         <div className="p-3 rounded-xl mb-4" style={{ background: 'rgba(230,57,70,0.2)', border: '1px solid rgba(230,57,70,0.4)' }}>
           <p style={{ color: '#ff6b6b', fontSize: 12, margin: 0, fontWeight: 600 }}>
-            ⚠️ Strike {sosStatus.citizen_strikes}/3 - One more false alarm will suspend your account
+            â ï¸ Strike {sosStatus.citizen_strikes}/3 - One more false alarm will suspend your account
           </p>
         </div>
       )}
