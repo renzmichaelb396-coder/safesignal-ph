@@ -223,7 +223,7 @@ export default function SosConfirm() {
       <div className="w-full mb-6">
         <div className="grid grid-cols-3 gap-3 mb-4">
           {numpadButtons.map(btn => (
-            btn !== '*' && btn !== '#' && (
+            btn !== '*&& btn !== '#' && (
               <button
                 key={btn}
                 onClick={() => handleNumpadClick(btn)}
@@ -293,7 +293,7 @@ export default function SosConfirm() {
             width: '100%',
             padding: '16px',
             borderRadius: 12,
-            background: pin.length === 4 && !loading ? 'var(--sos-red)' : '#555',
+            background: pin.length === 4 && !loading ? 'var(--sos-red)' : '#555",
             border: 'none',
             color: '#fff',
             fontSize: 16,
