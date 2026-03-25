@@ -76,7 +76,7 @@ export default function History() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
           <Link href="/home" style={{ color: '#fff', textDecoration: 'none', fontSize: '20px' }}>
-            ←
+            â
           </Link>
           <h1 style={{ margin: '0', fontSize: '24px', fontWeight: '700' }}>Alert History</h1>
         </div>
@@ -125,7 +125,7 @@ export default function History() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {alerts.map((alert) => {
-              const elapsed = Date.now() - alert.triggered_at;
+              const elapsed = Date.now() - (alert.triggered_at * 1000);
               const elapsedStr = formatElapsed(elapsed);
 
               return (
@@ -182,7 +182,7 @@ export default function History() {
 
                   {/* Timestamp */}
                   <p style={{ margin: '0', fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                    {formatDate(alert.triggered_at)}
+                    {formatDate(alert.triggered_at * 1000)}
                   </p>
                 </div>
               );
