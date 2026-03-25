@@ -53,11 +53,32 @@ export const citizenApi = {
   getAlerts: () => request('/api/citizen/alerts', {}, 'citizen'),
 };
 
+// ── Alert field normalizer ──────────────────────────────────────────
+// Backend: name, phone_number, triggered_at (unix sec), latitude, longitude
+// Frontend: full_name, phone, triggered_at (unix sec), lat, lng
+export function normalizeAlert(raw: any): any {
+  return {
+    ...raw,
+    full_name: raw.full_name || raw.name || 'Unknown',
+    phone: raw.phone || raw.phone_number || '',
+    lat: raw.lat ?? raw.latitude ?? null,
+    lng: raw.lng ?? raw.longitude ?? null,
+  };
+}
+
 // Dispatch API
 export const dispatchApi = {
   login: (body: any) => request('/api/dispatch/login', { method: 'POST', body: JSON.stringify(body) }),
-  getAlerts: (status?: string) => request(`/api/dispatch/alerts${status ? `?status=${status}` : ''}`, {}, 'officer'),
-  getAlert: (id: number) => request(`/api/dispatch/alerts/${id}`, {}, 'officer'),
+  getAlerts: async (status?: string) => {
+    const data: any = await request(`/api/dispatch/alerts${status ? `?status=${status}` : ''}`, {}, 'officer');
+    if (data.alerts) data.alerts = data.alerts.map(normalizeAlert);
+    return data;
+  },
+  getAlert: async (id: number) => {
+    const data: any = await request(`/api/dispatch/alerts/${id}`, {}, 'officer');
+    if (data.alert) data.alert = normalizeAlert(data.alert);
+    return data;
+  },
   acknowledge: (id: number) => request(`/api/dispatch/alerts/${id}/acknowledge`, { method: 'POST' }, 'officer'),
   resolve: (id: number, notes?: string) => request(`/api/dispatch/alerts/${id}/resolve`, { method: 'POST', body: JSON.stringify({ notes }) }, 'officer'),
   falseAlarm: (id: number, notes?: string) => request(`/api/dispatch/alerts/${id}/false-alarm`, { method: 'POST', body: JSON.stringify({ notes }) }, 'officer'),
