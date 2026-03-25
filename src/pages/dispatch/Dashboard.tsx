@@ -18,7 +18,7 @@ export default function Dashboard() {
   const leafletMapRef = useRef<any>(null);
   const markersRef = useRef<Map<number, any>>(new Map());
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const sseRetryRef = useRef(0);
+  const prevAlertIdsRef = useRef<Set<number>>(new Set());
 
   // Live timer + PST clock
   useEffect(() => {
@@ -103,80 +103,38 @@ export default function Dashboard() {
     updateMapMarkers(alerts);
   }, [alerts]);
 
-  // SSE connection with reconnection logic
+  // Poll for alerts every 3 seconds (SSE not supported on Vercel serverless)
   useEffect(() => {
     if (!officer) return;
 
-    const setupSSE = () => {
-      const token = localStorage.getItem('dispatch_token') || localStorage.getItem('safesignal_officer_token');
-      const es = new EventSource(`/api/events?token=${token}`);
-
-      es.addEventListener('new_alert', (e: any) => {
+    const pollAlerts = async () => {
+      try {
+        const data: any = await dispatchApi.getAlerts();
+        const incoming = data.alerts || [];
         React.startTransition(() => {
-          const data = JSON.parse(e.data);
           setAlerts(prev => {
-            const exists = prev.find(a => a.id === data.alert.id);
-            if (exists) return prev;
-            playBeep();
-            return [data.alert, ...prev];
+            // Detect new alerts by comparing IDs
+            const prevIds = prevAlertIdsRef.current;
+            for (const a of incoming) {
+              if (!prevIds.has(a.id) && prevIds.size > 0) {
+                playBeep();
+                break;
+              }
+            }
+            // Update known IDs
+            prevAlertIdsRef.current = new Set(incoming.map((a: any) => a.id));
+            return incoming;
           });
         });
-        sseRetryRef.current = 0;
-      });
-
-      es.addEventListener('alert_updated', (e: any) => {
-        React.startTransition(() => {
-          const data = JSON.parse(e.data);
-          setAlerts(prev => prev.map(a => a.id === data.alert.id ? data.alert : a));
-        });
-        sseRetryRef.current = 0;
-      });
-
-      es.addEventListener('location_update', (e: any) => {
-        React.startTransition(() => {
-          const data = JSON.parse(e.data);
-          setAlerts(prev => prev.map(a => {
-            if (a.id === data.alert_id) return { ...a, lat: data.lat, lng: data.lng };
-            return a;
-          }));
-        });
-        sseRetryRef.current = 0;
-      });
-
-      es.addEventListener('surge_warning', (e: any) => {
-        React.startTransition(() => {
-          const data = JSON.parse(e.data);
-          setSurgeWarning(data.message);
-          setTimeout(() => setSurgeWarning(null), 10000);
-        });
-        sseRetryRef.current = 0;
-      });
-
-      es.addEventListener('connected', () => {
-        sseRetryRef.current = 0;
-      });
-
-      es.onerror = () => {
-        if (es.readyState === EventSource.CLOSED) {
-          if (sseRetryRef.current < 3) {
-            sseRetryRef.current += 1;
-            setTimeout(() => {
-              setupSSE();
-            }, 2000);
-          } else {
-            // Token likely expired
-            localStorage.removeItem('dispatch_token');
-            localStorage.removeItem('safesignal_officer_token');
-            navigate('/dispatch/login');
-          }
-        }
-      };
-
-      return () => es.close();
+      } catch {}
     };
 
-    return setupSSE();
-  }, [officer, navigate]);
+    // Initial poll
+    pollAlerts();
+    // Poll every 3 seconds
+    const interval = setInterval(pollAlerts, 3000);
+    return () => clearInterval(interval);
+  }, [officer]);
 
   const fetchAlerts = async () => {
     try {
