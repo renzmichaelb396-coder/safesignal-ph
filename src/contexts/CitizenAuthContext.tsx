@@ -53,8 +53,9 @@ export function CitizenAuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('safesignal_citizen_token', token);
         citizenApi.getProfile()
           .then((data: any) => {
-            setCitizen(data.citizen);
-            localStorage.setItem(USER_KEY, JSON.stringify(data.citizen));
+            const normalized = { ...data.citizen, full_name: data.citizen.full_name || data.citizen.name };
+            setCitizen(normalized);
+            localStorage.setItem(USER_KEY, JSON.stringify(normalized));
           })
           .catch(() => {
             clearSession();
