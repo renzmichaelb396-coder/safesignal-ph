@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useCitizenAuth } from '../../hooks/useCitizenAuth';
 
@@ -47,12 +47,22 @@ export default function Login() {
     transition: 'border-color 0.2s',
   };
 
+  // Auto-login with demo credentials for instant demo access
+  useEffect(() => {
+    if (phone && pin && phone.length === 11 && pin.length === 4) {
+      const timer = setTimeout(() => {
+        handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   return (
     <div className="citizen-container px-5 py-6 flex flex-col items-center justify-between min-h-screen" style={{ background: 'var(--citizen-bg)' }}>
       <div className="w-full">
         <div className="flex items-center gap-3 mb-6">
           <Link href="/">
-            <button style={{ color: '#aaa', background: 'none', border: 'none', fontSize: 20 }}>←</button>
+            <button style={{ color: '#aaa', background: 'none', border: 'none', fontSize: 20 }}>â</button>
           </Link>
           <div>
             <h1 style={{ color: '#fff', fontSize: 20, fontWeight: 700, margin: 0 }}>Welcome Back</h1>
@@ -89,7 +99,7 @@ export default function Login() {
             <input
               type="password"
               style={inputStyle}
-              placeholder="••••"
+              placeholder="â¢â¢â¢â¢"
               value={pin}
               maxLength={4}
               onChange={e => setPin(e.target.value.replace(/\D/g, ''))}
