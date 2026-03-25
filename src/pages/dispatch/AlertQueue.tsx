@@ -211,7 +211,7 @@ export default function AlertQueue() {
               color: 'var(--dispatch-border, #8b949e)',
             }}
           >
-            <p style={{ fontSize: '32px', margin: '0 0 12px 0' }}>ð­</p>
+            <p style={{ fontSize: '32px', margin: '0 0 12px 0' }}>Ã°ÂÂÂ­</p>
             <p style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0' }}>No alerts found</p>
             <p style={{ fontSize: '12px', margin: 0 }}>
               {activeFilter === 'ALL' ? 'No alerts in the system' : `No ${activeFilter.toLowerCase()} alerts`}
@@ -283,7 +283,7 @@ export default function AlertQueue() {
                         flexShrink: 0,
                       }}
                     >
-                      {getInitials(alert.full_name)}
+                      {getInitials(alert.full_name || 'User')}
                     </div>
 
                     {/* Info */}
@@ -322,7 +322,7 @@ export default function AlertQueue() {
                           color: 'var(--dispatch-border, #8b949e)',
                         }}
                       >
-                        {alert.barangay} â¢ {elapsed}
+                        {alert.barangay} Ã¢ÂÂ¢ {elapsed}
                       </p>
                       <div style={{ display: 'flex', gap: '12px', fontSize: '11px' }}>
                         <span style={{ color: 'var(--dispatch-border, #8b949e)' }}>
@@ -360,7 +360,7 @@ export default function AlertQueue() {
                     >
                       {alert.status}
                     </span>
-                    <span style={{ fontSize: '18px' }}>â</span>
+                    <span style={{ fontSize: '18px' }}>Ã¢ÂÂ</span>
                   </div>
                 </button>
               );
