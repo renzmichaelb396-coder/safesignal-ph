@@ -72,8 +72,10 @@ export function CitizenAuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (phone: string, pin: string) => {
     const data: any = await citizenApi.login({ phone, pin });
-    saveSession(data.token, data.citizen);
-    setCitizen(data.citizen);
+    // Normalize: API returns 'name', interface expects 'full_name'
+    const citizen = { ...data.citizen, full_name: data.citizen.full_name || data.citizen.name };
+    saveSession(data.token, citizen);
+    setCitizen(citizen);
   };
 
   const logout = () => {
@@ -83,8 +85,9 @@ export function CitizenAuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = async () => {
     const data: any = await citizenApi.getProfile();
-    setCitizen(data.citizen);
-    localStorage.setItem(USER_KEY, JSON.stringify(data.citizen));
+    const refreshed = { ...data.citizen, full_name: data.citizen.full_name || data.citizen.name };
+    setCitizen(refreshed);
+    localStorage.setItem(USER_KEY, JSON.stringify(refreshed));
   };
 
   return (
