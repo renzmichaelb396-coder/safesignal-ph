@@ -132,7 +132,7 @@ export default function SosActive() {
       );
 
       window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: 'ÃÂ© OpenStreetMap contributors',
+        attribution: '� OpenStreetMap contributors',
         maxZoom: 19,
       }).addTo(map);
 
