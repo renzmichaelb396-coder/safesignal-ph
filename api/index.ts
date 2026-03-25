@@ -4,8 +4,8 @@ import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
-// Use asm.js build - no WASM needed for Vercel serverless
-const initSqlJs = require('sql.js/dist/sql-asm.js');
+// @ts-ignore - Use asm.js build, no WASM needed for Vercel serverless
+import initSqlJs from 'sql.js/dist/sql-asm.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'safesignal-ph-secret-key-2024';
 
