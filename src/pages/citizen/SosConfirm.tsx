@@ -26,7 +26,7 @@ export default function SosConfirm() {
     }
 
     if (countdown === 0 && showCountdown) {
-      navigate('/home');
+      navigate('/sos/active');
     }
   }, [countdown, showCountdown, navigate]);
 
@@ -213,7 +213,7 @@ export default function SosConfirm() {
                 color: 'var(--sos-red)',
               }}
             >
-              {pin[i] ? '●' : ''}
+              {pin[i] ? 'â' : ''}
             </div>
           ))}
         </div>
@@ -282,7 +282,7 @@ export default function SosConfirm() {
             e.currentTarget.style.background = 'rgba(255,255,255,0.07)';
           }}
         >
-          ← Backspace
+          â Backspace
         </button>
 
         {/* Submit Button */}
