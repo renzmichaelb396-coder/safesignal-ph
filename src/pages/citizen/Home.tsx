@@ -76,7 +76,7 @@ export default function Home() {
             justifyContent: 'center',
           }}
         >
-          ☰
+          â°
         </button>
       </div>
 
@@ -115,7 +115,7 @@ export default function Home() {
                 borderBottom: '1px solid rgba(255,255,255,0.1)',
               }}
             >
-              👤 Profile
+              ð¤ Profile
             </button>
           </Link>
           <Link href="/history">
@@ -133,7 +133,7 @@ export default function Home() {
                 borderBottom: '1px solid rgba(255,255,255,0.1)',
               }}
             >
-              📋 History
+              ð History
             </button>
           </Link>
           <button
@@ -152,7 +152,7 @@ export default function Home() {
               cursor: 'pointer',
             }}
           >
-            🚪 Logout
+            ðª Logout
           </button>
         </div>
       )}
@@ -210,7 +210,7 @@ export default function Home() {
             }}
           />
 
-          <Link href="/sos-confirm">
+          <Link href="/sos/confirm">
             <button
               style={{
                 position: 'absolute',
@@ -264,7 +264,7 @@ export default function Home() {
               e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
             }}
           >
-            <p style={{ fontSize: 20, margin: '0 0 4px 0' }}>📋</p>
+            <p style={{ fontSize: 20, margin: '0 0 4px 0' }}>ð</p>
             <p style={{ color: '#ccc', fontSize: 12, margin: 0, fontWeight: 600 }}>History</p>
           </div>
         </Link>
@@ -284,7 +284,7 @@ export default function Home() {
               e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
             }}
           >
-            <p style={{ fontSize: 20, margin: '0 0 4px 0' }}>👤</p>
+            <p style={{ fontSize: 20, margin: '0 0 4px 0' }}>ð¤</p>
             <p style={{ color: '#ccc', fontSize: 12, margin: 0, fontWeight: 600 }}>Profile</p>
           </div>
         </Link>
