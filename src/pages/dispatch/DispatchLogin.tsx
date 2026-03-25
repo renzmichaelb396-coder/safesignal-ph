@@ -36,6 +36,16 @@ export default function DispatchLogin() {
     fillDemoCredentials();
   }, []);
 
+  // Auto-login with demo credentials for instant demo access
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (email && password && badgeNumber && !loading) {
+        handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [email, password, badgeNumber]);
+
   return (
     <div
       style={{
@@ -69,7 +79,7 @@ export default function DispatchLogin() {
               justifyContent: 'center',
             }}
           >
-            ð¡ï¸
+            🛡️
           </div>
           <h1
             style={{
@@ -195,7 +205,7 @@ export default function DispatchLogin() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="â¢â¢â¢â¢â¢â¢â¢â¢"
+              placeholder="Ã¢ÂÂ¢Ã¢ÂÂ¢Ã¢ÂÂ¢Ã¢ÂÂ¢Ã¢ÂÂ¢Ã¢ÂÂ¢Ã¢ÂÂ¢Ã¢ÂÂ¢"
               required
               style={{
                 width: '100%',
