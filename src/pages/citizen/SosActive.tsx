@@ -132,7 +132,7 @@ export default function SosActive() {
       );
 
       window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: 'Â© OpenStreetMap contributors',
+        attribution: 'ÃÂ© OpenStreetMap contributors',
         maxZoom: 19,
       }).addTo(map);
 
@@ -222,14 +222,6 @@ export default function SosActive() {
         }}
       />
 
-      {/* Strike Warning */}
-      {sosStatus?.citizen_strikes >= 2 && (
-        <div className="p-3 rounded-xl mb-4" style={{ background: 'rgba(230,57,70,0.2)', border: '1px solid rgba(230,57,70,0.4)' }}>
-          <p style={{ color: '#ff6b6b', fontSize: 12, margin: 0, fontWeight: 600 }}>
-            â ï¸ Strike {sosStatus.citizen_strikes}/3 - One more false alarm will suspend your account
-          </p>
-        </div>
-      )}
 
       {error && (
         <div className="p-3 rounded-xl mb-4" style={{ background: 'rgba(230,57,70,0.2)', color: '#ff6b6b', fontSize: 12 }}>
