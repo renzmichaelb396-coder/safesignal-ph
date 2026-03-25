@@ -180,7 +180,7 @@ export default function DispatchHistory() {
               display: 'block',
               fontSize: '12px',
               fontWeight: 600,
-              color:&§var(--dispatch-border, #c9d1d9)',
+              color: 'var(--dispatch-border, #c9d1d9)',
               marginBottom: '6px',
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
@@ -198,7 +198,7 @@ export default function DispatchHistory() {
               backgroundColor: 'var(--dispatch-border, #161b22)',
               border: '1px solid var(--dispatch-border, #30363d)',
               borderRadius: '6px',
-              color:&§var(--dispatch-border, #e6edf3)',
+              color: 'var(--dispatch-border, #e6edf3)',
               cursor: 'pointer',
             }}
           />
@@ -226,7 +226,7 @@ export default function DispatchHistory() {
             style={{
               padding: '8px 12px',
               fontSize: '13px',
-              backgroundColor:&§var(--dispatch-border, #161b22)',
+              backgroundColor: 'var(--dispatch-border, #161b22)',
               border: '1px solid var(--dispatch-border, #30363d)',
               borderRadius: '6px',
               color: 'var(--dispatch-border, #e6edf3)',
@@ -393,7 +393,7 @@ export default function DispatchHistory() {
                   </div>
 
                   {/* Barangay */}
-                  <div style={{ color:&§var(--dispatch-border, #8b949e)' }}>{alert.barangay}</div>
+                  <div style={{ color: 'var(--dispatch-border, #8b949e)' }}>{alert.barangay}</div>
 
                   {/* Status */}
                   <div>
@@ -427,7 +427,7 @@ export default function DispatchHistory() {
                   <div
                     style={{
                       fontSize: '12px',
-                      color:&§var(--dispatch-border, #8b949e)',
+                      color: 'var(--dispatch-border, #8b949e)',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
