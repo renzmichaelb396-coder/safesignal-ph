@@ -199,7 +199,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
         >
           <div>
             <h2 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 600 }}>
-              {alert.full_name || (alert as any).name || 'Unknown'}
+              {alert.full_name}
             </h2>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <span
@@ -297,7 +297,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                 Phone
               </p>
               <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--dispatch-border, #e6edf3)' }}>
-                {alert.phone || (alert as any).phone_number || '—'}
+                {alert.phone || '—'}
               </p>
             </div>
             <div>
