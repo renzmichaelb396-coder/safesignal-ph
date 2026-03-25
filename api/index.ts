@@ -3,9 +3,9 @@ import cors from 'cors';
 import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
-import initSqlJs from 'sql.js';
+
+// Use asm.js build - no WASM needed for Vercel serverless
+const initSqlJs = require('sql.js/dist/sql-asm.js');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'safesignal-ph-secret-key-2024';
 
@@ -122,9 +122,7 @@ async function initializeDatabase(): Promise<void> {
   if (dbInitialized) return;
 
   if (!SQL) {
-    const wasmPath = require.resolve('sql.js/dist/sql-wasm.wasm');
-    const wasmBinary = fs.readFileSync(wasmPath);
-    SQL = await initSqlJs({ wasmBinary });
+    SQL = await initSqlJs();
   }
 
   db = new SQL.Database();
