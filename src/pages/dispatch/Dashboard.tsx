@@ -88,7 +88,7 @@ export default function Dashboard() {
 
       // Station marker
       const stationIcon = L.divIcon({
-        html: `<div style="font-size:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">⭐</div>`,
+        html: `<div style="font-size:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">â­</div>`,
         className: '', iconSize: [24, 24], iconAnchor: [12, 12]
       });
       L.marker([14.5378, 120.9932], { icon: stationIcon })
@@ -248,13 +248,13 @@ export default function Dashboard() {
             {surgeWarning && (
               <div className="absolute top-0 left-0 right-0 z-50 p-3 text-center"
                 style={{ background: 'rgba(230,57,70,0.9)', color: '#fff', fontSize: 13, fontWeight: 600 }}>
-                🚨 {surgeWarning}
+                ð¨ {surgeWarning}
               </div>
             )}
             <div ref={mapRef} style={{ width: '100%', height: '100%', background: '#f8fafc' }} />
           </div>
 
-          {/* RIGHT PANEL — Active Alerts */}
+          {/* RIGHT PANEL â Active Alerts */}
           <div className="dispatch-right-panel">
             <div className="p-4" style={{ borderBottom: '1px solid var(--dispatch-border)' }}>
               <div className="flex items-center justify-between">
@@ -275,7 +275,7 @@ export default function Dashboard() {
               </div>
               {clock && (
                 <p style={{ color: '#6b7280', fontSize: 10, margin: '6px 0 0', fontFamily: 'monospace', letterSpacing: '0.03em' }}>
-                  🕐 {clock} PST
+                  ð {clock} PST
                 </p>
               )}
             </div>
@@ -298,7 +298,7 @@ export default function Dashboard() {
                 </div>
               ) : activeAlerts.length === 0 ? (
                 <div className="text-center py-10">
-                  <div style={{ fontSize: 32 }}>✅</div>
+                  <div style={{ fontSize: 32 }}>â</div>
                   <p style={{ color: '#888', fontSize: 13, marginTop: 8 }}>No active alerts</p>
                 </div>
               ) : (
@@ -341,11 +341,11 @@ export default function Dashboard() {
                         <p style={{ color: alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED' ? '#6b7280' : '#888', fontSize: 11, margin: '2px 0' }}>{alert.barangay}</p>
                         <div className="flex items-center justify-between">
                           <span style={{ color: alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED' ? '#374151' : '#e1e4ed', fontSize: 12, fontFamily: 'monospace' }}>
-                            {formatElapsed(now - alert.triggered_at)}
+                            {formatElapsed(Date.now() - alert.triggered_at * 1000)}
                           </span>
                           <div className="flex items-center gap-1">
                             {alert.is_suspicious && (
-                              <span style={{ fontSize: 12 }} title="Suspicious">🚩</span>
+                              <span style={{ fontSize: 12 }} title="Suspicious">ð©</span>
                             )}
                             <span style={{
                               fontSize: 10, fontWeight: 600,
@@ -365,9 +365,9 @@ export default function Dashboard() {
             {/* Stats bar */}
             <div className="p-3 grid grid-cols-3 gap-2" style={{ borderTop: '1px solid var(--dispatch-border)' }}>
               {[
-                { label: 'Active', value: alerts.filter(a => a.status === 'ACTIVE').length, color: '#dc2626', bg: 'rgba(220,38,38,0.1)', icon: '🚨' },
-                { label: "Ack'd", value: alerts.filter(a => a.status === 'ACKNOWLEDGED').length, color: '#d97706', bg: 'rgba(217,119,6,0.1)', icon: '✋' },
-                { label: 'Today', value: alerts.filter(a => a.triggered_at > Date.now() - 86400000).length, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', icon: '📊' },
+                { label: 'Active', value: alerts.filter(a => a.status === 'ACTIVE').length, color: '#dc2626', bg: 'rgba(220,38,38,0.1)', icon: 'ð¨' },
+                { label: "Ack'd", value: alerts.filter(a => a.status === 'ACKNOWLEDGED').length, color: '#d97706', bg: 'rgba(217,119,6,0.1)', icon: 'â' },
+                { label: 'Today', value: alerts.filter(a => a.triggered_at > Date.now() - 86400000).length, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', icon: 'ð' },
               ].map((s, i) => (
                 <div key={i} className="text-center p-2 rounded-lg"
                   style={{ background: s.bg }}>
@@ -380,7 +380,7 @@ export default function Dashboard() {
         </div>
 
       </DispatchLayout>
-      {/* Alert Detail Modal — rendered OUTSIDE DispatchLayout so position:fixed is not clipped by overflow:hidden */}
+      {/* Alert Detail Modal â rendered OUTSIDE DispatchLayout so position:fixed is not clipped by overflow:hidden */}
       {selectedAlert && (
         <AlertDetailModal
           alert={selectedAlert}
