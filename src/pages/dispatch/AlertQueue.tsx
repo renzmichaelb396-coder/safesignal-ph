@@ -283,7 +283,7 @@ export default function AlertQueue() {
                         flexShrink: 0,
                       }}
                     >
-                      {getInitials(alert.full_name || (alert as any).name || 'User')}
+                      {getInitials(alert.full_name)}
                     </div>
 
                     {/* Info */}
@@ -297,7 +297,7 @@ export default function AlertQueue() {
                         }}
                       >
                         <p style={{ margin: 0, fontWeight: 600, fontSize: '14px' }}>
-                          {alert.full_name || (alert as any).name || 'Unknown'}
+                          {alert.full_name}
                         </p>
                         {alert.is_suspicious && (
                           <span
