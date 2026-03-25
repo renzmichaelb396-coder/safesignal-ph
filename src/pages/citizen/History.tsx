@@ -76,7 +76,7 @@ export default function History() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
           <Link href="/home" style={{ color: '#fff', textDecoration: 'none', fontSize: '20px' }}>
-            â
+            ←
           </Link>
           <h1 style={{ margin: '0', fontSize: '24px', fontWeight: '700' }}>Alert History</h1>
         </div>
