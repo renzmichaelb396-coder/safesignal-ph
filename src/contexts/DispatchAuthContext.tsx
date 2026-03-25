@@ -62,8 +62,10 @@ export function DispatchAuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string, badge_number: string) => {
     const data: any = await dispatchApi.login({ email, password, badge_number });
-    saveSession(data.token, data.officer);
-    setOfficer(data.officer);
+    // Normalize officer: API returns 'name', interface expects 'full_name'
+    const officer = { ...data.officer, full_name: data.officer.full_name || data.officer.name };
+    saveSession(data.token, officer);
+    setOfficer(officer);
   };
 
   const logout = () => {
