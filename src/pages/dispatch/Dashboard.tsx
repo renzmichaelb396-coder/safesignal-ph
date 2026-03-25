@@ -159,7 +159,7 @@ export default function Dashboard() {
       let newestActive: any = null;
 
       for (const alert of alertList) {
-        const initials = getInitials(alert.full_name || (alert as any).name || 'UN');
+        const initials = getInitials(alert.full_name);
 
         let color = '#6b7280';
         let size = 20;
@@ -328,12 +328,12 @@ export default function Dashboard() {
                         style={{ width: 36, height: 36,
                           background: alert.status === 'ACTIVE' ? 'var(--sos-red)' : '#eab308',
                           fontSize: 12, fontWeight: 700, color: '#fff' }}>
-                        {getInitials(alert.full_name || (alert as any).name || 'UN')}
+                        {getInitials(alert.full_name)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <p style={{ color: !alert.is_suspicious && (alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED') ? '#1f2937' : '#e1e4ed', fontSize: 13, fontWeight: 600, margin: 0 }}>
-                            {alert.full_name || (alert as any).name || 'Unknown'}
+                            {alert.full_name}
                           </p>
                           <span className={`px-1.5 py-0.5 rounded text-xs font-bold badge-${alert.status.toLowerCase()}`}>
                             {alert.status}
