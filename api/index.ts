@@ -120,7 +120,7 @@ async function initializeDatabase(): Promise<void> {
   if (dbInitialized) return;
 
   if (!SQL) {
-    SQL = await initSqlJs({ locateFile: (file: string) => require('path').join(process.cwd(), 'node_modules', 'sql.js', 'dist', file) });
+    SQL = await initSqlJs({ locateFile: (file: string) => `${process.cwd()}/node_modules/sql.js/dist/${file}` });
   }
 
   db = new SQL.Database();
@@ -260,7 +260,7 @@ async function initializeDatabase(): Promise<void> {
     ];
 
     for (const officer of officers) {
-      const passwordHash = bcryptjs.hashSync('password123', 10);
+      const passwordHash = bcryptjs.hashSync('password123', 4);
       db.run(
         'INSERT INTO officers (station_id, badge_number, name, role, password_hash) VALUES (?, ?, ?, ?, ?)',
         [stationId, officer.badge, officer.name, officer.role, passwordHash]
