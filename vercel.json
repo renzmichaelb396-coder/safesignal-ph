@@ -1,6 +1,11 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "node_modules/sql.js/dist/**"
+    }
+  },
   "rewrites": [
     { "source": "/api/events", "destination": "/api/events" },
     { "source": "/api/citizen/(.*)", "destination": "/api/index" },
