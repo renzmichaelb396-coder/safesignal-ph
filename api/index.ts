@@ -250,10 +250,8 @@ async function initializeDatabase(): Promise<void> {
     );
 
     const stmtStation = db.prepare('SELECT id FROM stations WHERE name = ?');
-    stmtStation.bind([stationName]);
-    if (stmtStation.step()) {
-      stationId = stmtStation.getAsObject()['id'] as number;
-    }
+    stmtStation.bind(['Pasay City Police Station']);
+    const stationId = stmtStation.step() ? (stmtStation.getAsObject()['id'] as number) : 0;
     stmtStation.free();
 
     // Create officers
