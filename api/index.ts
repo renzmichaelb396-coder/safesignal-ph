@@ -11,6 +11,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'safesignal-ph-secret-key-2024';
 let SQL: any = null;
 let db: any = null;
 let dbInitialized = false;
+let initializationInProgress = false;
 const loginAttempts = new Map<string, { count: number; lockUntil: number }>();
 
 // Initialize the app
@@ -390,13 +391,21 @@ function dbExec(sql: string, params: any[] = []): any[] {
 // Initialize DB on first request
 app.use(async (req: Request, res: Response, next: any) => {
   if (!dbInitialized) {
+    if (initializationInProgress) {
+      res.status(503).json({ error: 'Database initializing, please retry in a moment.' });
+      return;
+    }
+    initializationInProgress = true;
     try {
       await initializeDatabase();
+      initializationInProgress = false;
     } catch (error) {
-      const _initErrMsg = error instanceof Error ? error.message : String(error);
-          console.error('INIT_FAIL: ' + _initErrMsg);
-          res.status(500).json({ error: 'init_failed', detail: _initErrMsg });
-          return;
+      console.error('INIT_FAIL:', error instanceof Error ? error.message : String(error));
+      db = null;
+      dbInitialized = false;
+      initializationInProgress = false;
+      res.status(503).json({ error: 'Service temporarily unavailable. Please retry.' });
+      return;
     }
   }
   next();
