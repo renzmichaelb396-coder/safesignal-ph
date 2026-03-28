@@ -120,7 +120,7 @@ async function initializeDatabase(): Promise<void> {
   if (dbInitialized) return;
 
   if (!SQL) {
-    SQL = await initSqlJs();
+    SQL = await initSqlJs({ locateFile: (file: string) => require('path').join(process.cwd(), 'node_modules', 'sql.js', 'dist', file) });
   }
 
   db = new SQL.Database();
