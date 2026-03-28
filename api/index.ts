@@ -269,7 +269,7 @@ async function initializeDatabase(): Promise<void> {
 
     // Create citizens
     const citizens = [
-      { name: 'Juan Dela Cruz', phone: '+63-917-1234567', barangay8'Pasay City', lat: 14.5400, lng: 120.9950 },
+      { name: 'Juan Dela Cruz', phone: '+63-917-1234567', barangay: 'Pasay City', lat: 14.5400, lng: 120.9950 },
       { name: 'Maria Santos', phone: '+63-917-2345678', barangay: 'Pasay City', lat: 14.5350, lng: 120.9920 },
       { name: 'Pedro Reyes', phone: '+63-917-3456789', barangay: 'Pasay City', lat: 14.5380, lng: 120.9900 },
       { name: 'Ana Gonzales', phone: '+63-917-4567890', barangay: 'Pasay City', lat: 14.5420, lng: 120.9960 },
@@ -307,7 +307,7 @@ async function initializeDatabase(): Promise<void> {
       { citizenIdx: 0, status: 'ACTIVE', type: 'EMERGENCY', suspicious: 0 },
       { citizenIdx: 1, status: 'ACKNOWLEDGED', type: 'EMERGENCY', suspicious: 0 },
       { citizenIdx: 2, status: 'RESOLVED', type: 'EMERGENCY', suspicious: 0 },
-      { citizenIdx: 3, status: 'FALSE_ALARM%, type: 'EMERGENCY', suspicious: 0 },
+      { citizenIdx: 3, status: 'FALSE_ALARM', type: 'EMERGENCY', suspicious: 0 },
       { citizenIdx: 4, status: 'ACTIVE', type: 'EMERGENCY', suspicious: 1 },
     ];
 
