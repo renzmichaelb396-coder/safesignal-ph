@@ -249,8 +249,12 @@ async function initializeDatabase(): Promise<void> {
       ['Pasay City Police Station', 'Pasay City', 14.5378, 120.9932, '+63-2-8551-0000']
     );
 
-    const stationResult = db.exec('SELECT id FROM stations WHERE name = ?', ['Pasay City Police Station']);
-    const stationId = stationResult[0]?.values[0][0] || 1;
+    const stmtStation = db.prepare('SELECT id FROM stations WHERE name = ?');
+    stmtStation.bind([stationName]);
+    if (stmtStation.step()) {
+      stationId = stmtStation.getAsObject()['id'] as number;
+    }
+    stmtStation.free();
 
     // Create officers
     const officers = [
@@ -373,18 +377,16 @@ function dbRun(sql: string, params: any[] = []): any {
 function dbExec(sql: string, params: any[] = []): any[] {
   if (!db) return [];
   try {
-    const result = db.exec(sql, params);
-    if (result.length === 0) return [];
-    return result[0].values.map((row: any[]) => {
-      const columns = result[0].columns;
-      const obj: any = {};
-      columns.forEach((col: string, idx: number) => {
-        obj[col] = row[idx];
-      });
-      return obj;
-    });
+    const stmt = db.prepare(sql);
+    if (params.length > 0) stmt.bind(params);
+    const rows: any[] = [];
+    while (stmt.step()) {
+      rows.push(stmt.getAsObject());
+    }
+    stmt.free();
+    return rows;
   } catch (error) {
-    console.error('DB exec error:', error, sql);
+    console.error('DB exec error:', error);
     return [];
   }
 }
