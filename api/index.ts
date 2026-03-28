@@ -393,7 +393,10 @@ app.use(async (req: Request, res: Response, next: any) => {
     try {
       await initializeDatabase();
     } catch (error) {
-      console.error('Database initialization error:', error);
+      const _initErrMsg = error instanceof Error ? error.message : String(error);
+          console.error('INIT_FAIL: ' + _initErrMsg);
+          res.status(500).json({ error: 'init_failed', detail: _initErrMsg });
+          return;
     }
   }
   next();
