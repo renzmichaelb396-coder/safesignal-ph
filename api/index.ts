@@ -148,7 +148,7 @@ async function initializeDatabase(): Promise<void> {
       password_hash TEXT NOT NULL,
       status TEXT DEFAULT 'ACTIVE',
       created_at INTEGER DEFAULT (strftime('%s', 'now')),
-      FOREIGN KEY (station_id) REFERENCE stations(id)
+      FOREIGN KEY (station_id) REFERENCES stations(id)
     )
   `);
 
