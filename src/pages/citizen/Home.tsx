@@ -76,7 +76,7 @@ export default function Home() {
             justifyContent: 'center',
           }}
         >
-          ⚙️
+          ☰
         </button>
       </div>
 
