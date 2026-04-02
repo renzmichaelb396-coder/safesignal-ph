@@ -44,7 +44,7 @@ export default function DispatchHistory() {
 
       // Filter by date range
       alerts = alerts.filter((alert) => {
-        const alertDate = new Date(alert.triggered_at).toISOString().split('T')[0];
+        const _ts1 = Number(alert.triggered_at); const alertDate = new Date(!isNaN(_ts1) ? (_ts1 < 10000000000 ? _ts1 * 1000 : _ts1) : alert.triggered_at).toISOString().split('T')[0];
         return alertDate >= dateFilter.start && alertDate <= dateFilter.end;
       });
 
@@ -76,7 +76,7 @@ export default function DispatchHistory() {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    const _n = Number(dateString); const date = new Date(!isNaN(_n) ? (_n < 10000000000 ? _n * 1000 : _n) : dateString);
     return date.toLocaleDateString('en-PH', {
       year: 'numeric',
       month: 'short',
@@ -88,8 +88,8 @@ export default function DispatchHistory() {
 
   const calculateResolutionTime = (triggered: string, resolved?: string) => {
     if (!resolved) return '—';
-    const start = new Date(triggered).getTime();
-    const end = new Date(resolved).getTime();
+    const _ts2 = Number(triggered); const start = new Date(!isNaN(_ts2) ? (_ts2 < 10000000000 ? _ts2 * 1000 : _ts2) : triggered).getTime();
+    const _ts3 = Number(resolved); const end = !resolved ? Date.now() : new Date(!isNaN(_ts3) ? (_ts3 < 10000000000 ? _ts3 * 1000 : _ts3) : resolved).getTime();
     const minutes = Math.floor((end - start) / 60000);
 
     if (minutes < 60) return `${minutes}m`;
