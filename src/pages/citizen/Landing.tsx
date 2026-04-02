@@ -6,16 +6,16 @@ export default function Landing() {
     <div className="citizen-container flex flex-col items-center justify-between min-h-screen px-6 py-10"
       style={{ background: 'var(--citizen-bg)' }}>
       {/* Header */}
-      <div className="w-full flex justify-between items-center">
+      <div className="w-full flex items-center justify-center relative">
         <span style={{ color: 'var(--ph-gold)', fontSize: '12px', fontWeight: 600 }}>
           PASAY CITY POLICE STATION
         </span>
-        <span style={{ color: '#666', fontSize: '11px' }}>v1.0</span>
+        <span style={{ color: '#666', fontSize: '11px', position: 'absolute', right: 0 }}>v1.0</span>
       </div>
 
       {/* Logo & Branding */}
       <div className="flex flex-col items-center text-center gap-6">
-        <div className="relative" style={{ width: 120, height: 140 }}>
+        <div className="relative" style={{ width: 120, height: 140}}>
           <svg viewBox="0 0 120 140" width="120" height="140">
             <path d="M60 5 L110 25 L110 75 Q110 120 60 135 Q10 120 10 75 L10 25 Z"
               fill="#0038A8" stroke="#FFD700" strokeWidth="3"/>
