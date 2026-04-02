@@ -11,7 +11,7 @@ export default function Metrics() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (loading) return null;
+    if (loading) return;
     if (!officer) { navigate('/dispatch/login'); return; }
     dispatchApi.getStats()
       .then(setStats)
@@ -20,12 +20,12 @@ export default function Metrics() {
   }, [officer, loading]);
 
   const metricCards = stats ? [
-    { label: 'Total Alerts', value: stats.total_count ?? 0, color: '#e6edf3', icon: '📊' },
-    { label: 'Active Now', value: stats.active_count ?? 0, color: '#f85149', icon: '🚨' },
-    { label: 'Acknowledged', value: stats.acknowledged_count ?? 0, color: '#ffc107', icon: '👁️' },
-    { label: 'Resolved', value: stats.resolved_count ?? 0, color: '#3fb950', icon: '✅' },
-    { label: 'False Alarms', value: stats.false_alarm_count ?? 0, color: '#8b949e', icon: '⚠️' },
-    { label: 'Today', value: stats.today_count ?? 0, color: '#58a6ff', icon: '📅' },
+    { label: 'Total Alerts', value: stats.total ?? 0, color: '#e6edf3', icon: 'ð' },
+    { label: 'Active Now', value: stats.active_count ?? 0, color: '#f85149', icon: 'ð¨' },
+    { label: 'Acknowledged', value: stats.acknowledged_count ?? 0, color: '#ffc107', icon: 'ðï¸' },
+    { label: 'Resolved', value: stats.resolved_count ?? 0, color: '#3fb950', icon: 'â' },
+    { label: 'False Alarms', value: stats.false_alarm_count ?? 0, color: '#8b949e', icon: 'â ï¸' },
+    { label: 'Today', value: stats.today_count ?? 0, color: '#58a6ff', icon: 'ð' },
   ] : [];
 
   return (
@@ -33,12 +33,12 @@ export default function Metrics() {
       <div style={{ padding: '24px' }}>
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 600, color: '#e6edf3' }}>Metrics</h1>
-          <p style={{ margin: 0, fontSize: '13px', color: '#8b949e' }}>Pasay City Police Station — performance overview</p>
+          <p style={{ margin: 0, fontSize: '13px', color: '#8b949e' }}>Pasay City Police Station â performance overview</p>
         </div>
 
         {loading ? (
           <div style={{ textAlign: 'center' as const, padding: '64px', color: '#8b949e' }}>
-            <div style={{ fontSize: '32px', marginBottom: '12px' }}>📊</div>
+            <div style={{ fontSize: '32px', marginBottom: '12px' }}>ð</div>
             Loading metrics...
           </div>
         ) : !stats ? (
@@ -55,15 +55,15 @@ export default function Metrics() {
               ))}
             </div>
 
-            {stats.total_count > 0 && (
+            {stats.total > 0 && (
               <div style={{ backgroundColor: '#161b22', border: '1px solid #30363d', borderRadius: '8px', padding: '24px' }}>
                 <h3 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 600, color: '#e6edf3' }}>Resolution Rate</h3>
                 <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#8b949e' }}>
                   <span>Resolved</span>
-                  <span style={{ color: '#3fb950' }}>{stats.total_count > 0 ? Math.round(((stats.resolved_count ?? 0) / stats.total_count) * 100) : 0}%</span>
+                  <span style={{ color: '#3fb950' }}>{stats.total > 0 ? Math.round(((stats.resolved_count ?? 0) / stats.total) * 100) : 0}%</span>
                 </div>
                 <div style={{ height: '8px', backgroundColor: '#21262d', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${stats.total_count > 0 ? Math.round(((stats.resolved_count ?? 0) / stats.total_count) * 100) : 0}%`, backgroundColor: '#3fb950', borderRadius: '4px', transition: 'width 0.5s ease' }} />
+                  <div style={{ height: '100%', width: `${stats.total > 0 ? Math.round(((stats.resolved_count ?? 0) / stats.total) * 100) : 0}%`, backgroundColor: '#3fb950', borderRadius: '4px', transition: 'width 0.5s ease' }} />
                 </div>
               </div>
             )}
