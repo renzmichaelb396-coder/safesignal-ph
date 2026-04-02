@@ -241,7 +241,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
               fontSize: '20px',
               backgroundColor: 'transparent',
               border: 'none',
-              color: 'var(--dispatch-border, #8b949e)',
+              color: '#8b949e',
               cursor: 'pointer',
               padding: '0',
               width: '32px',
@@ -291,14 +291,14 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                   margin: '0 0 6px 0',
                   fontSize: '11px',
                   fontWeight: 600,
-                  color: 'var(--dispatch-border, #8b949e)',
+                  color: '#8b949e',
                   textTransform: 'uppercase',
                   letterSpacing: '0.3px',
                 }}
               >
                 Phone
               </p>
-              <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--dispatch-border, #e6edf3)' }}>
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#e6edf3' }}>
                 {alert.phone || '—'}
               </p>
             </div>
@@ -308,14 +308,14 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                   margin: '0 0 6px 0',
                   fontSize: '11px',
                   fontWeight: 600,
-                  color: 'var(--dispatch-border, #8b949e)',
+                  color: '#8b949e',
                   textTransform: 'uppercase',
                   letterSpacing: '0.3px',
                 }}
               >
                 Barangay
               </p>
-              <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--dispatch-border, #e6edf3)' }}>
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#e6edf3' }}>
                 {alert.barangay}
               </p>
             </div>
@@ -325,17 +325,17 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                   margin: '0 0 6px 0',
                   fontSize: '11px',
                   fontWeight: 600,
-                  color: 'var(--dispatch-border, #8b949e)',
+                  color: '#8b949e',
                   textTransform: 'uppercase',
                   letterSpacing: '0.3px',
                 }}
               >
                 Triggered
               </p>
-              <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--dispatch-border, #e6edf3)' }}>
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#e6edf3' }}>
                 {formatDate(alert.triggered_at)}
               </p>
-              <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: 'var(--dispatch-border, #8b949e)' }}>
+              <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#8b949e' }}>
                 {elapsed} ago
               </p>
             </div>
@@ -345,7 +345,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                   margin: '0 0 6px 0',
                   fontSize: '11px',
                   fontWeight: 600,
-                  color: 'var(--dispatch-border, #8b949e)',
+                  color: '#8b949e',
                   textTransform: 'uppercase',
                   letterSpacing: '0.3px',
                 }}
@@ -373,7 +373,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                   margin: '0 0 12px 0',
                   fontSize: '11px',
                   fontWeight: 600,
-                  color: 'var(--dispatch-border, #8b949e)',
+                  color: '#8b949e',
                   textTransform: 'uppercase',
                   letterSpacing: '0.3px',
                 }}
@@ -398,7 +398,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                   style={{
                     margin: '12px 0 0 0',
                     fontSize: '11px',
-                    color: 'var(--dispatch-border, #8b949e)',
+                    color: '#8b949e',
                   }}
                 >
                   {alert.location_history.length} location update{alert.location_history.length !== 1 ? 's' : ''}
@@ -449,7 +449,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                       display: 'block',
                       fontSize: '11px',
                       fontWeight: 600,
-                      color: 'var(--dispatch-border, #8b949e)',
+                      color: '#8b949e',
                       marginBottom: '8px',
                       textTransform: 'uppercase',
                     }}
@@ -467,7 +467,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                       backgroundColor: 'var(--dispatch-border, #161b22)',
                       border: '1px solid var(--dispatch-border, #30363d)',
                       borderRadius: '6px',
-                      color: 'var(--dispatch-border, #e6edf3)',
+                      color: '#e6edf3',
                       resize: 'vertical',
                       minHeight: '80px',
                       boxSizing: 'border-box',
@@ -511,7 +511,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                         padding: '10px',
                         fontSize: '12px',
                         fontWeight: 600,
-                        color: 'var(--dispatch-border, #e6edf3)',
+                        color: '#e6edf3',
                         backgroundColor: 'var(--dispatch-border, #30363d)',
                         border: 'none',
                         borderRadius: '6px',
@@ -598,7 +598,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                       display: 'block',
                       fontSize: '11px',
                       fontWeight: 600,
-                      color: 'var(--dispatch-border, #8b949e)',
+                      color: '#8b949e',
                       marginBottom: '8px',
                       textTransform: 'uppercase',
                     }}
@@ -616,7 +616,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                       backgroundColor: 'var(--dispatch-border, #161b22)',
                       border: '1px solid var(--dispatch-border, #30363d)',
                       borderRadius: '6px',
-                      color: 'var(--dispatch-border, #e6edf3)',
+                      color: '#e6edf3',
                       resize: 'vertical',
                       minHeight: '80px',
                       boxSizing: 'border-box',
@@ -660,7 +660,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                         padding: '10px',
                         fontSize: '12px',
                         fontWeight: 600,
-                        color: 'var(--dispatch-border, #e6edf3)',
+                        color: '#e6edf3',
                         backgroundColor: 'var(--dispatch-border, #30363d)',
                         border: 'none',
                         borderRadius: '6px',
@@ -686,7 +686,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                 padding: '12px',
                 fontSize: '13px',
                 fontWeight: 600,
-                color: 'var(--dispatch-border, #e6edf3)',
+                color: '#e6edf3',
                 backgroundColor: 'var(--dispatch-border, #30363d)',
                 border: '1px solid var(--dispatch-border, #30363d)',
                 borderRadius: '6px',
