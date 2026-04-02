@@ -6,26 +6,21 @@ export default function Landing() {
     <div className="citizen-container flex flex-col items-center justify-between min-h-screen px-6 py-10"
       style={{ background: 'var(--citizen-bg)' }}>
       {/* Header */}
-      <div className="w-full flex items-center justify-center relative">
+      <div className="w-full flex justify-between items-center">
         <span style={{ color: 'var(--ph-gold)', fontSize: '12px', fontWeight: 600 }}>
           PASAY CITY POLICE STATION
         </span>
-        <span style={{ color: '#666', fontSize: '11px', position: 'absolute', right: 0 }}>v1.0</span>
+        <span style={{ color: '#666', fontSize: '11px' }}>v1.0</span>
       </div>
 
       {/* Logo & Branding */}
       <div className="flex flex-col items-center text-center gap-6">
-        <div className="relative" style={{ width: 120, height: 140}}>
-          <svg viewBox="0 0 120 140" width="120" height="140">
-            <path d="M60 5 L110 25 L110 75 Q110 120 60 135 Q10 120 10 75 L10 25 Z"
-              fill="#0038A8" stroke="#FFD700" strokeWidth="3"/>
-            <circle cx="60" cy="70" r="22" fill="#FFD700"/>
-            <text x="60" y="77" textAnchor="middle" fill="#0038A8"
-              fontSize="16" fontWeight="900" fontFamily="Arial">SOS</text>
-            <text x="25" y="45" textAnchor="middle" fill="#FFD700" fontSize="12">★</text>
-            <text x="95" y="45" textAnchor="middle" fill="#FFD700" fontSize="12">★</text>
-            <text x="60" y="30" textAnchor="middle" fill="#FFD700" fontSize="12">★</text>
-          </svg>
+        <div className="relative" style={{ width: 120, height: 140 }}>
+          <img
+            src="/pasay-police-badge.svg"
+            alt="Pasay City Police Station"
+            style={{ width: 120, height: 140, objectFit: 'contain' }}
+          />
         </div>
 
         <div>
@@ -42,9 +37,9 @@ export default function Landing() {
 
         <div className="flex flex-col gap-3 w-full mt-4">
           {[
-            { icon: '🚨', text: 'One-tap SOS with GPS location' },
-            { icon: '🗺️', text: 'Real-time officer tracking' },
-            { icon: '🔐', text: 'Secure PIN verification' },
+            { icon: '\u{1F6A8}', text: 'One-tap SOS with GPS location' },
+            { icon: '\u{1F5FA}\uFE0F', text: 'Real-time officer tracking' },
+            { icon: '\u{1F510}', text: 'Secure PIN verification' },
           ].map((f, i) => (
             <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-xl"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
