@@ -11,12 +11,13 @@ export default function Metrics() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (loading) return null;
     if (!officer) { navigate('/dispatch/login'); return; }
     dispatchApi.getStats()
       .then(setStats)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [officer]);
+  }, [officer, loading]);
 
   const metricCards = stats ? [
     { label: 'Total Alerts', value: stats.total_count ?? 0, color: '#e6edf3', icon: '📊' },
