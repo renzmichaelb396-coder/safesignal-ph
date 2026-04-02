@@ -1,1166 +1,625 @@
-import express, { Request, Response } from 'express';
-import cors from 'cors';
-import bcryptjs from 'bcryptjs';
+import express from 'express';
+import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import initSqlJs from 'sql.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'safesignal-ph-secret-key-2024';
-
-// Global database instance
-let SQL: any = null;
-let db: any = null;
-let dbInitialized = false;
-let initializationInProgress = false;
-const loginAttempts = new Map<string, { count: number; lockUntil: number }>();
-
-// Initialize the app
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-// Types
-interface CitizenPayload {
-  type: 'citizen';
-  id: number;
-  phone: string;
-}
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  next();
+});
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
-interface OfficerPayload {
-  type: 'officer';
-  id: number;
-  email: string;
-  role: string;
-  badge_number: string;
-}
+// ── Database ──────────────────────────────────────────────────────────────────
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL ||
+    'postgresql://postgres.royymgtupuecnxqhnzle:RespondPH_Pilot2025@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres',
+  ssl: { rejectUnauthorized: false },
+  max: 5,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+});
 
-// Utility functions
 function hashPin(pin: string): string {
   return crypto.createHash('sha256').update(pin).digest('hex');
 }
 
-function signCitizenToken(payload: Omit<CitizenPayload, 'type'>): string {
-  return jwt.sign({ type: 'citizen', ...payload }, JWT_SECRET, { expiresIn: '7d' });
-}
-
-function signOfficerToken(payload: Omit<OfficerPayload, 'type'>): string {
-  return jwt.sign({ type: 'officer', ...payload }, JWT_SECRET, { expiresIn: '24h' });
-}
-
-function verifyToken(token: string): CitizenPayload | OfficerPayload | null {
+let seeded = false;
+async function initDb(): Promise<void> {
+  if (seeded) return;
   try {
-    return jwt.verify(token, JWT_SECRET) as CitizenPayload | OfficerPayload;
-  } catch {
-    return null;
+    await pool.query('SELECT 1');
+    const stationResult = await pool.query(`
+      INSERT INTO stations (name, barangay, latitude, longitude, contact_number)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+      RETURNING id
+    `, ['Pasay City Police Station', 'Pasay City', 14.5378, 120.9932, '+63-2-8551-0000']);
+    const stationId = stationResult.rows[0].id;
+    await pool.query(`
+      INSERT INTO station_settings (station_id, surge_threshold, surge_window_minutes, cooldown_minutes, strike_limit)
+      VALUES ($1, 5, 2, 10, 3)
+      ON CONFLICT (station_id) DO NOTHING
+    `, [stationId]);
+    const officers = [
+      { badge: 'PNP-001', email: 'dispatcher@pasay.safesignal.ph', full_name: 'Maria Lopez', role: 'DISPATCHER' },
+      { badge: 'PNP-002', email: 'dispatcher2@pasay.safesignal.ph', full_name: 'Carlos Mendoza', role: 'DISPATCHER' },
+      { badge: 'PNP-ADM', email: 'admin@pasay.safesignal.ph', full_name: 'Chief Antonio Reyes', role: 'STATION_ADMIN' },
+    ];
+    for (const officer of officers) {
+      const existing = await pool.query('SELECT id FROM officers WHERE badge_number = $1', [officer.badge]);
+      if (existing.rows.length === 0) {
+        const passwordHash = await bcrypt.hash('password123', 10);
+        await pool.query(`
+          INSERT INTO officers (station_id, badge_number, email, full_name, role, password_hash, is_active)
+          VALUES ($1, $2, $3, $4, $5, $6, true)
+        `, [stationId, officer.badge, officer.email, officer.full_name, officer.role, passwordHash]);
+        console.log('[SafeSignal] Seeded officer:', officer.badge);
+      }
+    }
+    seeded = true;
+    console.log('[SafeSignal] initDb complete');
+  } catch (err) {
+    console.error('[SafeSignal] initDb error:', err);
   }
 }
 
-function extractToken(req: Request): string | null {
+// ── Auth ──────────────────────────────────────────────────────────────────────
+const JWT_SECRET = process.env.JWT_SECRET || 'safesignal-ph-secret-key-2024';
+
+interface CitizenPayload { type: 'citizen'; id: number; phone: string; }
+interface OfficerPayload { type: 'officer'; id: number; email: string; role: string; badge_number: string; }
+
+function signCitizenToken(p: Omit<CitizenPayload, 'type'>): string {
+  return jwt.sign({ type: 'citizen', ...p }, JWT_SECRET, { expiresIn: '7d' });
+}
+function signOfficerToken(p: Omit<OfficerPayload, 'type'>): string {
+  return jwt.sign({ type: 'officer', ...p }, JWT_SECRET, { expiresIn: '24h' });
+}
+function verifyToken(token: string): CitizenPayload | OfficerPayload | null {
+  try { return jwt.verify(token, JWT_SECRET) as any; } catch { return null; }
+}
+function extractToken(req: any): string | null {
   const auth = req.headers.authorization;
-  if (auth && auth.startsWith('Bearer ')) {
-    return auth.slice(7);
-  }
-  if (req.query?.token && typeof req.query.token === 'string') {
-    return req.query.token;
-  }
+  if (auth && auth.startsWith('Bearer ')) return auth.slice(7);
+  if (req.query?.token && typeof req.query.token === 'string') return req.query.token;
   return null;
 }
-
-// Middleware
-function requireCitizenAuth(req: Request, res: Response, next: any): void {
+function requireOfficerAuth(req: any, res: any, next: any): void {
   const token = extractToken(req);
-  if (!token) {
-    res.status(401).json({ error: 'No token provided' });
-    return;
-  }
+  if (!token) { res.status(401).json({ error: 'No token provided' }); return; }
   const payload = verifyToken(token);
-  if (!payload || payload.type !== 'citizen') {
-    res.status(401).json({ error: 'Invalid or expired token' });
-    return;
-  }
-  (req as any).citizen = payload;
+  if (!payload || payload.type !== 'officer') { res.status(401).json({ error: 'Invalid or expired token' }); return; }
+  req.officer = payload;
   next();
 }
-
-function requireOfficerAuth(req: Request, res: Response, next: any): void {
+function requireAdminAuth(req: any, res: any, next: any): void {
   const token = extractToken(req);
-  if (!token) {
-    res.status(401).json({ error: 'No token provided' });
-    return;
-  }
+  if (!token) { res.status(401).json({ error: 'No token provided' }); return; }
   const payload = verifyToken(token);
-  if (!payload || payload.type !== 'officer') {
-    res.status(401).json({ error: 'Invalid or expired token' });
-    return;
-  }
-  (req as any).officer = payload;
+  if (!payload || payload.type !== 'officer') { res.status(401).json({ error: 'Invalid or expired token' }); return; }
+  if ((payload as OfficerPayload).role !== 'STATION_ADMIN') { res.status(403).json({ error: 'Admin access required' }); return; }
+  req.officer = payload;
   next();
 }
-
-function requireAdminAuth(req: Request, res: Response, next: any): void {
+function requireCitizenAuth(req: any, res: any, next: any): void {
   const token = extractToken(req);
-  if (!token) {
-    res.status(401).json({ error: 'No token provided' });
-    return;
-  }
+  if (!token) { res.status(401).json({ error: 'No token provided' }); return; }
   const payload = verifyToken(token);
-  if (!payload || payload.type !== 'officer') {
-    res.status(401).json({ error: 'Invalid or expired token' });
-    return;
-  }
-  if ((payload as OfficerPayload).role !== 'STATION_ADMIN') {
-    res.status(403).json({ error: 'Admin access required' });
-    return;
-  }
-  (req as any).officer = payload;
+  if (!payload || payload.type !== 'citizen') { res.status(401).json({ error: 'Invalid or expired token' }); return; }
+  req.citizen = payload;
   next();
 }
 
-// Database initialization with sql.js
-async function initializeDatabase(): Promise<void> {
-  if (dbInitialized) return;
-
-  if (!SQL) {
-    SQL = await initSqlJs({ locateFile: (file: string) => `${process.cwd()}/node_modules/sql.js/dist/${file}` });
+// ── SSE ───────────────────────────────────────────────────────────────────────
+const sseClients: Map<string, any> = new Map();
+function addSSEClient(req: any, res: any): void {
+  const clientId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+  res.write(`event: connected\ndata: ${JSON.stringify({ clientId })}\n\n`);
+  sseClients.set(clientId, { id: clientId, res });
+  req.on('close', () => { sseClients.delete(clientId); });
+}
+function broadcastEvent(eventType: string, data: unknown): void {
+  const payload = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
+  const dead: string[] = [];
+  for (const [id, client] of Array.from(sseClients.entries())) {
+    try { client.res.write(payload); } catch { dead.push(id); }
   }
-
-  db = new SQL.Database();
-
-  // Create tables
-  db.run(`
-    CREATE TABLE IF NOT EXISTS stations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      barangay TEXT,
-      latitude REAL,
-      longitude REAL,
-      contact_number TEXT,
-      created_at INTEGER DEFAULT (strftime('%s', 'now'))
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS officers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      station_id INTEGER NOT NULL,
-      badge_number TEXT NOT NULL UNIQUE,
-      name TEXT NOT NULL,
-      role TEXT NOT NULL,
-      password_hash TEXT NOT NULL,
-      status TEXT DEFAULT 'ACTIVE',
-      created_at INTEGER DEFAULT (strftime('%s', 'now')),
-      FOREIGN KEY (station_id) REFERENCES stations(id)
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS citizens (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      phone_number TEXT,
-      barangay TEXT NOT NULL,
-      latitude REAL,
-      longitude REAL,
-      pin_hash TEXT NOT NULL,
-      emergency_contacts TEXT,
-      status TEXT DEFAULT 'ACTIVE',
-      created_at INTEGER DEFAULT (strftime('%s', 'now'))
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS citizen_trust_scores (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      citizen_id INTEGER NOT NULL,
-      score REAL DEFAULT 100.0,
-      false_alarm_count INTEGER DEFAULT 0,
-      verified_alert_count INTEGER DEFAULT 0,
-      last_updated INTEGER DEFAULT (strftime('%s', 'now')),
-      FOREIGN KEY (citizen_id) REFERENCES citizens(id)
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS sos_alerts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      citizen_id INTEGER NOT NULL,
-      station_id INTEGER,
-      status TEXT NOT NULL DEFAULT 'ACTIVE',
-      alert_type TEXT,
-      triggered_at INTEGER DEFAULT (strftime('%s', 'now')),
-      acknowledged_at INTEGER,
-      acknowledged_by INTEGER,
-      resolved_at INTEGER,
-      resolved_by INTEGER,
-      resolution_notes TEXT,
-      is_suspicious INTEGER DEFAULT 0,
-      created_at INTEGER DEFAULT (strftime('%s', 'now')),
-      FOREIGN KEY (citizen_id) REFERENCES citizens(id),
-      FOREIGN KEY (station_id) REFERENCES stations(id),
-      FOREIGN KEY (acknowledged_by) REFERENCES officers(id),
-      FOREIGN KEY (resolved_by) REFERENCES officers(id)
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS alert_location_history (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      alert_id INTEGER NOT NULL,
-      latitude REAL,
-      longitude REAL,
-      recorded_at INTEGER DEFAULT (strftime('%s', 'now')),
-      FOREIGN KEY (alert_id) REFERENCES sos_alerts(id)
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS station_settings (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      station_id INTEGER NOT NULL UNIQUE,
-      surge_threshold INTEGER DEFAULT 5,
-      surge_window_minutes INTEGER DEFAULT 2,
-      response_timeout_minutes INTEGER DEFAULT 15,
-      created_at INTEGER DEFAULT (strftime('%s', 'now')),
-      FOREIGN KEY (station_id) REFERENCES stations(id)
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS otp_codes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      officer_id INTEGER NOT NULL,
-      code TEXT NOT NULL,
-      expires_at INTEGER,
-      is_used INTEGER DEFAULT 0,
-      created_at INTEGER DEFAULT (strftime('%s', 'now')),
-      FOREIGN KEY (officer_id) REFERENCES officers(id)
-    )
-  `);
-
-  // Seed data
-  const stationCountResult = db.exec('SELECT COUNT(*) as count FROM stations');
-  const stationCount = stationCountResult.length > 0 && stationCountResult[0].values.length > 0
-    ? stationCountResult[0].values[0][0]
-    : 0;
-
-  if (stationCount === 0) {
-    // Create station
-    db.run(
-      'INSERT INTO stations (name, barangay, latitude, longitude, contact_number) VALUES (?, ?, ?, ?, ?)',
-      ['Pasay City Police Station', 'Pasay City', 14.5378, 120.9932, '+63-2-8551-0000']
-    );
-
-    const stationResult = db.exec("SELECT id FROM stations WHERE name = 'Pasay City Police Station'");
-    const stationId = stationResult.length > 0 ? (stationResult[0].values[0][0] as number) : 0;
-
-    // Create officers
-    const officers = [
-      { badge: 'PNP-001', name: 'Maria Lopez', role: 'DISPATCHER' },
-      { badge: 'PNP-002', name: 'Carlos Mendoza', role: 'DISPATCHER' },
-      { badge: 'PNP-ADM', name: 'Chief Antonio Reyes', role: 'STATION_ADMIN' },
-    ];
-
-    for (const officer of officers) {
-      const passwordHash = bcryptjs.hashSync('password123', 4);
-      db.run(
-        'INSERT INTO officers (station_id, badge_number, name, role, password_hash) VALUES (?, ?, ?, ?, ?)',
-        [stationId, officer.badge, officer.name, officer.role, passwordHash]
-      );
-    }
-
-    // Create citizens
-    const citizens = [
-      { name: 'Juan Dela Cruz', phone: '+63-917-1234567', barangay: 'Pasay City', lat: 14.5400, lng: 120.9950 },
-      { name: 'Maria Santos', phone: '+63-917-2345678', barangay: 'Pasay City', lat: 14.5350, lng: 120.9920 },
-      { name: 'Pedro Reyes', phone: '+63-917-3456789', barangay: 'Pasay City', lat: 14.5380, lng: 120.9900 },
-      { name: 'Ana Gonzales', phone: '+63-917-4567890', barangay: 'Pasay City', lat: 14.5420, lng: 120.9960 },
-      { name: 'Miguel Torres', phone: '+63-917-5678901', barangay: 'Pasay City', lat: 14.5360, lng: 120.9880 },
-    ];
-
-    const citizenIds: number[] = [];
-    for (const citizen of citizens) {
-      const pinHash = hashPin('1234');
-      db.run(
-        'INSERT INTO citizens (name, phone_number, barangay, latitude, longitude, pin_hash) VALUES (?, ?, ?, ?, ?, ?)',
-        [citizen.name, citizen.phone, citizen.barangay, citizen.lat, citizen.lng, pinHash]
-      );
-    }
-
-    // Get citizen IDs
-    const citizenResult = db.exec('SELECT id FROM citizens ORDER BY id');
-    if (citizenResult.length > 0) {
-      for (let i = 0; i < citizenResult[0].values.length; i++) {
-        citizenIds.push(citizenResult[0].values[i][0]);
-      }
-    }
-
-    // Create trust scores
-    for (let i = 0; i < citizenIds.length; i++) {
-      db.run(
-        'INSERT INTO citizen_trust_scores (citizen_id, score, false_alarm_count, verified_alert_count) VALUES (?, ?, ?, ?)',
-        [citizenIds[i], 95.0 - i * 5, i, 5 - i]
-      );
-    }
-
-    // Create demo alerts
-    const now = Math.floor(Date.now() / 1000);
-    const alerts = [
-      { citizenIdx: 0, status: 'ACTIVE', type: 'EMERGENCY', suspicious: 0 },
-      { citizenIdx: 1, status: 'ACKNOWLEDGED', type: 'EMERGENCY', suspicious: 0 },
-      { citizenIdx: 2, status: 'RESOLVED', type: 'EMERGENCY', suspicious: 0 },
-      { citizenIdx: 3, status: 'FALSE_ALARM', type: 'EMERGENCY', suspicious: 0 },
-      { citizenIdx: 4, status: 'ACTIVE', type: 'EMERGENCY', suspicious: 1 },
-    ];
-
-    const alertIds: number[] = [];
-    for (let i = 0; i < alerts.length; i++) {
-      const alert = alerts[i];
-      const triggeredAt = now - (300 * (i + 1));
-      if (citizenIds[alert.citizenIdx]) {
-        db.run(
-          'INSERT INTO sos_alerts (citizen_id, station_id, status, alert_type, triggered_at, is_suspicious) VALUES (?, ?, ?, ?, ?, ?)',
-          [citizenIds[alert.citizenIdx], stationId, alert.status, alert.type, triggeredAt, alert.suspicious]
-        );
-      }
-    }
-
-    // Get alert IDs
-    const alertResult = db.exec('SELECT id FROM sos_alerts ORDER BY id');
-    if (alertResult.length > 0) {
-      for (let i = 0; i < alertResult[0].values.length; i++) {
-        alertIds.push(alertResult[0].values[i][0]);
-      }
-    }
-
-    // Add location history
-    for (let i = 0; i < Math.min(alertIds.length, citizens.length); i++) {
-      const alert = alerts[i];
-      const citizen = citizens[alert.citizenIdx];
-      const triggeredAt = now - (300 * (i + 1));
-      db.run(
-        'INSERT INTO alert_location_history (alert_id, latitude, longitude, recorded_at) VALUES (?, ?, ?, ?)',
-        [alertIds[i], citizen.lat, citizen.lng, triggeredAt]
-      );
-    }
-
-    // Create station settings
-    db.run(
-      'INSERT INTO station_settings (station_id, surge_threshold, surge_window_minutes, response_timeout_minutes) VALUES (?, ?, ?, ?)',
-      [stationId, 5, 2, 15]
-    );
-  }
-
-  dbInitialized = true;
+  for (const id of dead) sseClients.delete(id);
 }
 
-// Helper function to run sql.js queries
-function dbRun(sql: string, params: any[] = []): any {
-  if (!db) return null;
-  try {
-    const stmt = db.prepare(sql);
-    if (params.length > 0) {
-      stmt.bind(params);
-    }
-    stmt.step();
-    stmt.free();
-    return { lastInsertRowid: db.getRowsModified() };
-  } catch (error) {
-    console.error('DB run error:', error, sql);
-    return null;
-  }
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const loginAttempts = new Map<string, { count: number; lockUntil: number }>();
+function recordFailedAttempt(key: string): void {
+  const current = loginAttempts.get(key) || { count: 0, lockUntil: 0 };
+  current.count += 1;
+  if (current.count >= 5) { current.lockUntil = Date.now() + 60 * 1000; current.count = 0; }
+  loginAttempts.set(key, current);
+}
+function normalizeAlert(a: any): any { const r = { ...a }; delete r.password_hash; return r; }
+function normalizeCitizen(c: any): any { const r = { ...c }; delete r.pin_hash; return r; }
+async function getFullAlert(alertId: any): Promise<any> {
+  const r = await pool.query(`SELECT a.*, c.full_name, c.phone, c.barangay, c.address, c.photo_url, c.strike_count, c.is_suspended, t.score as trust_score, t.total_alerts, t.false_alarms, t.resolved_emergencies, o.full_name as officer_name, o.badge_number as officer_badge FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id LEFT JOIN officers o ON a.assigned_officer_id = o.id WHERE a.id = $1`, [alertId]);
+  return r.rows[0] ? normalizeAlert(r.rows[0]) : null;
+}
+async function getAlertWithCitizen(alertId: any): Promise<any> {
+  const r = await pool.query(`SELECT a.*, c.full_name, c.phone, c.barangay, c.address, c.photo_url, c.strike_count, c.is_suspended, t.score as trust_score, o.full_name as officer_name, o.badge_number as officer_badge FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id LEFT JOIN officers o ON a.assigned_officer_id = o.id WHERE a.id = $1`, [alertId]);
+  return r.rows[0] || null;
 }
 
-// Helper function to execute SELECT queries
-function dbExec(sql: string, params: any[] = []): any[] {
-  if (!db) return [];
+// Cold-start init
+initDb().catch(err => console.error('[SafeSignal] Cold-start initDb error:', err));
+
+// ── Health ────────────────────────────────────────────────────────────────────
+app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: Date.now() }));
+
+// ── SSE endpoint ──────────────────────────────────────────────────────────────
+app.get('/api/dispatch/events', requireOfficerAuth, (req, res) => addSSEClient(req, res));
+
+// ─────────────────────────── DISPATCH ROUTES ─────────────────────────────────
+
+// POST /api/dispatch/login
+app.post('/api/dispatch/login', async (req: any, res: any) => {
   try {
-    const stmt = db.prepare(sql);
-    if (params.length > 0) stmt.bind(params);
-    const rows: any[] = [];
-    while (stmt.step()) {
-      rows.push(stmt.getAsObject());
+    const { email, password, badge_number } = req.body;
+    if (!email || !password || !badge_number) {
+      res.status(400).json({ error: 'email, password, and badge_number are required' }); return;
     }
-    stmt.free();
-    return rows;
-  } catch (error) {
-    console.error('DB exec error:', error);
-    return [];
-  }
-}
-
-// Initialize DB on first request
-app.use(async (req: Request, res: Response, next: any) => {
-  if (!dbInitialized) {
-    if (initializationInProgress) {
-      res.status(503).json({ error: 'Database initializing, please retry in a moment.' });
-      return;
-    }
-    initializationInProgress = true;
-    try {
-      await initializeDatabase();
-      initializationInProgress = false;
-    } catch (error) {
-      console.error('INIT_FAIL:', error instanceof Error ? error.message : String(error));
-      db = null;
-      dbInitialized = false;
-      initializationInProgress = false;
-      res.status(503).json({ error: 'Service temporarily unavailable. Please retry.' });
-      return;
-    }
-  }
-  next();
-});
-
-// CITIZEN ROUTES
-
-app.post('/api/citizen/register', async (req: Request, res: Response) => {
-  try {
-    const { full_name, phone, address, barangay, pin, photo_url } = req.body;
-
-    if (!full_name || !phone || !pin) {
-      res.status(400).json({ error: 'full_name, phone, and pin are required' });
-      return;
-    }
-
-    if (!/^09\d{9}$/.test(phone)) {
-      res.status(400).json({ error: 'Phone must be 11 digits starting with 09' });
-      return;
-    }
-
-    if (!/^\d{4}$/.test(pin)) {
-      res.status(400).json({ error: 'PIN must be 4 digits' });
-      return;
-    }
-
-    const existing = dbExec('SELECT id FROM citizens WHERE phone_number = ?', [phone]);
-    if (existing.length > 0) {
-      res.status(409).json({ error: 'Phone number already registered' });
-      return;
-    }
-
-    const pinHash = hashPin(pin);
-    dbRun(
-      'INSERT INTO citizens (name, phone_number, address, barangay, latitude, longitude, pin_hash) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [full_name, phone, address || null, barangay || null, 0, 0, pinHash]
-    );
-
-    const citizen = dbExec('SELECT id FROM citizens WHERE phone_number = ?', [phone]);
-    if (citizen.length === 0) {
-      res.status(500).json({ error: 'Failed to create citizen' });
-      return;
-    }
-
-    const citizenId = citizen[0].id;
-    dbRun('INSERT INTO citizen_trust_scores (citizen_id, score, false_alarm_count, verified_alert_count) VALUES (?, ?, ?, ?)', [citizenId, 100, 0, 0]);
-
-    res.status(201).json({ citizen_id: citizenId, message: 'Registration successful. OTP sent to your phone (demo: 123456)' });
-  } catch (error) {
-    console.error('Register handler error:', error);
-    res.status(500).json({ error: 'Failed to process registration' });
-  }
-});
-
-app.post('/api/citizen/verify-otp', (req: Request, res: Response) => {
-  try {
-    const { citizen_id, otp } = req.body;
-    if (!citizen_id || !otp) {
-      res.status(400).json({ error: 'citizen_id and otp are required' });
-      return;
-    }
-
-    if (otp !== '123456') {
-      res.status(400).json({ error: 'Invalid OTP code' });
-      return;
-    }
-
-    const citizen = dbExec('SELECT * FROM citizens WHERE id = ?', [citizen_id]);
-    if (citizen.length === 0) {
-      res.status(404).json({ error: 'Citizen not found' });
-      return;
-    }
-
-    const token = signCitizenToken({ id: citizen[0].id, phone: citizen[0].phone_number });
-    res.json({ token, citizen: { id: citizen[0].id, name: citizen[0].name, phone: citizen[0].phone_number } });
-  } catch (error) {
-    console.error('Verify OTP handler error:', error);
-    res.status(500).json({ error: 'Failed to verify OTP' });
-  }
-});
-
-app.post('/api/citizen/login', (req: Request, res: Response) => {
-  try {
-    const { phone, pin } = req.body;
-    if (!phone || !pin) {
-      res.status(400).json({ error: 'phone and pin are required' });
-      return;
-    }
-
-    const citizen = dbExec('SELECT * FROM citizens WHERE phone_number = ?', [phone]);
-    if (citizen.length === 0) {
-      res.status(401).json({ error: 'Invalid phone or PIN' });
-      return;
-    }
-
-    const pinHash = hashPin(pin);
-    if (citizen[0].pin_hash !== pinHash) {
-      res.status(401).json({ error: 'Invalid phone or PIN' });
-      return;
-    }
-
-    const token = signCitizenToken({ id: citizen[0].id, phone: citizen[0].phone_number });
-    res.json({
-      token,
-      citizen: {
-        id: citizen[0].id,
-        name: citizen[0].name,
-        phone: citizen[0].phone_number,
-        barangay: citizen[0].barangay,
-        status: citizen[0].status,
-      },
-    });
-  } catch (error) {
-    console.error('Login handler error:', error);
-    res.status(500).json({ error: 'Failed to process login' });
-  }
-});
-
-app.get('/api/citizen/profile', requireCitizenAuth, (req: Request, res: Response) => {
-  try {
-    const citizenPayload = (req as any).citizen as CitizenPayload;
-    const citizen = dbExec('SELECT * FROM citizens WHERE id = ?', [citizenPayload.id]);
-    if (citizen.length === 0) {
-      res.status(404).json({ error: 'Citizen not found' });
-      return;
-    }
-
-    const trust = dbExec('SELECT * FROM citizen_trust_scores WHERE citizen_id = ?', [citizen[0].id]);
-
-    res.json({
-      citizen: {
-        id: citizen[0].id,
-        name: citizen[0].name,
-        phone: citizen[0].phone_number,
-        barangay: citizen[0].barangay,
-        status: citizen[0].status,
-        trust: trust.length > 0 ? { score: trust[0].score, false_alarms: trust[0].false_alarm_count, verified_alerts: trust[0].verified_alert_count } : { score: 100, false_alarms: 0, verified_alerts: 0 },
-      },
-    });
-  } catch (error) {
-    console.error('Profile handler error:', error);
-    res.status(500).json({ error: 'Failed to fetch profile' });
-  }
-});
-
-app.put('/api/citizen/profile', requireCitizenAuth, (req: Request, res: Response) => {
-  try {
-    const citizenPayload = (req as any).citizen as CitizenPayload;
-    const { name, address, barangay } = req.body;
-    dbRun('UPDATE citizens SET name = COALESCE(?, name), barangay = COALESCE(?, barangay) WHERE id = ?', [name || null, barangay || null, citizenPayload.id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Update profile handler error:', error);
-    res.status(500).json({ error: 'Failed to update profile' });
-  }
-});
-
-app.post('/api/citizen/verify-pin', requireCitizenAuth, (req: Request, res: Response) => {
-  try {
-    const citizenPayload = (req as any).citizen as CitizenPayload;
-    const { pin } = req.body;
-    if (!pin) {
-      res.status(400).json({ error: 'pin is required' });
-      return;
-    }
-
-    const citizen = dbExec('SELECT pin_hash FROM citizens WHERE id = ?', [citizenPayload.id]);
-    const pinHash = hashPin(pin);
-    res.json({ valid: citizen.length > 0 && citizen[0].pin_hash === pinHash });
-  } catch (error) {
-    console.error('Verify PIN handler error:', error);
-    res.status(500).json({ error: 'Failed to verify PIN' });
-  }
-});
-
-app.post('/api/citizen/sos', requireCitizenAuth, (req: Request, res: Response) => {
-  try {
-    const citizenPayload = (req as any).citizen as CitizenPayload;
-    const { lat, lng, pin } = req.body;
-
-    if (!lat || !lng || !pin) {
-      res.status(400).json({ error: 'lat, lng, and pin are required' });
-      return;
-    }
-
-    const citizen = dbExec('SELECT * FROM citizens WHERE id = ?', [citizenPayload.id]);
-    if (citizen.length === 0) {
-      res.status(404).json({ error: 'Citizen not found' });
-      return;
-    }
-
-    const pinHash = hashPin(pin);
-    if (citizen[0].pin_hash !== pinHash) {
-      res.status(401).json({ error: 'Invalid PIN' });
-      return;
-    }
-
-    // Check for existing active alert
-    const activeAlert = dbExec('SELECT id FROM sos_alerts WHERE citizen_id = ? AND status IN (?, ?)', [citizenPayload.id, 'ACTIVE', 'ACKNOWLEDGED']);
-    if (activeAlert.length > 0) {
-      res.status(409).json({ error: 'You already have an active alert', alert_id: activeAlert[0].id });
-      return;
-    }
-
-    const now = Math.floor(Date.now() / 1000);
-    const station = dbExec('SELECT id FROM stations LIMIT 1');
-    const stationId = station.length > 0 ? station[0].id : 1;
-
-    dbRun('INSERT INTO sos_alerts (citizen_id, station_id, status, triggered_at) VALUES (?, ?, ?, ?)', [citizenPayload.id, stationId, 'ACTIVE', now]);
-
-    const alert = dbExec('SELECT id FROM sos_alerts WHERE citizen_id = ? AND status = ? ORDER BY id DESC LIMIT 1', [citizenPayload.id, 'ACTIVE']);
-    if (alert.length === 0) {
-      res.status(500).json({ error: 'Failed to create alert' });
-      return;
-    }
-
-    const alertId = alert[0].id;
-    dbRun('INSERT INTO alert_location_history (alert_id, latitude, longitude, recorded_at) VALUES (?, ?, ?, ?)', [alertId, lat, lng, now]);
-    dbRun('UPDATE citizen_trust_scores SET verified_alert_count = verified_alert_count + 1 WHERE citizen_id = ?', [citizenPayload.id]);
-
-    res.status(201).json({ alert: { id: alertId, status: 'ACTIVE', triggered_at: now } });
-  } catch (error) {
-    console.error('SOS handler error:', error);
-    res.status(500).json({ error: 'Failed to process SOS request' });
-  }
-});
-
-app.get('/api/citizen/active-alert', requireCitizenAuth, (req: Request, res: Response) => {
-  try {
-    const citizenPayload = (req as any).citizen as CitizenPayload;
-    const alert = dbExec('SELECT * FROM sos_alerts WHERE citizen_id = ? AND status IN (?, ?) ORDER BY triggered_at DESC LIMIT 1', [citizenPayload.id, 'ACTIVE', 'ACKNOWLEDGED']);
-
-    if (alert.length === 0) {
-      res.json({ alert: null });
-      return;
-    }
-
-    const locationHistory = dbExec('SELECT latitude, longitude, recorded_at FROM alert_location_history WHERE alert_id = ? ORDER BY recorded_at ASC', [alert[0].id]);
-    const latestLoc = locationHistory[locationHistory.length - 1];
-
-    res.json({
-      alert: {
-        ...alert[0],
-        lat: latestLoc?.latitude ?? null,
-        lng: latestLoc?.longitude ?? null,
-        triggered_at: alert[0].triggered_at && alert[0].triggered_at < 1e10 ? alert[0].triggered_at * 1000 : alert[0].triggered_at,
-        location_history: locationHistory.map((loc: any) => ({ lat: loc.latitude, lng: loc.longitude, recorded_at: loc.recorded_at * 1000 })),
-      },
-    });
-  } catch (error) {
-    console.error('Active alert handler error:', error);
-    res.status(500).json({ error: 'Failed to fetch active alert' });
-  }
-});
-
-app.post('/api/citizen/sos/cancel', requireCitizenAuth, (req: Request, res: Response) => {
-  try {
-    const citizenPayload = (req as any).citizen as CitizenPayload;
-    const { reason } = req.body;
-
-    const alert = dbExec('SELECT * FROM sos_alerts WHERE citizen_id = ? AND status IN (?, ?) ORDER BY triggered_at DESC LIMIT 1', [citizenPayload.id, 'ACTIVE', 'ACKNOWLEDGED']);
-    if (alert.length === 0) {
-      res.status(404).json({ error: 'No active alert found' });
-      return;
-    }
-
-    const now = Math.floor(Date.now() / 1000);
-    dbRun('UPDATE sos_alerts SET status = ? WHERE id = ?', ['CANCELLED', alert[0].id]);
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Cancel SOS handler error:', error);
-    res.status(500).json({ error: 'Failed to cancel SOS' });
-  }
-});
-
-app.post('/api/citizen/location-update', requireCitizenAuth, (req: Request, res: Response) => {
-  try {
-    const citizenPayload = (req as any).citizen as CitizenPayload;
-    const { lat, lng } = req.body;
-    if (!lat || !lng) {
-      res.status(400).json({ error: 'lat and lng are required' });
-      return;
-    }
-
-    const alert = dbExec('SELECT id FROM sos_alerts WHERE citizen_id = ? AND status IN (?, ?) ORDER BY triggered_at DESC LIMIT 1', [citizenPayload.id, 'ACTIVE', 'ACKNOWLEDGED']);
-    if (alert.length === 0) {
-      res.json({ success: false, message: 'No active alert' });
-      return;
-    }
-
-    const now = Math.floor(Date.now() / 1000);
-    dbRun('INSERT INTO alert_location_history (alert_id, latitude, longitude, recorded_at) VALUES (?, ?, ?, ?)', [alert[0].id, lat, lng, now]);
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Location update handler error:', error);
-    res.status(500).json({ error: 'Failed to update location' });
-  }
-});
-
-app.get('/api/citizen/alerts', requireCitizenAuth, (req: Request, res: Response) => {
-  try {
-    const citizenPayload = (req as any).citizen as CitizenPayload;
-    const alerts = dbExec('SELECT * FROM sos_alerts WHERE citizen_id = ? ORDER BY triggered_at DESC', [citizenPayload.id]);
-    res.json({ alerts });
-  } catch (error) {
-    console.error('Alerts history handler error:', error);
-    res.status(500).json({ error: 'Failed to fetch alerts' });
-  }
-});
-
-app.post('/api/citizen/resend-otp', (req: Request, res: Response) => {
-  try {
-    const { citizen_id } = req.body;
-    if (!citizen_id) {
-      res.status(400).json({ error: 'citizen_id is required' });
-      return;
-    }
-    res.json({ message: 'OTP resent (demo: 123456)' });
-  } catch (error) {
-    console.error('Resend OTP handler error:', error);
-    res.status(500).json({ error: 'Failed to resend OTP' });
-  }
-});
-
-// DISPATCH ROUTES
-
-app.post('/api/dispatch/login', async (req: Request, res: Response) => {
-  try {
-    const { badge_number, password } = req.body;
-    if (!badge_number || !password) {
-      res.status(400).json({ error: 'badge_number and password are required' });
-      return;
-    }
-
-    const attemptKey = badge_number.toLowerCase();
+    const attemptKey = email.toLowerCase();
     const attempts = loginAttempts.get(attemptKey);
     if (attempts && attempts.lockUntil > Date.now()) {
       const remaining = Math.ceil((attempts.lockUntil - Date.now()) / 1000);
-      res.status(429).json({ error: `Too many attempts. Try again in ${remaining} seconds.` });
-      return;
+      res.status(429).json({ error: `Too many attempts. Try again in ${remaining} seconds.` }); return;
     }
-
-    const officer = dbExec('SELECT * FROM officers WHERE badge_number = ?', [badge_number]);
-    if (officer.length === 0) {
-      recordFailedAttempt(loginAttempts, attemptKey);
-      res.status(401).json({ error: 'Invalid credentials' });
-      return;
-    }
-
-    const valid = await bcryptjs.compare(password, officer[0].password_hash);
-    if (!valid) {
-      recordFailedAttempt(loginAttempts, attemptKey);
-      res.status(401).json({ error: 'Invalid credentials' });
-      return;
-    }
-
+    const or = await pool.query(
+      `SELECT * FROM officers WHERE email = $1 AND badge_number = $2 AND is_active = true`,
+      [email, badge_number]
+    );
+    const officer = or.rows[0];
+    if (!officer) { recordFailedAttempt(attemptKey); res.status(401).json({ error: 'Invalid credentials' }); return; }
+    const valid = await bcrypt.compare(password, officer.password_hash);
+    if (!valid) { recordFailedAttempt(attemptKey); res.status(401).json({ error: 'Invalid credentials' }); return; }
     loginAttempts.delete(attemptKey);
-
-    const token = signOfficerToken({
-      id: officer[0].id,
-      email: officer[0].name,
-      role: officer[0].role,
-      badge_number: officer[0].badge_number,
-    });
-
-    const station = dbExec('SELECT * FROM stations WHERE id = ?', [officer[0].station_id]);
-
-    res.json({
-      token,
-      officer: {
-        id: officer[0].id,
-        name: officer[0].name,
-        badge_number: officer[0].badge_number,
-        role: officer[0].role,
-        station: station.length > 0 ? station[0] : {},
-      },
-    });
-  } catch (error) {
-    console.error('Login handler error:', error);
-    res.status(500).json({ error: 'Failed to process login' });
-  }
+    await pool.query('UPDATE officers SET last_login = $1 WHERE id = $2', [Date.now(), officer.id]);
+    const token = signOfficerToken({ id: officer.id, email: officer.email, role: officer.role, badge_number: officer.badge_number });
+    const stationResult = await pool.query('SELECT * FROM stations WHERE id = $1', [officer.station_id]);
+    res.json({ token, officer: { id: officer.id, full_name: officer.full_name, badge_number: officer.badge_number, role: officer.role, email: officer.email, station: stationResult.rows[0] } });
+  } catch (error) { console.error('Login error:', error); res.status(500).json({ error: 'Failed to process login' }); }
 });
 
-function recordFailedAttempt(map: Map<string, { count: number; lockUntil: number }>, key: string): void {
-  const current = map.get(key) || { count: 0, lockUntil: 0 };
-  current.count += 1;
-  if (current.count >= 5) {
-    current.lockUntil = Date.now() + 60 * 1000;
-    current.count = 0;
-  }
-  map.set(key, current);
-}
-
-app.get('/api/dispatch/alerts', requireOfficerAuth, (req: Request, res: Response) => {
+// GET /api/dispatch/alerts
+app.get('/api/dispatch/alerts', requireOfficerAuth, async (req: any, res: any) => {
   try {
     const { status } = req.query;
-    let query = `
-      SELECT a.*, c.name as full_name, c.phone_number as phone, c.barangay,
-      t.score as trust_score,
-      (SELECT lh.latitude FROM alert_location_history lh WHERE lh.alert_id = a.id ORDER BY lh.recorded_at DESC LIMIT 1) as lat,
-      (SELECT lh.longitude FROM alert_location_history lh WHERE lh.alert_id = a.id ORDER BY lh.recorded_at DESC LIMIT 1) as lng
-      FROM sos_alerts a
-      JOIN citizens c ON a.citizen_id = c.id
-      LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id
-    `;
+    let query = `SELECT a.*, c.full_name, c.phone, c.barangay, c.address, c.photo_url, c.strike_count, c.is_suspended, t.score as trust_score, o.full_name as officer_name, o.badge_number as officer_badge FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id LEFT JOIN officers o ON a.assigned_officer_id = o.id`;
     const params: any[] = [];
-
-    if (status) {
-      query += ' WHERE a.status = ?';
-      params.push(status);
-    }
+    if (status) { query += ' WHERE a.status = $1'; params.push(status); }
     query += ' ORDER BY a.triggered_at DESC';
-
-    const alerts = dbExec(query, params);
-    // Normalize triggered_at to milliseconds for client consistency
-    const normalized = alerts.map((a: any) => ({
-      ...a,
-      triggered_at: a.triggered_at && a.triggered_at < 1e10 ? a.triggered_at * 1000 : a.triggered_at,
-    }));
-    res.json({ alerts: normalized });
-  } catch (error) {
-    console.error('Get alerts handler error:', error);
-    res.status(500).json({ error: 'Failed to fetch alerts' });
-  }
+    const result = await pool.query(query, params);
+    res.json({ alerts: result.rows.map(normalizeAlert) });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch alerts' }); }
 });
 
-app.get('/api/dispatch/alerts/:id', requireOfficerAuth, (req: Request, res: Response) => {
+// GET /api/dispatch/alerts/export
+app.get('/api/dispatch/alerts/export', requireOfficerAuth, async (_req: any, res: any) => {
   try {
-    const alert = dbExec(
-      `SELECT a.*, c.name as full_name, c.phone_number as phone, c.barangay,
-       t.score as trust_score FROM sos_alerts a
-       JOIN citizens c ON a.citizen_id = c.id
-       LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id
-       WHERE a.id = ?`,
-      [req.params.id]
-    );
-
-    if (alert.length === 0) {
-      res.status(404).json({ error: 'Alert not found' });
-      return;
-    }
-
-    const locationHistory = dbExec('SELECT latitude, longitude, recorded_at FROM alert_location_history WHERE alert_id = ? ORDER BY recorded_at ASC', [alert[0].id]);
-    const latestLoc = locationHistory[locationHistory.length - 1];
-
-    res.json({
-      alert: {
-        ...alert[0],
-        full_name: alert[0].full_name,
-        phone: alert[0].phone,
-        lat: latestLoc?.latitude ?? null,
-        lng: latestLoc?.longitude ?? null,
-        triggered_at: alert[0].triggered_at && alert[0].triggered_at < 1e10 ? alert[0].triggered_at * 1000 : alert[0].triggered_at,
-        location_history: locationHistory.map((loc: any) => ({ lat: loc.latitude, lng: loc.longitude, recorded_at: loc.recorded_at * 1000 })),
-      },
-    });
-  } catch (error) {
-    console.error('Get alert detail handler error:', error);
-    res.status(500).json({ error: 'Failed to fetch alert details' });
-  }
+    const result = await pool.query(`SELECT a.id, c.full_name, c.phone, c.barangay, a.status, a.triggered_at, a.acknowledged_at, a.resolved_at, a.cancelled_at, a.lat, a.lng, a.notes, a.cancellation_reason, o.full_name as officer_name, o.badge_number as officer_badge, t.score as trust_score FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id LEFT JOIN officers o ON a.assigned_officer_id = o.id WHERE a.status IN ('RESOLVED','CANCELLED','FALSE_ALARM') ORDER BY a.triggered_at DESC`);
+    const headers = ['ID','Citizen','Phone','Barangay','Status','Triggered','Acknowledged','Resolved','Cancelled','Lat','Lng','Officer','Badge','Trust Score','Notes'];
+    const rows = result.rows.map((a: any) => [a.id, a.full_name, a.phone, a.barangay, a.status, a.triggered_at ? new Date(a.triggered_at).toISOString() : '', a.acknowledged_at ? new Date(a.acknowledged_at).toISOString() : '', a.resolved_at ? new Date(a.resolved_at).toISOString() : '', a.cancelled_at ? new Date(a.cancelled_at).toISOString() : '', a.lat, a.lng, a.officer_name || '', a.officer_badge || '', a.trust_score || '', (a.notes || a.cancellation_reason || '').replace(/,/g, ';')]);
+    const csv = [headers, ...rows].map((r: any[]) => r.join(',')).join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="safesignal-alerts.csv"');
+    res.send(csv);
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to export alerts' }); }
 });
 
-app.post('/api/dispatch/alerts/:id/acknowledge', requireOfficerAuth, (req: Request, res: Response) => {
+// GET /api/dispatch/alerts/:id
+app.get('/api/dispatch/alerts/:id', requireOfficerAuth, async (req: any, res: any) => {
   try {
-    const officerPayload = (req as any).officer as OfficerPayload;
-    const alert = dbExec('SELECT * FROM sos_alerts WHERE id = ?', [req.params.id]);
-
-    if (alert.length === 0) {
-      res.status(404).json({ error: 'Alert not found' });
-      return;
-    }
-
-    if (alert[0].status !== 'ACTIVE') {
-      res.status(400).json({ error: 'Alert is not in ACTIVE status' });
-      return;
-    }
-
-    const now = Math.floor(Date.now() / 1000);
-    dbRun('UPDATE sos_alerts SET status = ?, acknowledged_at = ?, acknowledged_by = ? WHERE id = ?', ['ACKNOWLEDGED', now, officerPayload.id, alert[0].id]);
-
-    const updated = dbExec('SELECT * FROM sos_alerts WHERE id = ?', [alert[0].id]);
-    res.json({ alert: updated.length > 0 ? updated[0] : {} });
-  } catch (error) {
-    console.error('Acknowledge handler error:', error);
-    res.status(500).json({ error: 'Failed to acknowledge alert' });
-  }
+    const alertResult = await pool.query(`SELECT a.*, c.full_name, c.phone, c.barangay, c.address, c.photo_url, c.strike_count, c.is_suspended, t.score as trust_score, t.total_alerts, t.false_alarms, t.resolved_emergencies, o.full_name as officer_name, o.badge_number as officer_badge FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id LEFT JOIN officers o ON a.assigned_officer_id = o.id WHERE a.id = $1`, [req.params.id]);
+    const alert = alertResult.rows[0];
+    if (!alert) { res.status(404).json({ error: 'Alert not found' }); return; }
+    const locResult = await pool.query(`SELECT lat, lng, recorded_at FROM alert_location_history WHERE alert_id = $1 ORDER BY recorded_at ASC`, [alert.id]);
+    res.json({ alert: { ...normalizeAlert(alert), location_history: locResult.rows } });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch alert details' }); }
 });
 
-app.post('/api/dispatch/alerts/:id/resolve', requireOfficerAuth, (req: Request, res: Response) => {
+// POST /api/dispatch/alerts/:id/acknowledge
+app.post('/api/dispatch/alerts/:id/acknowledge', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const officerPayload = req.officer as OfficerPayload;
+    const alertResult = await pool.query('SELECT * FROM sos_alerts WHERE id = $1', [req.params.id]);
+    const alert = alertResult.rows[0];
+    if (!alert) { res.status(404).json({ error: 'Alert not found' }); return; }
+    if (alert.status !== 'ACTIVE') { res.status(400).json({ error: 'Alert is not in ACTIVE status' }); return; }
+    const now = Date.now();
+    await pool.query(`UPDATE sos_alerts SET status = 'ACKNOWLEDGED', acknowledged_at = $1, assigned_officer_id = $2 WHERE id = $3`, [now, officerPayload.id, alert.id]);
+    const updated = await getFullAlert(alert.id);
+    broadcastEvent('alert_updated', { alert: updated });
+    res.json({ alert: updated });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to acknowledge alert' }); }
+});
+
+// POST /api/dispatch/alerts/:id/resolve
+app.post('/api/dispatch/alerts/:id/resolve', requireOfficerAuth, async (req: any, res: any) => {
   try {
     const { notes } = req.body;
-    const alert = dbExec('SELECT * FROM sos_alerts WHERE id = ?', [req.params.id]);
-
-    if (alert.length === 0) {
-      res.status(404).json({ error: 'Alert not found' });
-      return;
-    }
-
-    if (!['ACTIVE', 'ACKNOWLEDGED'].includes(alert[0].status)) {
-      res.status(400).json({ error: 'Alert cannot be resolved in current status' });
-      return;
-    }
-
-    const now = Math.floor(Date.now() / 1000);
-    dbRun('UPDATE sos_alerts SET status = ?, resolved_at = ?, resolution_notes = ? WHERE id = ?', ['RESOLVED', now, notes || null, alert[0].id]);
-
-    const trust = dbExec('SELECT score FROM citizen_trust_scores WHERE citizen_id = ?', [alert[0].citizen_id]);
-    const newScore = Math.min(100, (trust.length > 0 ? trust[0].score : 100) + 10);
-    dbRun('UPDATE citizen_trust_scores SET score = ?, verified_alert_count = verified_alert_count + 1 WHERE citizen_id = ?', [newScore, alert[0].citizen_id]);
-
-    const updated = dbExec('SELECT * FROM sos_alerts WHERE id = ?', [alert[0].id]);
-    res.json({ alert: updated.length > 0 ? updated[0] : {} });
-  } catch (error) {
-    console.error('Resolve handler error:', error);
-    res.status(500).json({ error: 'Failed to resolve alert' });
-  }
+    const alertResult = await pool.query('SELECT * FROM sos_alerts WHERE id = $1', [req.params.id]);
+    const alert = alertResult.rows[0];
+    if (!alert) { res.status(404).json({ error: 'Alert not found' }); return; }
+    if (!['ACTIVE', 'ACKNOWLEDGED'].includes(alert.status)) { res.status(400).json({ error: 'Alert cannot be resolved in current status' }); return; }
+    const now = Date.now();
+    await pool.query(`UPDATE sos_alerts SET status = 'RESOLVED', resolved_at = $1, notes = $2 WHERE id = $3`, [now, notes || null, alert.id]);
+    const trustResult = await pool.query('SELECT score FROM citizen_trust_scores WHERE citizen_id = $1', [alert.citizen_id]);
+    const newScore = Math.min(100, (trustResult.rows[0]?.score || 100) + 10);
+    await pool.query(`UPDATE citizen_trust_scores SET score = $1, resolved_emergencies = resolved_emergencies + 1, last_updated = $2 WHERE citizen_id = $3`, [newScore, now, alert.citizen_id]);
+    const updated = await getFullAlert(alert.id);
+    broadcastEvent('alert_updated', { alert: updated });
+    res.json({ alert: updated });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to resolve alert' }); }
 });
 
-app.post('/api/dispatch/alerts/:id/false-alarm', requireOfficerAuth, (req: Request, res: Response) => {
+// POST /api/dispatch/alerts/:id/false-alarm
+app.post('/api/dispatch/alerts/:id/false-alarm', requireOfficerAuth, async (req: any, res: any) => {
   try {
     const { notes } = req.body;
-    const alert = dbExec('SELECT * FROM sos_alerts WHERE id = ?', [req.params.id]);
-
-    if (alert.length === 0) {
-      res.status(404).json({ error: 'Alert not found' });
-      return;
-    }
-
-    const now = Math.floor(Date.now() / 1000);
-    dbRun('UPDATE sos_alerts SET status = ?, resolved_at = ?, resolution_notes = ? WHERE id = ?', ['FALSE_ALARM', now, notes || null, alert[0].id]);
-
-    const trust = dbExec('SELECT score FROM citizen_trust_scores WHERE citizen_id = ?', [alert[0].citizen_id]);
-    const newScore = Math.max(0, (trust.length > 0 ? trust[0].score : 100) - 15);
-    dbRun('UPDATE citizen_trust_scores SET score = ?, false_alarm_count = false_alarm_count + 1 WHERE citizen_id = ?', [newScore, alert[0].citizen_id]);
-
-    const updated = dbExec('SELECT * FROM sos_alerts WHERE id = ?', [alert[0].id]);
-    res.json({ alert: updated.length > 0 ? updated[0] : {} });
-  } catch (error) {
-    console.error('False alarm handler error:', error);
-    res.status(500).json({ error: 'Failed to mark false alarm' });
-  }
+    const alertResult = await pool.query('SELECT * FROM sos_alerts WHERE id = $1', [req.params.id]);
+    const alert = alertResult.rows[0];
+    if (!alert) { res.status(404).json({ error: 'Alert not found' }); return; }
+    const now = Date.now();
+    await pool.query(`UPDATE sos_alerts SET status = 'FALSE_ALARM', cancelled_at = $1, notes = $2 WHERE id = $3`, [now, notes || null, alert.id]);
+    const citizenResult = await pool.query('SELECT * FROM citizens WHERE id = $1', [alert.citizen_id]);
+    const citizen = citizenResult.rows[0];
+    const settingsResult = await pool.query('SELECT * FROM station_settings LIMIT 1');
+    const settings = settingsResult.rows[0];
+    const strikeLimit = settings?.strike_limit || 3;
+    const newStrikes = (citizen.strike_count || 0) + 1;
+    let isSuspended = citizen.is_suspended;
+    let suspensionReason = citizen.suspension_reason;
+    if (newStrikes >= strikeLimit) { isSuspended = true; suspensionReason = `Auto-suspended after ${newStrikes} false alarms`; }
+    await pool.query(`UPDATE citizens SET strike_count = $1, is_suspended = $2, suspension_reason = $3 WHERE id = $4`, [newStrikes, isSuspended, suspensionReason, alert.citizen_id]);
+    const trustResult = await pool.query('SELECT score FROM citizen_trust_scores WHERE citizen_id = $1', [alert.citizen_id]);
+    const newScore = Math.max(0, (trustResult.rows[0]?.score || 100) - 15);
+    await pool.query(`UPDATE citizen_trust_scores SET score = $1, false_alarms = false_alarms + 1, last_updated = $2 WHERE citizen_id = $3`, [newScore, now, alert.citizen_id]);
+    const updated = await getFullAlert(alert.id);
+    broadcastEvent('alert_updated', { alert: updated });
+    res.json({ alert: updated });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to mark false alarm' }); }
 });
 
-app.post('/api/dispatch/alerts/:id/suspicious', requireOfficerAuth, (req: Request, res: Response) => {
+// POST /api/dispatch/alerts/:id/suspicious
+app.post('/api/dispatch/alerts/:id/suspicious', requireOfficerAuth, async (req: any, res: any) => {
   try {
     const { reason } = req.body;
-    const alert = dbExec('SELECT * FROM sos_alerts WHERE id = ?', [req.params.id]);
-
-    if (alert.length === 0) {
-      res.status(404).json({ error: 'Alert not found' });
-      return;
-    }
-
-    dbRun('UPDATE sos_alerts SET is_suspicious = ? WHERE id = ?', [1, alert[0].id]);
-
-    const updated = dbExec('SELECT * FROM sos_alerts WHERE id = ?', [alert[0].id]);
-    res.json({ alert: updated.length > 0 ? updated[0] : {} });
-  } catch (error) {
-    console.error('Suspicious handler error:', error);
-    res.status(500).json({ error: 'Failed to flag alert' });
-  }
+    const alertResult = await pool.query('SELECT * FROM sos_alerts WHERE id = $1', [req.params.id]);
+    const alert = alertResult.rows[0];
+    if (!alert) { res.status(404).json({ error: 'Alert not found' }); return; }
+    await pool.query(`UPDATE sos_alerts SET is_suspicious = true, suspicious_reason = $1 WHERE id = $2`, [reason || 'Flagged by dispatcher', alert.id]);
+    const updated = await getFullAlert(alert.id);
+    broadcastEvent('alert_updated', { alert: updated });
+    res.json({ alert: updated });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to flag alert' }); }
 });
 
-app.get('/api/dispatch/citizens', requireOfficerAuth, (req: Request, res: Response) => {
+// GET /api/dispatch/citizens
+app.get('/api/dispatch/citizens', requireOfficerAuth, async (req: any, res: any) => {
   try {
-    const { search } = req.query;
-    let query = `
-      SELECT c.*, t.score as trust_score, t.false_alarm_count, t.verified_alert_count
-      FROM citizens c
-      LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id
-      WHERE 1=1
-    `;
+    const { search, filter } = req.query;
+    let query = `SELECT c.*, t.score as trust_score, t.total_alerts, t.false_alarms, t.resolved_emergencies FROM citizens c LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id WHERE 1=1`;
     const params: any[] = [];
+    let paramIdx = 1;
+    if (search) { query += ` AND (c.full_name ILIKE $${paramIdx} OR c.phone ILIKE $${paramIdx + 1})`; params.push(`%${search}%`, `%${search}%`); paramIdx += 2; }
+    if (filter === 'suspended') { query += ` AND c.is_suspended = true`; }
+    else if (filter === 'active') { query += ` AND c.is_suspended = false`; }
+    query += ' ORDER BY c.registered_at DESC';
+    const result = await pool.query(query, params);
+    res.json({ citizens: result.rows.map(normalizeCitizen) });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch citizens' }); }
+});
 
-    if (search) {
-      query += ' AND (c.name LIKE ? OR c.phone_number LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
-    }
-    query += ' ORDER BY c.created_at DESC';
+// GET /api/dispatch/citizens/:id
+app.get('/api/dispatch/citizens/:id', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const citizenResult = await pool.query(`SELECT c.*, t.score as trust_score, t.total_alerts, t.false_alarms, t.resolved_emergencies FROM citizens c LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id WHERE c.id = $1`, [req.params.id]);
+    const citizen = citizenResult.rows[0];
+    if (!citizen) { res.status(404).json({ error: 'Citizen not found' }); return; }
+    const alertsResult = await pool.query(`SELECT * FROM sos_alerts WHERE citizen_id = $1 ORDER BY triggered_at DESC`, [citizen.id]);
+    res.json({ citizen: normalizeCitizen(citizen), alerts: alertsResult.rows.map(normalizeAlert) });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch citizen details' }); }
+});
 
-    const citizens = dbExec(query, params);
-    res.json({ citizens });
-  } catch (error) {
-    console.error('Get citizens handler error:', error);
-    res.status(500).json({ error: 'Failed to fetch citizens' });
+// POST /api/dispatch/citizens/:id/suspend
+app.post('/api/dispatch/citizens/:id/suspend', requireOfficerAuth, async (req: any, res: any) => {
+  try { const { reason } = req.body; await pool.query(`UPDATE citizens SET is_suspended = true, suspension_reason = $1 WHERE id = $2`, [reason || 'Suspended by dispatcher', req.params.id]); res.json({ success: true }); }
+  catch (error) { console.error(error); res.status(500).json({ error: 'Failed to suspend citizen' }); }
+});
+
+// POST /api/dispatch/citizens/:id/unsuspend
+app.post('/api/dispatch/citizens/:id/unsuspend', requireOfficerAuth, async (req: any, res: any) => {
+  try { await pool.query(`UPDATE citizens SET is_suspended = false, suspension_reason = NULL WHERE id = $1`, [req.params.id]); res.json({ success: true }); }
+  catch (error) { console.error(error); res.status(500).json({ error: 'Failed to unsuspend citizen' }); }
+});
+
+// POST /api/dispatch/citizens/:id/reset-strikes
+app.post('/api/dispatch/citizens/:id/reset-strikes', requireOfficerAuth, async (req: any, res: any) => {
+  try { await pool.query('UPDATE citizens SET strike_count = 0 WHERE id = $1', [req.params.id]); res.json({ success: true }); }
+  catch (error) { console.error(error); res.status(500).json({ error: 'Failed to reset strikes' }); }
+});
+
+// GET /api/dispatch/officers
+app.get('/api/dispatch/officers', requireOfficerAuth, async (_req: any, res: any) => {
+  try {
+    const result = await pool.query(`SELECT o.*, s.name as station_name FROM officers o LEFT JOIN stations s ON o.station_id = s.id ORDER BY o.created_at DESC`);
+    res.json({ officers: result.rows.map((o: any) => { const r = { ...o }; delete r.password_hash; return r; }) });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch officers' }); }
+});
+
+// POST /api/dispatch/officers
+app.post('/api/dispatch/officers', requireAdminAuth, async (req: any, res: any) => {
+  try {
+    const { full_name, email, badge_number, password, role } = req.body;
+    if (!full_name || !email || !badge_number || !password || !role) { res.status(400).json({ error: 'All fields are required' }); return; }
+    const stationResult = await pool.query('SELECT id FROM stations LIMIT 1');
+    const passwordHash = await bcrypt.hash(password, 10);
+    const result = await pool.query(`INSERT INTO officers (full_name, email, badge_number, station_id, role, password_hash, is_active) VALUES ($1, $2, $3, $4, $5, $6, true) RETURNING id`, [full_name, email, badge_number, stationResult.rows[0].id, role, passwordHash]);
+    res.status(201).json({ officer: { id: result.rows[0].id, full_name, email, badge_number, role } });
+  } catch (err: any) {
+    if (err.code === '23505') { res.status(409).json({ error: 'Email or badge number already exists' }); }
+    else { console.error(err); res.status(500).json({ error: 'Failed to create officer' }); }
   }
 });
 
-app.get('/api/dispatch/citizens/:id', requireOfficerAuth, (req: Request, res: Response) => {
+// POST /api/dispatch/officers/:id/toggle-active
+app.post('/api/dispatch/officers/:id/toggle-active', requireAdminAuth, async (req: any, res: any) => {
   try {
-    const citizen = dbExec(`
-      SELECT c.*, t.score as trust_score, t.false_alarm_count, t.verified_alert_count
-      FROM citizens c
-      LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id
-      WHERE c.id = ?
-    `, [req.params.id]);
-
-    if (citizen.length === 0) {
-      res.status(404).json({ error: 'Citizen not found' });
-      return;
-    }
-
-    const alerts = dbExec('SELECT * FROM sos_alerts WHERE citizen_id = ? ORDER BY triggered_at DESC', [citizen[0].id]);
-
-    res.json({ citizen: citizen[0], alerts });
-  } catch (error) {
-    console.error('Get citizen detail handler error:', error);
-    res.status(500).json({ error: 'Failed to fetch citizen details' });
-  }
+    const officerPayload = req.officer as OfficerPayload;
+    const officerResult = await pool.query('SELECT * FROM officers WHERE id = $1', [req.params.id]);
+    const officer = officerResult.rows[0];
+    if (!officer) { res.status(404).json({ error: 'Officer not found' }); return; }
+    if (officer.id === officerPayload.id) { res.status(400).json({ error: 'Cannot deactivate yourself' }); return; }
+    await pool.query('UPDATE officers SET is_active = $1 WHERE id = $2', [!officer.is_active, officer.id]);
+    res.json({ success: true, is_active: !officer.is_active });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to toggle officer status' }); }
 });
 
-app.post('/api/dispatch/citizens/:id/suspend', requireOfficerAuth, (req: Request, res: Response) => {
+// GET /api/dispatch/stats
+app.get('/api/dispatch/stats', requireOfficerAuth, async (_req: any, res: any) => {
   try {
-    const { reason } = req.body;
-    dbRun('UPDATE citizens SET status = ? WHERE id = ?', ['SUSPENDED', req.params.id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Suspend citizen handler error:', error);
-    res.status(500).json({ error: 'Failed to suspend citizen' });
-  }
-});
-
-app.post('/api/dispatch/citizens/:id/unsuspend', requireOfficerAuth, (req: Request, res: Response) => {
-  try {
-    dbRun('UPDATE citizens SET status = ? WHERE id = ?', ['ACTIVE', req.params.id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Unsuspend citizen handler error:', error);
-    res.status(500).json({ error: 'Failed to unsuspend citizen' });
-  }
-});
-
-app.post('/api/dispatch/citizens/:id/reset-strikes', requireOfficerAuth, (req: Request, res: Response) => {
-  try {
-    dbRun('UPDATE citizen_trust_scores SET false_alarm_count = ? WHERE citizen_id = ?', [0, req.params.id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Reset strikes handler error:', error);
-    res.status(500).json({ error: 'Failed to reset strikes' });
-  }
-});
-
-app.get('/api/dispatch/officers', requireOfficerAuth, (req: Request, res: Response) => {
-  try {
-    const officers = dbExec('SELECT o.*, s.name as station_name FROM officers o LEFT JOIN stations s ON o.station_id = s.id ORDER BY o.created_at DESC');
-    res.json({ officers: officers.map((o: any) => ({ ...o, password_hash: undefined })) });
-  } catch (error) {
-    console.error('Get officers handler error:', error);
-    res.status(500).json({ error: 'Failed to fetch officers' });
-  }
-});
-
-app.post('/api/dispatch/officers', requireAdminAuth, async (req: Request, res: Response) => {
-  try {
-    const { name, badge_number, password, role } = req.body;
-    if (!name || !badge_number || !password || !role) {
-      res.status(400).json({ error: 'All fields are required' });
-      return;
-    }
-
-    const station = dbExec('SELECT id FROM stations LIMIT 1');
-    const passwordHash = await bcryptjs.hash(password, 10);
-
-    dbRun('INSERT INTO officers (station_id, badge_number, name, role, password_hash) VALUES (?, ?, ?, ?, ?)', [
-      station.length > 0 ? station[0].id : 1,
-      badge_number,
-      name,
-      role,
-      passwordHash,
+    const [total, active, acknowledged, resolved, falseAlarms, cancelled] = await Promise.all([
+      pool.query('SELECT COUNT(*) as c FROM sos_alerts'),
+      pool.query("SELECT COUNT(*) as c FROM sos_alerts WHERE status = 'ACTIVE'"),
+      pool.query("SELECT COUNT(*) as c FROM sos_alerts WHERE status = 'ACKNOWLEDGED'"),
+      pool.query("SELECT COUNT(*) as c FROM sos_alerts WHERE status = 'RESOLVED'"),
+      pool.query("SELECT COUNT(*) as c FROM sos_alerts WHERE status = 'FALSE_ALARM'"),
+      pool.query("SELECT COUNT(*) as c FROM sos_alerts WHERE status = 'CANCELLED'"),
     ]);
-
-    res.status(201).json({ success: true });
-  } catch (error: any) {
-    console.error('Create officer handler error:', error);
-    res.status(500).json({ error: 'Failed to create officer' });
-  }
+    const t = parseInt(total.rows[0].c, 10);
+    const fa = parseInt(falseAlarms.rows[0].c, 10);
+    res.json({ stats: { total: t, active: parseInt(active.rows[0].c, 10), acknowledged: parseInt(acknowledged.rows[0].c, 10), resolved: parseInt(resolved.rows[0].c, 10), false_alarms: fa, cancelled: parseInt(cancelled.rows[0].c, 10), false_alarm_rate: t > 0 ? Math.round((fa / t) * 100) : 0, avg_response_time_ms: 0 } });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch stats' }); }
 });
 
-app.post('/api/dispatch/officers/:id/toggle-active', requireAdminAuth, (req: Request, res: Response) => {
+// GET /api/dispatch/settings
+app.get('/api/dispatch/settings', requireOfficerAuth, async (_req: any, res: any) => {
   try {
-    const officer = dbExec('SELECT * FROM officers WHERE id = ?', [req.params.id]);
-
-    if (officer.length === 0) {
-      res.status(404).json({ error: 'Officer not found' });
-      return;
-    }
-
-    const newStatus = officer[0].status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-    dbRun('UPDATE officers SET status = ? WHERE id = ?', [newStatus, officer[0].id]);
-    res.json({ success: true, status: newStatus });
-  } catch (error) {
-    console.error('Toggle active handler error:', error);
-    res.status(500).json({ error: 'Failed to toggle officer status' });
-  }
+    const [settingsResult, stationResult] = await Promise.all([pool.query('SELECT * FROM station_settings LIMIT 1'), pool.query('SELECT * FROM stations LIMIT 1')]);
+    res.json({ settings: settingsResult.rows[0], station: stationResult.rows[0] });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch settings' }); }
 });
 
-app.get('/api/dispatch/stats', requireOfficerAuth, (req: Request, res: Response) => {
+// PUT /api/dispatch/settings
+app.put('/api/dispatch/settings', requireAdminAuth, async (req: any, res: any) => {
   try {
-    const total = dbExec('SELECT COUNT(*) as c FROM sos_alerts');
-    const active = dbExec("SELECT COUNT(*) as c FROM sos_alerts WHERE status = ?", ['ACTIVE']);
-    const acknowledged = dbExec("SELECT COUNT(*) as c FROM sos_alerts WHERE status = ?", ['ACKNOWLEDGED']);
-    const resolved = dbExec("SELECT COUNT(*) as c FROM sos_alerts WHERE status = ?", ['RESOLVED']);
-    const falseAlarms = dbExec("SELECT COUNT(*) as c FROM sos_alerts WHERE status = ?", ['FALSE_ALARM']);
-
-    res.json({
-      stats: {
-        total: total.length > 0 ? total[0].c : 0,
-        active: active.length > 0 ? active[0].c : 0,
-        acknowledged: acknowledged.length > 0 ? acknowledged[0].c : 0,
-        resolved: resolved.length > 0 ? resolved[0].c : 0,
-        false_alarms: falseAlarms.length > 0 ? falseAlarms[0].c : 0,
-        false_alarm_rate: 0,
-      },
-    });
-  } catch (error) {
-    console.error('Stats handler error:', error);
-    res.status(500).json({ error: 'Failed to fetch stats' });
-  }
-});
-
-app.get('/api/dispatch/settings', requireOfficerAuth, (req: Request, res: Response) => {
-  try {
-    const settings = dbExec('SELECT * FROM station_settings LIMIT 1');
-    const station = dbExec('SELECT * FROM stations LIMIT 1');
-    res.json({ settings: settings.length > 0 ? settings[0] : {}, station: station.length > 0 ? station[0] : {} });
-  } catch (error) {
-    console.error('Get settings handler error:', error);
-    res.status(500).json({ error: 'Failed to fetch settings' });
-  }
-});
-
-app.put('/api/dispatch/settings', requireAdminAuth, (req: Request, res: Response) => {
-  try {
-    const { surge_threshold, surge_window_minutes, response_timeout_minutes } = req.body;
-    dbRun(
-      'UPDATE station_settings SET surge_threshold = COALESCE(?, surge_threshold), surge_window_minutes = COALESCE(?, surge_window_minutes), response_timeout_minutes = COALESCE(?, response_timeout_minutes) WHERE id = 1',
-      [surge_threshold || null, surge_window_minutes || null, response_timeout_minutes || null]
-    );
+    const { surge_threshold, surge_window_minutes, cooldown_minutes, strike_limit } = req.body;
+    await pool.query(`UPDATE station_settings SET surge_threshold = COALESCE($1, surge_threshold), surge_window_minutes = COALESCE($2, surge_window_minutes), cooldown_minutes = COALESCE($3, cooldown_minutes), strike_limit = COALESCE($4, strike_limit) WHERE id = 1`, [surge_threshold || null, surge_window_minutes || null, cooldown_minutes || null, strike_limit || null]);
     res.json({ success: true });
-  } catch (error) {
-    console.error('Update settings handler error:', error);
-    res.status(500).json({ error: 'Failed to update settings' });
-  }
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to update settings' }); }
 });
 
-// Health check
-app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', message: 'SafeSignal API is running' });
+// ─────────────────────────── CITIZEN ROUTES ──────────────────────────────────
+
+// POST /api/citizen/register
+app.post('/api/citizen/register', async (req: any, res: any) => {
+  try {
+    const { full_name, phone, address, barangay, pin, photo_url } = req.body;
+    if (!full_name || !phone || !pin) { res.status(400).json({ error: 'full_name, phone, and pin are required' }); return; }
+    if (!/^09\d{9}$/.test(phone)) { res.status(400).json({ error: 'Phone must be 11 digits starting with 09' }); return; }
+    if (!/^\d{4}$/.test(pin)) { res.status(400).json({ error: 'PIN must be 4 digits' }); return; }
+    const existing = await pool.query('SELECT id FROM citizens WHERE phone = $1', [phone]);
+    if (existing.rows.length > 0) { res.status(409).json({ error: 'Phone number already registered' }); return; }
+    const pinHash = hashPin(pin);
+    const result = await pool.query(`INSERT INTO citizens (full_name, phone, address, barangay, pin_hash, photo_url, verified) VALUES ($1, $2, $3, $4, $5, $6, false) RETURNING id`, [full_name, phone, address || null, barangay || null, pinHash, photo_url || null]);
+    const citizenId = result.rows[0].id;
+    await pool.query(`INSERT INTO citizen_trust_scores (citizen_id, score, total_alerts, false_alarms, resolved_emergencies) VALUES ($1, 100, 0, 0, 0)`, [citizenId]);
+    await pool.query(`INSERT INTO otp_codes (citizen_id, code, expires_at) VALUES ($1, '123456', $2)`, [citizenId, Date.now() + 10 * 60 * 1000]);
+    res.status(201).json({ citizen_id: citizenId, message: 'OTP sent to your phone' });
+  } catch (error) { console.error('Register error:', error); res.status(500).json({ error: 'Failed to process registration' }); }
 });
 
-// Default 404
-app.use((req: Request, res: Response) => {
-  res.status(404).json({ error: 'Endpoint not found' });
+// POST /api/citizen/verify-otp
+app.post('/api/citizen/verify-otp', async (req: any, res: any) => {
+  try {
+    const { citizen_id, otp } = req.body;
+    if (!citizen_id || !otp) { res.status(400).json({ error: 'citizen_id and otp are required' }); return; }
+    if (otp !== '123456') { res.status(400).json({ error: 'Invalid OTP code' }); return; }
+    const citizenResult = await pool.query('SELECT * FROM citizens WHERE id = $1', [citizen_id]);
+    const citizen = citizenResult.rows[0];
+    if (!citizen) { res.status(404).json({ error: 'Citizen not found' }); return; }
+    await pool.query('UPDATE citizens SET verified = true WHERE id = $1', [citizen_id]);
+    const token = signCitizenToken({ id: citizen.id, phone: citizen.phone });
+    res.json({ token, citizen: { id: citizen.id, full_name: citizen.full_name, phone: citizen.phone } });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to verify OTP' }); }
+});
+
+// POST /api/citizen/login
+app.post('/api/citizen/login', async (req: any, res: any) => {
+  try {
+    const { phone, pin } = req.body;
+    if (!phone || !pin) { res.status(400).json({ error: 'phone and pin are required' }); return; }
+    const citizenResult = await pool.query('SELECT * FROM citizens WHERE phone = $1', [phone]);
+    const citizen = citizenResult.rows[0];
+    if (!citizen) { res.status(401).json({ error: 'Invalid phone or PIN' }); return; }
+    if (!citizen.verified) { res.status(401).json({ error: 'Account not verified. Please complete OTP verification.' }); return; }
+    const pinHash = hashPin(pin);
+    if (citizen.pin_hash !== pinHash) { res.status(401).json({ error: 'Invalid phone or PIN' }); return; }
+    await pool.query('UPDATE citizens SET last_active = $1 WHERE id = $2', [Date.now(), citizen.id]);
+    const token = signCitizenToken({ id: citizen.id, phone: citizen.phone });
+    res.json({ token, citizen: { id: citizen.id, full_name: citizen.full_name, phone: citizen.phone, barangay: citizen.barangay, is_suspended: citizen.is_suspended, suspension_reason: citizen.suspension_reason } });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to process login' }); }
+});
+
+// GET /api/citizen/profile
+app.get('/api/citizen/profile', requireCitizenAuth, async (req: any, res: any) => {
+  try {
+    const cp = req.citizen as CitizenPayload;
+    const citizenResult = await pool.query('SELECT * FROM citizens WHERE id = $1', [cp.id]);
+    const citizen = citizenResult.rows[0];
+    if (!citizen) { res.status(404).json({ error: 'Citizen not found' }); return; }
+    const trustResult = await pool.query('SELECT * FROM citizen_trust_scores WHERE citizen_id = $1', [citizen.id]);
+    const trust = trustResult.rows[0];
+    res.json({ citizen: { id: citizen.id, full_name: citizen.full_name, phone: citizen.phone, address: citizen.address, barangay: citizen.barangay, city: citizen.city, photo_url: citizen.photo_url, verified: citizen.verified, strike_count: citizen.strike_count, is_suspended: citizen.is_suspended, suspension_reason: citizen.suspension_reason, registered_at: citizen.registered_at, last_active: citizen.last_active, trust: trust ? { score: trust.score, total_alerts: trust.total_alerts, false_alarms: trust.false_alarms, resolved_emergencies: trust.resolved_emergencies } : { score: 100, total_alerts: 0, false_alarms: 0, resolved_emergencies: 0 } } });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch profile' }); }
+});
+
+// PUT /api/citizen/profile
+app.put('/api/citizen/profile', requireCitizenAuth, async (req: any, res: any) => {
+  try {
+    const cp = req.citizen as CitizenPayload;
+    const { full_name, address, barangay, photo_url } = req.body;
+    await pool.query(`UPDATE citizens SET full_name = COALESCE($1, full_name), address = COALESCE($2, address), barangay = COALESCE($3, barangay), photo_url = COALESCE($4, photo_url) WHERE id = $5`, [full_name || null, address || null, barangay || null, photo_url || null, cp.id]);
+    res.json({ success: true });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to update profile' }); }
+});
+
+// POST /api/citizen/verify-pin
+app.post('/api/citizen/verify-pin', requireCitizenAuth, async (req: any, res: any) => {
+  try {
+    const cp = req.citizen as CitizenPayload;
+    const { pin } = req.body;
+    if (!pin) { res.status(400).json({ error: 'pin is required' }); return; }
+    const citizenResult = await pool.query('SELECT pin_hash FROM citizens WHERE id = $1', [cp.id]);
+    const pinHash = hashPin(pin);
+    res.json({ valid: citizenResult.rows[0]?.pin_hash === pinHash });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to verify PIN' }); }
+});
+
+// POST /api/citizen/sos
+app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
+  try {
+    const cp = req.citizen as CitizenPayload;
+    const { lat, lng, accuracy, pin } = req.body;
+    if (!lat || !lng || !pin) { res.status(400).json({ error: 'lat, lng, and pin are required' }); return; }
+    const citizenResult = await pool.query('SELECT * FROM citizens WHERE id = $1', [cp.id]);
+    const citizen = citizenResult.rows[0];
+    if (!citizen) { res.status(404).json({ error: 'Citizen not found' }); return; }
+    if (citizen.is_suspended) { res.status(403).json({ error: 'Account suspended', reason: citizen.suspension_reason }); return; }
+    const pinHash = hashPin(pin);
+    if (citizen.pin_hash !== pinHash) { res.status(401).json({ error: 'Invalid PIN' }); return; }
+    const settingsResult = await pool.query('SELECT * FROM station_settings LIMIT 1');
+    const settings = settingsResult.rows[0];
+    const cooldownMs = (settings?.cooldown_minutes || 10) * 60 * 1000;
+    const recentAlert = await pool.query(`SELECT id FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED') AND triggered_at > $2`, [cp.id, Date.now() - cooldownMs]);
+    if (recentAlert.rows.length > 0) { res.status(429).json({ error: 'Cooldown active. Please wait before sending another alert.' }); return; }
+    const activeAlert = await pool.query(`SELECT id FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED')`, [cp.id]);
+    if (activeAlert.rows.length > 0) { res.status(409).json({ error: 'You already have an active alert', alert_id: activeAlert.rows[0].id }); return; }
+    const now = Date.now();
+    const result = await pool.query(`INSERT INTO sos_alerts (citizen_id, lat, lng, status, triggered_at, location_accuracy) VALUES ($1, $2, $3, 'ACTIVE', $4, $5) RETURNING id`, [cp.id, lat, lng, now, accuracy || null]);
+    const alertId = result.rows[0].id;
+    await pool.query(`INSERT INTO alert_location_history (alert_id, lat, lng, recorded_at) VALUES ($1, $2, $3, $4)`, [alertId, lat, lng, now]);
+    await pool.query(`UPDATE citizen_trust_scores SET total_alerts = total_alerts + 1, last_updated = $1 WHERE citizen_id = $2`, [now, cp.id]);
+    await pool.query('UPDATE citizens SET last_active = $1 WHERE id = $2', [now, cp.id]);
+    const alertWithCitizen = await getAlertWithCitizen(alertId);
+    broadcastEvent('new_alert', { alert: alertWithCitizen });
+    if (citizen.barangay) {
+      const windowMs = (settings?.surge_window_minutes || 2) * 60 * 1000;
+      const surgeResult = await pool.query(`SELECT COUNT(*) as count FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id WHERE c.barangay = $1 AND a.triggered_at > $2 AND a.status IN ('ACTIVE', 'ACKNOWLEDGED')`, [citizen.barangay, Date.now() - windowMs]);
+      const surgeCount = parseInt(surgeResult.rows[0].count, 10);
+      const threshold = settings?.surge_threshold || 5;
+      if (surgeCount >= threshold) {
+        broadcastEvent('surge_warning', { barangay: citizen.barangay, count: surgeCount, threshold, window_minutes: settings?.surge_window_minutes || 2, message: `SURGE ALERT: ${surgeCount} active alerts in ${citizen.barangay} within ${settings?.surge_window_minutes || 2} minutes!` });
+      }
+    }
+    res.status(201).json({ alert: { id: alertId, status: 'ACTIVE', triggered_at: now } });
+  } catch (error) { console.error('SOS error:', error); res.status(500).json({ error: 'Failed to process SOS request' }); }
+});
+
+// GET /api/citizen/active-alert
+app.get('/api/citizen/active-alert', requireCitizenAuth, async (req: any, res: any) => {
+  try {
+    const cp = req.citizen as CitizenPayload;
+    const alertResult = await pool.query(`SELECT a.*, o.full_name as officer_name, o.badge_number as officer_badge FROM sos_alerts a LEFT JOIN officers o ON a.assigned_officer_id = o.id WHERE a.citizen_id = $1 AND a.status IN ('ACTIVE', 'ACKNOWLEDGED') ORDER BY a.triggered_at DESC LIMIT 1`, [cp.id]);
+    const alert = alertResult.rows[0];
+    if (!alert) { res.json({ alert: null }); return; }
+    const locResult = await pool.query(`SELECT lat, lng, recorded_at FROM alert_location_history WHERE alert_id = $1 ORDER BY recorded_at ASC`, [alert.id]);
+    res.json({ alert: { ...alert, location_history: locResult.rows } });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch active alert' }); }
+});
+
+// POST /api/citizen/sos/cancel
+app.post('/api/citizen/sos/cancel', requireCitizenAuth, async (req: any, res: any) => {
+  try {
+    const cp = req.citizen as CitizenPayload;
+    const { reason } = req.body;
+    const alertResult = await pool.query(`SELECT * FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED') ORDER BY triggered_at DESC LIMIT 1`, [cp.id]);
+    const alert = alertResult.rows[0];
+    if (!alert) { res.status(404).json({ error: 'No active alert found' }); return; }
+    const now = Date.now();
+    await pool.query(`UPDATE sos_alerts SET status = 'CANCELLED', cancelled_at = $1, cancellation_reason = $2 WHERE id = $3`, [now, reason || 'No reason provided', alert.id]);
+    if (reason === 'Accidental' || reason === 'accidental') {
+      const trustResult = await pool.query('SELECT score FROM citizen_trust_scores WHERE citizen_id = $1', [cp.id]);
+      const newScore = Math.max(0, (trustResult.rows[0]?.score || 100) - 5);
+      await pool.query(`UPDATE citizen_trust_scores SET score = $1, last_updated = $2 WHERE citizen_id = $3`, [newScore, now, cp.id]);
+    }
+    const updatedAlert = await getAlertWithCitizen(alert.id);
+    broadcastEvent('alert_updated', { alert: updatedAlert });
+    res.json({ success: true });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to cancel SOS' }); }
+});
+
+// POST /api/citizen/location-update
+app.post('/api/citizen/location-update', requireCitizenAuth, async (req: any, res: any) => {
+  try {
+    const cp = req.citizen as CitizenPayload;
+    const { lat, lng } = req.body;
+    if (!lat || !lng) { res.status(400).json({ error: 'lat and lng are required' }); return; }
+    const alertResult = await pool.query(`SELECT id FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED') ORDER BY triggered_at DESC LIMIT 1`, [cp.id]);
+    const alert = alertResult.rows[0];
+    if (!alert) { res.json({ success: false, message: 'No active alert' }); return; }
+    const now = Date.now();
+    await pool.query(`INSERT INTO alert_location_history (alert_id, lat, lng, recorded_at) VALUES ($1, $2, $3, $4)`, [alert.id, lat, lng, now]);
+    broadcastEvent('location_update', { alert_id: alert.id, lat, lng, recorded_at: now });
+    res.json({ success: true });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to update location' }); }
+});
+
+// GET /api/citizen/alerts
+app.get('/api/citizen/alerts', requireCitizenAuth, async (req: any, res: any) => {
+  try {
+    const cp = req.citizen as CitizenPayload;
+    const result = await pool.query(`SELECT * FROM sos_alerts WHERE citizen_id = $1 ORDER BY triggered_at DESC`, [cp.id]);
+    res.json({ alerts: result.rows });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch alerts' }); }
+});
+
+// POST /api/citizen/resend-otp
+app.post('/api/citizen/resend-otp', async (req: any, res: any) => {
+  try {
+    const { citizen_id } = req.body;
+    if (!citizen_id) { res.status(400).json({ error: 'citizen_id is required' }); return; }
+    await pool.query(`INSERT INTO otp_codes (citizen_id, code, expires_at) VALUES ($1, '123456', $2)`, [citizen_id, Date.now() + 10 * 60 * 1000]);
+    res.json({ message: 'OTP resent' });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to resend OTP' }); }
 });
 
 export default app;
