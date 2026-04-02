@@ -73,7 +73,14 @@ async function initDb(): Promise<void> {
         console.log('[SafeSignal] Seeded officer:', officer.badge);
       }
     }
-    seeded = true;
+    // Seed demo citizen account for demos
+    await pool.query(`
+      INSERT INTO citizens (full_name, phone, address, barangay, city, pin_hash, verified, strike_count, is_suspended)
+      VALUES ('Demo Citizen', '09171234567', '123 Leveriza St', 'Barangay 76', 'Pasay City', $1, true, 0, false)
+      ON CONFLICT (phone) DO NOTHING
+    `, [hashPin('1234')]);
+    console.log('[SafeSignal] Demo citizen ensured: 09171234567 / 1234');
+        seeded = true;
     console.log('[SafeSignal] initDb complete');
   } catch (err) {
     console.error('[SafeSignal] initDb error:', err);
