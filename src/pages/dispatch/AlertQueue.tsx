@@ -94,7 +94,7 @@ export default function AlertQueue() {
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: 'var(--dispatch-bg, #0d1117)',
-        color: 'var(--dispatch-border, #e6edf3)',
+        color: '#e6edf3',
       }}
     >
       {/* Header */}
@@ -111,7 +111,7 @@ export default function AlertQueue() {
           <h1 style={{ margin: '0 0 8px 0', fontSize: '24px', fontWeight: 600, color: 'var(--ph-gold, #ffc107)' }}>
             Alert Queue
           </h1>
-          <p style={{ margin: 0, fontSize: '13px', color: 'var(--dispatch-border, #8b949e)' }}>
+          <p style={{ margin: 0, fontSize: '13px', color: '#8b949e' }}>
             {filteredAlerts.length} alert{filteredAlerts.length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -208,7 +208,7 @@ export default function AlertQueue() {
             style={{
               padding: '40px 24px',
               textAlign: 'center',
-              color: 'var(--dispatch-border, #8b949e)',
+              color: '#8b949e',
             }}
           >
             <p style={{ fontSize: '32px', margin: '0 0 12px 0' }}>ð­</p>
@@ -224,7 +224,7 @@ export default function AlertQueue() {
             style={{
               padding: '40px 24px',
               textAlign: 'center',
-              color: 'var(--dispatch-border, #8b949e)',
+              color: '#8b949e',
             }}
           >
             <p style={{ fontSize: '14px' }}>Loading alerts...</p>
@@ -320,13 +320,13 @@ export default function AlertQueue() {
                         style={{
                           margin: '0 0 6px 0',
                           fontSize: '12px',
-                          color: 'var(--dispatch-border, #8b949e)',
+                          color: '#8b949e',
                         }}
                       >
                         {alert.barangay} â¢ {elapsed}
                       </p>
                       <div style={{ display: 'flex', gap: '12px', fontSize: '11px' }}>
-                        <span style={{ color: 'var(--dispatch-border, #8b949e)' }}>
+                        <span style={{ color: '#8b949e' }}>
                           Trust:{' '}
                           <span style={{ color: trustColor, fontWeight: 700 }}>
                             {alert.trust_score}%
