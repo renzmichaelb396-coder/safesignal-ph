@@ -30,7 +30,7 @@ export default function Landing() {
 
         <div>
           <h1 style={{ color: '#ffffff', fontSize: '28px', fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>
-            SafeSignal PH
+            RespondPH
           </h1>
           <p style={{ color: 'var(--ph-gold)', fontSize: '14px', marginTop: 8, fontStyle: 'italic' }}>
             Emergency help, one tap away
