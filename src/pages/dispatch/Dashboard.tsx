@@ -72,7 +72,8 @@ export default function Dashboard() {
  useEffect(() => {
  const timer = setInterval(async () => {
  try {
- const alerts = await dispatchApi.getAlerts();
+ const data = await dispatchApi.getAlerts();
+ const alerts = data.alerts || [];
  setAlerts(alerts);
  alerts.forEach(a => {
  if (mapInstance.current) {
