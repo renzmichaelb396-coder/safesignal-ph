@@ -26,7 +26,7 @@ export default function SosConfirm() {
     }
 
     if (countdown === 0 && showCountdown) {
-      navigate('/home');
+      navigate('/sos/active');
     }
   }, [countdown, showCountdown, navigate]);
 
