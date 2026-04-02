@@ -125,7 +125,7 @@ export default function History() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {alerts.map((alert) => {
-              const elapsed = Date.now() - (alert.triggered_at * 1000);
+              const elapsed = Date.now() - alert.triggered_at;
               const elapsedStr = formatElapsed(elapsed);
 
               return (
@@ -182,7 +182,7 @@ export default function History() {
 
                   {/* Timestamp */}
                   <p style={{ margin: '0', fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                    {formatDate(alert.triggered_at * 1000)}
+                    {formatDate(alert.triggered_at)}
                   </p>
                 </div>
               );
