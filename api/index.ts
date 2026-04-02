@@ -192,11 +192,11 @@ app.post('/api/dispatch/login', async (req: any, res: any) => {
       res.status(429).json({ error: `Too many attempts. Try again in ${remaining} seconds.` }); return;
     }
     const or = await pool.query(
-      `SELECT * FROM officers WHERE email = $1 AND badge_number = $2 AND is_active = true`,
+      `SELECT * FROM officers WHERE email = $1 AND badge_number = $2`,
       [email, badge_number]
     );
     const officer = or.rows[0];
-    if (!officer) { recordFailedAttempt(attemptKey); res.status(401).json({ error: 'Invalid credentials' }); return; }
+    if (!officer || !officer.is_active) { recordFailedAttempt(attemptKey); res.status(401).json({ error: 'Invalid credentials' }); return; }
     const valid = await bcrypt.compare(password, officer.password_hash);
     if (!valid) { recordFailedAttempt(attemptKey); res.status(401).json({ error: 'Invalid credentials' }); return; }
     loginAttempts.delete(attemptKey);
