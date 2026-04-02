@@ -1,130 +1,59 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 250">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 280">
   <defs>
-    <linearGradient id="navyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1e3a8a"/>
-      <stop offset="100%" stop-color="#0f2060"/>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2200aa"/>
+      <stop offset="100%" stop-color="#0d0066"/>
     </linearGradient>
     <linearGradient id="goldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#fde68a"/>
-      <stop offset="40%" stop-color="#f59e0b"/>
-      <stop offset="100%" stop-color="#b45309"/>
+      <stop offset="0%" stop-color="#ffe066"/>
+      <stop offset="50%" stop-color="#ffd700"/>
+      <stop offset="100%" stop-color="#c8a800"/>
     </linearGradient>
-    <linearGradient id="goldShine" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#fef3c7"/>
-      <stop offset="50%" stop-color="#fcd34d"/>
-      <stop offset="100%" stop-color="#d97706"/>
-    </linearGradient>
-    <filter id="dropshadow">
-      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.6"/>
-    </filter>
-    <filter id="glow">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.5"/>
     </filter>
   </defs>
-
-  <!-- Shield outer shape (gold border) - police badge shape -->
-  <path d="M110 6
-           C110 6 205 32 210 85
-           C215 138 190 188 110 240
-           C30 188 5 138 10 85
-           C15 32 110 6 110 6 Z"
-        fill="url(#goldGrad)" filter="url(#dropshadow)"/>
-
-  <!-- Shield inner fill (navy) -->
-  <path d="M110 16
-           C110 16 197 40 202 87
-           C207 134 183 181 110 228
-           C37 181 13 134 18 87
-           C23 40 110 16 110 16 Z"
-        fill="url(#navyGrad)"/>
-
-  <!-- Inner gold thin border line -->
-  <path d="M110 22
-           C110 22 193 45 198 88
-           C203 131 180 176 110 222
-           C40 176 17 131 22 88
-           C27 45 110 22 110 22 Z"
-        fill="none" stroke="url(#goldShine)" stroke-width="2" opacity="0.8"/>
-
-  <!-- POLICE curved text banner area -->
-  <path d="M58 72 Q110 44 162 72" fill="none" id="policeArc"/>
-  <text font-family="'Arial Black',Arial,sans-serif" font-weight="900" font-size="20"
-        letter-spacing="5" fill="url(#goldShine)" filter="url(#glow)">
-    <textPath href="#policeArc" startOffset="50%" text-anchor="middle">POLICE</textPath>
+  <path d="M 40 255 L 18 128 Q 150 -8 282 128 L 260 255 Q 150 268 40 255 Z" fill="url(#goldGrad)" filter="url(#shadow)"/>
+  <path d="M 52 248 L 32 130 Q 150 8 268 130 L 248 248 Q 150 260 52 248 Z" fill="url(#blueGrad)"/>
+  <path d="M 60 244 L 42 132 Q 150 18 258 132 L 240 244 Q 150 255 60 244 Z" fill="none" stroke="#ffd700" stroke-width="2.5" opacity="0.7"/>
+  <path id="policeTextPath" d="M 58 126 Q 150 30 242 126" fill="none"/>
+  <text font-family="'Arial Black', Arial, sans-serif" font-weight="900" font-size="28" letter-spacing="8" fill="#ffd700">
+    <textPath href="#policeTextPath" startOffset="50%" text-anchor="middle">POLICE</textPath>
   </text>
-
-  <!-- Decorative lines under POLICE -->
-  <path d="M62 80 Q110 62 158 80" fill="none" stroke="url(#goldGrad)" stroke-width="1.5"/>
-  <path d="M65 83 Q110 66 155 83" fill="none" stroke="url(#goldGrad)" stroke-width="0.8" opacity="0.6"/>
-
-  <!-- PASAY'S BEST gold banner -->
-  <path d="M34 92 Q110 85 186 92 L186 112 Q110 119 34 112 Z" fill="url(#goldGrad)"/>
-  <path d="M36 94 Q110 87 184 94 L184 110 Q110 117 36 110 Z" fill="#1e3a8a"/>
-  <text x="110" y="106" font-family="'Arial Black',Arial,sans-serif" font-weight="900"
-        font-size="11" letter-spacing="2.5" text-anchor="middle" fill="url(#goldShine)">PASAY'S BEST</text>
-
-  <!-- 8 stars in circle around center seal -->
-  <!-- Using â unicode stars positioned in a circle, r=46 from center(110,162) -->
-  <g fill="url(#goldShine)" font-size="11" text-anchor="middle" dominant-baseline="central" filter="url(#glow)">
-    <text x="110" y="118">â</text>  <!-- top -->
-    <text x="143" y="127">â</text>  <!-- top-right -->
-    <text x="157" y="156">â</text>  <!-- right -->
-    <text x="143" y="186">â</text>  <!-- bottom-right -->
-    <text x="110" y="198">â</text>  <!-- bottom -->
-    <text x="77"  y="186">â</text>  <!-- bottom-left -->
-    <text x="63"  y="156">â</text>  <!-- left -->
-    <text x="77"  y="127">â</text>  <!-- top-left -->
+  <path d="M 50 148 Q 150 138 250 148 L 248 170 Q 150 180 52 170 Z" fill="#ffd700"/>
+  <path d="M 54 151 Q 150 141 246 151 L 244 167 Q 150 177 56 167 Z" fill="#1a0088"/>
+  <text x="150" y="164" font-family="'Arial Black', Arial, sans-serif" font-weight="900" font-size="14" letter-spacing="3" text-anchor="middle" fill="#ffd700">PASAY'S BEST</text>
+  <g fill="#ffd700" font-size="13" text-anchor="middle" dominant-baseline="central">
+    <text x="150" y="146">&#9733;</text>
+    <text x="185" y="152">&#9733;</text>
+    <text x="210" y="172">&#9733;</text>
+    <text x="216" y="200">&#9733;</text>
+    <text x="206" y="228">&#9733;</text>
+    <text x="150" y="244">&#9733;</text>
+    <text x="94" y="228">&#9733;</text>
+    <text x="84" y="200">&#9733;</text>
+    <text x="90" y="172">&#9733;</text>
+    <text x="115" y="152">&#9733;</text>
   </g>
-
-  <!-- Center seal outer gold ring -->
-  <circle cx="110" cy="156" r="35" fill="url(#goldGrad)"/>
-  <!-- Seal navy ring -->
-  <circle cx="110" cy="156" r="32" fill="#1a3580"/>
-  <!-- Seal inner navy fill -->
-  <circle cx="110" cy="156" r="29" fill="url(#navyGrad)"/>
-
-  <!-- Seal circular text -->
-  <path id="sealTop" d="M 81 148 A 29 29 0 0 1 139 148" fill="none"/>
-  <text font-family="Arial,sans-serif" font-weight="700" font-size="5.8"
-        fill="url(#goldShine)" letter-spacing="1">
-    <textPath href="#sealTop" startOffset="50%" text-anchor="middle">LUNGSOD NG PASAY</textPath>
+  <circle cx="150" cy="200" r="46" fill="#ffd700"/>
+  <circle cx="150" cy="200" r="42" fill="#f5f0dc"/>
+  <circle cx="150" cy="200" r="39" fill="#fffff0"/>
+  <path id="sealTopText" d="M 115 196 A 35 35 0 0 1 185 196" fill="none"/>
+  <path id="sealBotText" d="M 113 204 A 37 37 0 0 0 187 204" fill="none"/>
+  <text font-family="Arial, sans-serif" font-weight="700" font-size="7" fill="#1a0088" letter-spacing="1.5">
+    <textPath href="#sealTopText" startOffset="50%" text-anchor="middle">CITY OF PASAY</textPath>
   </text>
-
-  <path id="sealBot" d="M 81 164 A 29 29 0 0 0 139 164" fill="none"/>
-  <text font-family="Arial,sans-serif" font-weight="700" font-size="5.2"
-        fill="url(#goldShine)" letter-spacing="0.8">
-    <textPath href="#sealBot" startOffset="50%" text-anchor="middle">KALAKHANG MAYNILA</textPath>
+  <text font-family="Arial, sans-serif" font-weight="700" font-size="6.5" fill="#1a0088" letter-spacing="1">
+    <textPath href="#sealBotText" startOffset="50%" text-anchor="middle">METRO MANILA</textPath>
   </text>
-
-  <!-- Center city seal emblem -->
-  <circle cx="110" cy="155" r="18" fill="#0f2060" stroke="url(#goldShine)" stroke-width="1"/>
-  <!-- Sun burst rays -->
-  <g stroke="url(#goldShine)" stroke-width="1" opacity="0.85">
-    <line x1="110" y1="138" x2="110" y2="142"/>
-    <line x1="116.5" y1="139.4" x2="114.8" y2="143"/>
-    <line x1="121.8" y1="143.5" x2="119" y2="146.2"/>
-    <line x1="124.5" y1="150" x2="120.8" y2="151"/>
-    <line x1="123.2" y1="157" x2="119.5" y2="156.2"/>
-    <line x1="118.5" y1="162.8" x2="116" y2="159.8"/>
-    <line x1="110" y1="165" x2="110" y2="161"/>
-    <line x1="102" y1="162.8" x2="104.5" y2="159.8"/>
-    <line x1="97.5" y1="157" x2="101.2" y2="156.2"/>
-    <line x1="95.5" y1="150" x2="99.2" y2="151"/>
-    <line x1="98.2" y1="143.5" x2="101" y2="146.2"/>
-    <line x1="103.5" y1="139.4" x2="105.2" y2="143"/>
-  </g>
-  <!-- Sun center -->
-  <circle cx="110" cy="153" r="6" fill="url(#goldShine)" opacity="0.9"/>
-  <circle cx="110" cy="153" r="3.5" fill="#f59e0b"/>
-  <!-- 3 stars below sun -->
-  <text x="110" y="166" font-size="6.5" text-anchor="middle" fill="url(#goldShine)">â â â</text>
-
-  <!-- 1946 bottom text -->
-  <text x="110" y="212" font-family="'Arial Black',Arial,sans-serif" font-weight="900"
-        font-size="18" letter-spacing="6" text-anchor="middle" fill="url(#goldShine)" filter="url(#glow)">1946</text>
-
-  <!-- Bottom decorative lines -->
-  <path d="M68 218 Q110 213 152 218" fill="none" stroke="url(#goldGrad)" stroke-width="1.5"/>
-  <path d="M72 222 Q110 217 148 222" fill="none" stroke="url(#goldGrad)" stroke-width="0.8" opacity="0.5"/>
+  <ellipse cx="150" cy="197" rx="18" ry="20" fill="#8B6914" opacity="0.85"/>
+  <ellipse cx="134" cy="193" rx="12" ry="7" fill="#6B4F10" opacity="0.9" transform="rotate(-20,134,193)"/>
+  <ellipse cx="166" cy="193" rx="12" ry="7" fill="#6B4F10" opacity="0.9" transform="rotate(20,166,193)"/>
+  <ellipse cx="150" cy="182" rx="7" ry="7.5" fill="#C8960C"/>
+  <path d="M 153 185 L 157 189 L 153 188 Z" fill="#FFD700"/>
+  <circle cx="152" cy="181" r="1.5" fill="#000"/>
+  <ellipse cx="144" cy="199" rx="7" ry="9" fill="#CC0000" opacity="0.8"/>
+  <ellipse cx="156" cy="199" rx="7" ry="9" fill="#0038A8" opacity="0.8"/>
+  <circle cx="150" cy="175" r="4" fill="#FFD700" opacity="0.5"/>
+  <text x="150" y="236" font-family="'Arial Black', Arial, sans-serif" font-weight="900" font-size="20" letter-spacing="5" text-anchor="middle" fill="#ffd700">1946</text>
 </svg>
