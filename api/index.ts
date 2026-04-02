@@ -35,6 +35,15 @@ async function initDb(): Promise<void> {
   if (seeded) return;
   try {
     await pool.query('SELECT 1');
+    // Create tables if they don't exist yet (idempotent schema bootstrap)
+    await pool.query(`CREATE TABLE IF NOT EXISTS stations (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, barangay TEXT, latitude FLOAT, longitude FLOAT, contact_number TEXT, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS station_settings (id SERIAL PRIMARY KEY, station_id INT UNIQUE REFERENCES stations(id), surge_threshold INT DEFAULT 5, surge_window_minutes INT DEFAULT 2, cooldown_minutes INT DEFAULT 10, strike_limit INT DEFAULT 3)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS officers (id SERIAL PRIMARY KEY, station_id INT REFERENCES stations(id), badge_number TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL, full_name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'DISPATCHER', password_hash TEXT NOT NULL, is_active BOOL DEFAULT true, last_login BIGINT, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS citizens (id SERIAL PRIMARY KEY, full_name TEXT NOT NULL, phone TEXT UNIQUE NOT NULL, address TEXT, barangay TEXT, city TEXT, pin_hash TEXT NOT NULL, photo_url TEXT, verified BOOL DEFAULT false, strike_count INT DEFAULT 0, is_suspended BOOL DEFAULT false, suspension_reason TEXT, registered_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000), last_active BIGINT)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS citizen_trust_scores (id SERIAL PRIMARY KEY, citizen_id INT UNIQUE REFERENCES citizens(id), score INT DEFAULT 100, total_alerts INT DEFAULT 0, false_alarms INT DEFAULT 0, resolved_emergencies INT DEFAULT 0, last_updated BIGINT)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS sos_alerts (id SERIAL PRIMARY KEY, citizen_id INT REFERENCES citizens(id), lat FLOAT NOT NULL, lng FLOAT NOT NULL, status TEXT NOT NULL DEFAULT 'ACTIVE', triggered_at BIGINT, acknowledged_at BIGINT, resolved_at BIGINT, cancelled_at BIGINT, location_accuracy FLOAT, assigned_officer_id INT REFERENCES officers(id), is_suspicious BOOL DEFAULT false, suspicious_reason TEXT, notes TEXT, cancellation_reason TEXT)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS alert_location_history (id SERIAL PRIMARY KEY, alert_id INT REFERENCES sos_alerts(id), lat FLOAT NOT NULL, lng FLOAT NOT NULL, recorded_at BIGINT)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS otp_codes (id SERIAL PRIMARY KEY, citizen_id INT REFERENCES citizens(id), code TEXT NOT NULL, expires_at BIGINT)`);
     const stationResult = await pool.query(`
       INSERT INTO stations (name, barangay, latitude, longitude, contact_number)
       VALUES ($1, $2, $3, $4, $5)
@@ -618,8 +627,7 @@ app.post('/api/citizen/resend-otp', async (req: any, res: any) => {
     const { citizen_id } = req.body;
     if (!citizen_id) { res.status(400).json({ error: 'citizen_id is required' }); return; }
     await pool.query(`INSERT INTO otp_codes (citizen_id, code, expires_at) VALUES ($1, '123456', $2)`, [citizen_id, Date.now() + 10 * 60 * 1000]);
-    res.json({ message: 'OTP resent' });
-  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to resend OTP' }); }
+    res.json({ message: 'OTP resent' });  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to resend OTP' }); }
 });
 
 export default app;
