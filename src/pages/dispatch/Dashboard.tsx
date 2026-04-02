@@ -19,6 +19,8 @@ export default function Dashboard() {
  const markersRef = useRef<Map<number, any>>(new Map());
  const audioCtxRef = useRef<AudioContext | null>(null);
  const sseRetryRef = useRef(0);
+ const leafletCssLoaded = useRef(false);
+ const mapInstance = useRef<any>(null);
 
  useEffect(() => {
  if (!officer) {
