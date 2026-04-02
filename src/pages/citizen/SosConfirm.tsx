@@ -5,7 +5,7 @@ import { citizenApi } from '../../lib/api';
 
 export default function SosConfirm() {
   const [, navigate] = useLocation();
-  const { user } = useCitizenAuth();
+  const { user, loading: authLoading } = useCitizenAuth();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -14,10 +14,11 @@ export default function SosConfirm() {
   const [geoError, setGeoError] = useState('');
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       navigate('/login');
     }
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
     if (showCountdown && countdown > 0) {
@@ -213,7 +214,7 @@ export default function SosConfirm() {
                 color: 'var(--sos-red)',
               }}
             >
-              {pin[i] ? 'â' : ''}
+              {pin[i] ? '●' : ''}
             </div>
           ))}
         </div>
@@ -282,7 +283,7 @@ export default function SosConfirm() {
             e.currentTarget.style.background = 'rgba(255,255,255,0.07)';
           }}
         >
-          â Backspace
+          ← Backspace
         </button>
 
         {/* Submit Button */}
