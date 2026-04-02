@@ -117,7 +117,7 @@ export default function Settings() {
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: 'var(--dispatch-bg, #0d1117)',
-        color: 'var(--dispatch-border, #e6edf3)',
+        color: '#e6edf3',
       }}
     >
       {/* Header */}
@@ -237,7 +237,7 @@ export default function Settings() {
                         backgroundColor: 'var(--dispatch-border, #161b22)',
                         border: '1px solid var(--dispatch-border, #30363d)',
                         borderRadius: '6px',
-                        color: 'var(--dispatch-border, #e6edf3)',
+                        color: '#e6edf3',
                         boxSizing: 'border-box',
                         transition: 'border-color 0.2s',
                       }}
@@ -312,7 +312,7 @@ export default function Settings() {
                   padding: '10px 20px',
                   fontSize: '13px',
                   fontWeight: 600,
-                  color: 'var(--dispatch-border, #e6edf3)',
+                  color: '#e6edf3',
                   backgroundColor: 'transparent',
                   border: '1px solid var(--dispatch-border, #30363d)',
                   borderRadius: '6px',
