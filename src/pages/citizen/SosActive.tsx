@@ -11,7 +11,7 @@ declare global {
 
 export default function SosActive() {
   const [, navigate] = useLocation();
-  const { user } = useCitizenAuth();
+  const { user, loading: authLoading } = useCitizenAuth();
   const [sosStatus, setSosStatus] = useState<any>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -32,10 +32,11 @@ export default function SosActive() {
   }, [sosId]);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       navigate('/home');
     }
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   // Fetch SOS status via getActiveAlert
   useEffect(() => {
