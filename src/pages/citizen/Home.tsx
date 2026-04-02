@@ -1,30 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useCitizenAuth } from '../../hooks/useCitizenAuth';
-import { citizenApi } from '../../lib/api';
 
 export default function Home() {
   const [, navigate] = useLocation();
   const { user, logout } = useCitizenAuth();
   const [showMenu, setShowMenu] = useState(false);
-  const [trustScore, setTrustScore] = useState(0);
+  const [trustScore, setTrustScore] = useState(85);
+  const [strikes, setStrikes] = useState(1);
   const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-    }
+    if (!user) navigate('/login');
   }, [user, navigate]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
     setIsOnline(navigator.onLine);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
@@ -32,279 +27,94 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (user) {
-      setTrustScore(Math.floor(Math.random() * 40) + 60);
-    }
+    if (user) setTrustScore(Math.floor(Math.random() * 30) + 70);
   }, [user]);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
-
-  const getTrustColor = (score: number) => {
-    if (score >= 80) return '#4ade80';
-    if (score >= 60) return '#facc15';
-    return '#ef4444';
-  };
+  const handleLogout = () => { logout(); navigate('/'); };
+  const displayName = user?.name?.split(' ')[0] || 'Demo';
 
   return (
-    <div className="citizen-container px-5 py-6 flex flex-col min-h-screen" style={{ background: 'var(--citizen-bg)' }}>
-      {/* Header */}
-      <div className="flex justify-between items-center mb-2" style={{
-        borderBottom: '1px solid rgba(255,255,255,0.1)',
-        paddingBottom: 12,
-        marginBottom: 12,
-      }}>
+    <div className="citizen-container flex flex-col min-h-screen"
+         style={{ background: 'var(--citizen-bg)', padding: 0 }}>
+
+      <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <p style={{ color: 'var(--ph-gold)', fontSize: 10, margin: 0, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
-            PASAY CITY POLICE
-          </p>
-          <h1 style={{ color: '#fff', fontSize: 16, fontWeight: 800, margin: 0, letterSpacing: '-0.3px' }}>
-            RespondPH
-          </h1>
+          <p style={{ color: '#888', fontSize: 10, margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>PASAY CITY POLICE</p>
+          <h1 style={{ color: '#fff', fontSize: 17, fontWeight: 800, margin: 0 }}>RespondPH</h1>
         </div>
-        <button
-          onClick={() => setShowMenu(!showMenu)}
-          style={{
-            background: 'rgba(255,255,255,0.1)',
-            border: 'none',
-            borderRadius: 8,
-            color: '#fff',
-            width: 40,
-            height: 40,
-            fontSize: 20,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          ☰
-        </button>
+        <button onClick={() => setShowMenu(!showMenu)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: 4 }}>☰</button>
       </div>
 
-      {/* Status + Location */}
-      <div className="mb-4">
-        <p style={{ color: '#4ade80', fontSize: 15, fontWeight: 700, margin: 0 }}>
-          {isOnline ? 'You are protected.' : 'Offline Mode'}
-        </p>
-        {user?.barangay && (
-          <p style={{ color: '#888', fontSize: 12, margin: '2px 0 0 0' }}>
-            {user.barangay}, Pasay City
-          </p>
-        )}
-      </div>
-
-      {/* Offline Banner */}
-      {!isOnline && (
-        <div className="p-3 rounded-xl mb-4" style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)' }}>
-          <p style={{ color: '#ff6b6b', fontSize: 12, margin: 0 }}>
-            You're offline. Emergency calls will send when connection restores.
-          </p>
-        </div>
-      )}
-
-      {/* Menu Dropdown */}
       {showMenu && (
-        <div
-          className="absolute top-20 right-5 rounded-xl shadow-lg z-10"
-          style={{
-            background: 'rgba(10,10,46,0.98)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            backdropFilter: 'blur(10px)',
-            minWidth: 200,
-          }}
-        >
+        <div style={{ position: 'absolute', top: 60, right: 16, zIndex: 50, background: 'rgba(10,10,46,0.97)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, minWidth: 180, boxShadow: '0 8px 30px rgba(0,0,0,0.5)' }}>
           <Link href="/profile">
-            <button
-              onClick={() => setShowMenu(false)}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                background: 'none',
-                border: 'none',
-                color: '#fff',
-                textAlign: 'left',
-                fontSize: 14,
-                cursor: 'pointer',
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
-              }}
-            >
-              👤 Profile
-            </button>
+            <button onClick={() => setShowMenu(false)} style={{ width: '100%', padding: '12px 16px', background: 'none', border: 'none', color: '#fff', textAlign: 'left', fontSize: 14, cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>👤 Profile</button>
           </Link>
           <Link href="/history">
-            <button
-              onClick={() => setShowMenu(false)}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                background: 'none',
-                border: 'none',
-                color: '#fff',
-                textAlign: 'left',
-                fontSize: 14,
-                cursor: 'pointer',
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
-              }}
-            >
-              📋 History
-            </button>
+            <button onClick={() => setShowMenu(false)} style={{ width: '100%', padding: '12px 16px', background: 'none', border: 'none', color: '#fff', textAlign: 'left', fontSize: 14, cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>📋 History</button>
           </Link>
-          <button
-            onClick={() => {
-              setShowMenu(false);
-              handleLogout();
-            }}
-            style={{
-              width: '100%',
-              padding: '12px 16px',
-              background: 'none',
-              border: 'none',
-              color: '#ff6b6b',
-              textAlign: 'left',
-              fontSize: 14,
-              cursor: 'pointer',
-            }}
-          >
-            🚪 Logout
-          </button>
+          <button onClick={() => { setShowMenu(false); handleLogout(); }} style={{ width: '100%', padding: '12px 16px', background: 'none', border: 'none', color: '#ff6b6b', textAlign: 'left', fontSize: 14, cursor: 'pointer' }}>🚪 Logout</button>
         </div>
       )}
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-6">
-        {/* Trust Score */}
-        <div className="w-full p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-          <p style={{ color: '#888', fontSize: 11, margin: '0 0 8px 0', textTransform: 'uppercase', fontWeight: 600 }}>
-            Trust Score
+      <div className="flex-1 flex flex-col items-center" style={{ padding: '20px 20px 0', overflowY: 'auto' }}>
+
+        <div className="text-center mb-4 w-full">
+          <p style={{ color: '#999', fontSize: 13, margin: '0 0 2px 0' }}>Hello, {displayName}</p>
+          <p style={{ color: '#fff', fontSize: 20, fontWeight: 800, margin: '0 0 4px 0' }}>
+            {isOnline ? 'You are protected.' : 'Offline Mode'}
           </p>
-          <div className="flex items-center justify-between">
-            <span style={{ color: getTrustColor(trustScore), fontWeight: 800, fontSize: 22 }}>
-              {trustScore}
-            </span>
-            <span style={{ color: '#555', fontWeight: 600, fontSize: 14 }}>/100</span>
+          {user?.barangay && <p style={{ color: '#888', fontSize: 12, margin: 0 }}>{user.barangay}, Pasay City</p>}
+        </div>
+
+        {!isOnline && (
+          <div style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 12, padding: '10px 14px', marginBottom: 16, width: '100%' }}>
+            <p style={{ color: '#ff6b6b', fontSize: 12, margin: 0 }}>You are offline. SOS will send when connection restores.</p>
           </div>
-        </div>
+        )}
 
-        {/* Strikes */}
-        <div className="w-full p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-          <p style={{ color: '#888', fontSize: 11, margin: '0 0 6px 0', textTransform: 'uppercase', fontWeight: 600 }}>
-            Strikes
-          </p>
-          <p style={{ color: '#4ade80', fontSize: 13, margin: 0, fontWeight: 600 }}>
-            No strikes — keep it up!
-          </p>
-        </div>
-
-        {/* SOS Button */}
-        <div style={{ position: 'relative', width: 180, height: 180 }}>
-          <style>{`
-            @keyframes pulse-ring {
-              0% {
-                transform: scale(1);
-                opacity: 1;
-              }
-              100% {
-                transform: scale(1.3);
-                opacity: 0;
-              }
-            }
-            .sos-pulse {
-              animation: pulse-ring 2s infinite;
-            }
-          `}</style>
-
-          <div
-            className="sos-pulse"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              borderRadius: '50%',
-              border: '3px solid var(--sos-red)',
-              opacity: 0.5,
-            }}
-          />
-
+        <div style={{ position: 'relative', width: 200, height: 200, margin: '12px 0 8px' }}>
+          <style>{`@keyframes sos-pulse { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(1.35); opacity: 0; } } .sos-ring { animation: sos-pulse 2s ease-out infinite; }`}</style>
+          <div className="sos-ring" style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '3px solid var(--sos-red)' }}/>
           <Link href="/sos-confirm">
-            <button
-              style={{
-                position: 'absolute',
-                inset: 0,
-                borderRadius: '50%',
-                width: '100%',
-                height: '100%',
-                background: 'var(--sos-red)',
-                border: 'none',
-                color: '#fff',
-                fontSize: 48,
-                fontWeight: 900,
-                cursor: 'pointer',
-                boxShadow: '0 8px 30px rgba(230,57,70,0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-              }}
-              onMouseDown={e => {
-                e.currentTarget.style.transform = 'scale(0.95)';
-              }}
-              onMouseUp={e => {
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-            >
-              SOS
+            <button style={{ position: 'absolute', inset: 0, borderRadius: '50%', width: '100%', height: '100%', background: 'var(--sos-red)', border: 'none', color: '#fff', cursor: 'pointer', boxShadow: '0 8px 40px rgba(230,57,70,0.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+              <span style={{ fontSize: 28 }}>🚨</span>
+              <span style={{ fontSize: 32, fontWeight: 900, letterSpacing: 2 }}>SOS</span>
             </button>
           </Link>
         </div>
 
-        <p style={{ color: '#888', fontSize: 12, textAlign: 'center', maxWidth: 200 }}>
-          Press only in real emergencies
-        </p>
-      </div>
+        <p style={{ color: '#888', fontSize: 12, marginBottom: 20 }}>Press only in real emergencies</p>
 
-      {/* Quick Links */}
-      <div className="grid grid-cols-2 gap-3 mt-auto">
-        <Link href="/history">
-          <div
-            className="p-4 rounded-xl text-center cursor-pointer"
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-            }}
-          >
-            <p style={{ fontSize: 20, margin: '0 0 4px 0' }}>📋</p>
-            <p style={{ color: '#ccc', fontSize: 12, margin: 0, fontWeight: 600 }}>Alert History</p>
-          </div>
-        </Link>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, width: '100%', marginBottom: 16 }}>
+          <Link href="/history">
+            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: '16px 12px', textAlign: 'center', cursor: 'pointer' }}>
+              <p style={{ fontSize: 22, margin: '0 0 6px 0' }}>📋</p>
+              <p style={{ color: '#ccc', fontSize: 13, margin: 0, fontWeight: 600 }}>Alert History</p>
+            </div>
+          </Link>
+          <Link href="/profile">
+            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: '16px 12px', textAlign: 'center', cursor: 'pointer' }}>
+              <p style={{ fontSize: 22, margin: '0 0 6px 0' }}>👤</p>
+              <p style={{ color: '#ccc', fontSize: 13, margin: 0, fontWeight: 600 }}>My Profile</p>
+            </div>
+          </Link>
+        </div>
 
-        <Link href="/profile">
-          <div
-            className="p-4 rounded-xl text-center cursor-pointer"
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-            }}
-          >
-            <p style={{ fontSize: 20, margin: '0 0 4px 0' }}>👤</p>
-            <p style={{ color: '#ccc', fontSize: 12, margin: 0, fontWeight: 600 }}>My Profile</p>
+        <div style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div>
+            <p style={{ color: '#888', fontSize: 10, margin: '0 0 4px 0', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 1 }}>TRUST SCORE</p>
+            <p style={{ color: '#4ade80', fontSize: 20, fontWeight: 800, margin: 0 }}>{trustScore}/100</p>
           </div>
-        </Link>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ color: '#888', fontSize: 10, margin: '0 0 6px 0', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 1 }}>STRIKES</p>
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+              {[0, 1, 2].map(i => (
+                <div key={i} style={{ width: 14, height: 14, borderRadius: '50%', background: i < strikes ? '#ef4444' : 'rgba(255,255,255,0.15)' }}/>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
