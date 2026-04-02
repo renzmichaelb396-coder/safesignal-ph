@@ -4,7 +4,7 @@ import { useCitizenAuth } from '../../hooks/useCitizenAuth';
 
 export default function Login() {
   const [, navigate] = useLocation();
-  const { login } = useCitizenAuth();
+  const { login, user, loading: authLoading } = useCitizenAuth();
   const [phone, setPhone] = useState('09171234567');
   const [pin, setPin] = useState('1234');
   const [error, setError] = useState('');
@@ -43,7 +43,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(phone, pin);
-      navigate('/home');
+
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -61,6 +61,13 @@ export default function Login() {
     fontSize: 15,
     outline: 'none',
   };
+
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/home');
+    }
+  }, [user, authLoading, navigate]);
 
   return (
     <div className="citizen-container flex flex-col items-center justify-between min-h-screen"
