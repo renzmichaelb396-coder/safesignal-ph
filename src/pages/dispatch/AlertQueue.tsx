@@ -236,7 +236,7 @@ export default function AlertQueue() {
             {filteredAlerts.map((alert) => {
               const statusColor = getStatusColor(alert.status);
               const trustColor = getTrustColor(alert.trust_score);
-              const elapsed = formatElapsed(Date.now() - alert.triggered_at * 1000);
+              const elapsed = formatElapsed(Date.now() - Number(alert.triggered_at));
 
               return (
                 <button
