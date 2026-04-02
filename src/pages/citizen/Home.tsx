@@ -51,14 +51,18 @@ export default function Home() {
   return (
     <div className="citizen-container px-5 py-6 flex flex-col min-h-screen" style={{ background: 'var(--citizen-bg)' }}>
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-2" style={{
+        borderBottom: '1px solid rgba(255,255,255,0.1)',
+        paddingBottom: 12,
+        marginBottom: 12,
+      }}>
         <div>
-          <h1 style={{ color: '#fff', fontSize: 20, fontWeight: 700, margin: 0 }}>
-            Hello, {user?.full_name?.split(' ')[0]}
-          </h1>
-          <p style={{ color: '#888', fontSize: 12, margin: 0, marginTop: 2 }}>
-            {isOnline ? 'Online & Ready' : 'Offline Mode'}
+          <p style={{ color: 'var(--ph-gold)', fontSize: 10, margin: 0, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
+            PASAY CITY POLICE
           </p>
+          <h1 style={{ color: '#fff', fontSize: 16, fontWeight: 800, margin: 0, letterSpacing: '-0.3px' }}>
+            RespondPH
+          </h1>
         </div>
         <button
           onClick={() => setShowMenu(!showMenu)}
@@ -78,6 +82,18 @@ export default function Home() {
         >
           ☰
         </button>
+      </div>
+
+      {/* Status + Location */}
+      <div className="mb-4">
+        <p style={{ color: '#4ade80', fontSize: 15, fontWeight: 700, margin: 0 }}>
+          {isOnline ? 'You are protected.' : 'Offline Mode'}
+        </p>
+        {user?.barangay && (
+          <p style={{ color: '#888', fontSize: 12, margin: '2px 0 0 0' }}>
+            {user.barangay}, Pasay City
+          </p>
+        )}
       </div>
 
       {/* Offline Banner */}
@@ -164,21 +180,22 @@ export default function Home() {
           <p style={{ color: '#888', fontSize: 11, margin: '0 0 8px 0', textTransform: 'uppercase', fontWeight: 600 }}>
             Trust Score
           </p>
-          <div className="flex items-center gap-3">
-            <div style={{ width: '100%', height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
-              <div
-                style={{
-                  width: `${trustScore}%`,
-                  height: '100%',
-                  background: getTrustColor(trustScore),
-                  transition: 'width 0.3s',
-                }}
-              />
-            </div>
-            <span style={{ color: getTrustColor(trustScore), fontWeight: 700, fontSize: 14, minWidth: 40 }}>
-              {trustScore}%
+          <div className="flex items-center justify-between">
+            <span style={{ color: getTrustColor(trustScore), fontWeight: 800, fontSize: 22 }}>
+              {trustScore}
             </span>
+            <span style={{ color: '#555', fontWeight: 600, fontSize: 14 }}>/100</span>
           </div>
+        </div>
+
+        {/* Strikes */}
+        <div className="w-full p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <p style={{ color: '#888', fontSize: 11, margin: '0 0 6px 0', textTransform: 'uppercase', fontWeight: 600 }}>
+            Strikes
+          </p>
+          <p style={{ color: '#4ade80', fontSize: 13, margin: 0, fontWeight: 600 }}>
+            No strikes — keep it up!
+          </p>
         </div>
 
         {/* SOS Button */}
@@ -210,7 +227,7 @@ export default function Home() {
             }}
           />
 
-          <Link href="/sos/confirm">
+          <Link href="/sos-confirm">
             <button
               style={{
                 position: 'absolute',
@@ -243,7 +260,7 @@ export default function Home() {
         </div>
 
         <p style={{ color: '#888', fontSize: 12, textAlign: 'center', maxWidth: 200 }}>
-          Press and hold for emergency. Your location will be shared with police.
+          Press only in real emergencies
         </p>
       </div>
 
@@ -265,7 +282,7 @@ export default function Home() {
             }}
           >
             <p style={{ fontSize: 20, margin: '0 0 4px 0' }}>📋</p>
-            <p style={{ color: '#ccc', fontSize: 12, margin: 0, fontWeight: 600 }}>History</p>
+            <p style={{ color: '#ccc', fontSize: 12, margin: 0, fontWeight: 600 }}>Alert History</p>
           </div>
         </Link>
 
@@ -285,7 +302,7 @@ export default function Home() {
             }}
           >
             <p style={{ fontSize: 20, margin: '0 0 4px 0' }}>👤</p>
-            <p style={{ color: '#ccc', fontSize: 12, margin: 0, fontWeight: 600 }}>Profile</p>
+            <p style={{ color: '#ccc', fontSize: 12, margin: 0, fontWeight: 600 }}>My Profile</p>
           </div>
         </Link>
       </div>
