@@ -23,13 +23,14 @@ export default function Dashboard() {
  const mapInstance = useRef<any>(null);
 
  useEffect(() => {
- if (!officer) {
- navigate('/login');
+ if (loading) return;
+    if (!officer) {
+ navigate('/dispatch/login');
  return;
  }
  const timer = setInterval(() => setNow(Date.now()), 1000);
  return () => clearInterval(timer);
- }, [officer, navigate]);
+ }, [officer, loading, navigate]);
 
  useEffect(() => {
  const hour = new Date().getHours();
