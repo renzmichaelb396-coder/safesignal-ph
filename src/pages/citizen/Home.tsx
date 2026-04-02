@@ -4,15 +4,13 @@ import { useCitizenAuth } from '../../hooks/useCitizenAuth';
 
 export default function Home() {
   const [, navigate] = useLocation();
-  const { user, logout } = useCitizenAuth();
+  const { user, logout, loading } = useCitizenAuth();
   const [showMenu, setShowMenu] = useState(false);
   const [trustScore, setTrustScore] = useState(85);
   const [strikes, setStrikes] = useState(1);
   const [isOnline, setIsOnline] = useState(true);
 
-  useEffect(() => {
-    if (!user) navigate('/login');
-  }, [user, navigate]);
+  useEffect(() => { if (!loading && !user) navigate('/login'); }, [user, loading, navigate]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -76,7 +74,7 @@ export default function Home() {
         <div style={{ position: 'relative', width: 200, height: 200, margin: '12px 0 8px' }}>
           <style>{`@keyframes sos-pulse { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(1.35); opacity: 0; } } .sos-ring { animation: sos-pulse 2s ease-out infinite; }`}</style>
           <div className="sos-ring" style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '3px solid var(--sos-red)' }}/>
-          <Link href="/sos-confirm">
+          <Link href="/sos/confirm">
             <button style={{ position: 'absolute', inset: 0, borderRadius: '50%', width: '100%', height: '100%', background: 'var(--sos-red)', border: 'none', color: '#fff', cursor: 'pointer', boxShadow: '0 8px 40px rgba(230,57,70,0.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
               <span style={{ fontSize: 28 }}>🚨</span>
               <span style={{ fontSize: 32, fontWeight: 900, letterSpacing: 2 }}>SOS</span>
