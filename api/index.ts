@@ -1,3 +1,4 @@
+// SafeSignal PH v1.0.1
 import express from 'express';
 import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
