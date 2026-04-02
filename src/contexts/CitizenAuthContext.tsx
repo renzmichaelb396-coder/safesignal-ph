@@ -17,7 +17,7 @@ interface CitizenUser {
 
 interface CitizenAuthContextType {
   citizen: CitizenUser | null;
-  user: CitizenUser | null;
+  user: CitizenUser | null; // alias for citizen — kept for page compatibility
   loading: boolean;
   login: (phone: string, pin: string) => Promise<void>;
   logout: () => void;
@@ -53,9 +53,8 @@ export function CitizenAuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('safesignal_citizen_token', token);
         citizenApi.getProfile()
           .then((data: any) => {
-            const normalized = { ...data.citizen, full_name: data.citizen.full_name || data.citizen.name };
-            setCitizen(normalized);
-            localStorage.setItem(USER_KEY, JSON.stringify(normalized));
+            setCitizen(data.citizen);
+            localStorage.setItem(USER_KEY, JSON.stringify(data.citizen));
           })
           .catch(() => {
             clearSession();
@@ -73,10 +72,8 @@ export function CitizenAuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (phone: string, pin: string) => {
     const data: any = await citizenApi.login({ phone, pin });
-    // Normalize: API returns 'name', interface expects 'full_name'
-    const citizen = { ...data.citizen, full_name: data.citizen.full_name || data.citizen.name };
-    saveSession(data.token, citizen);
-    setCitizen(citizen);
+    saveSession(data.token, data.citizen);
+    setCitizen(data.citizen);
   };
 
   const logout = () => {
@@ -86,9 +83,8 @@ export function CitizenAuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = async () => {
     const data: any = await citizenApi.getProfile();
-    const refreshed = { ...data.citizen, full_name: data.citizen.full_name || data.citizen.name };
-    setCitizen(refreshed);
-    localStorage.setItem(USER_KEY, JSON.stringify(refreshed));
+    setCitizen(data.citizen);
+    localStorage.setItem(USER_KEY, JSON.stringify(data.citizen));
   };
 
   return (
