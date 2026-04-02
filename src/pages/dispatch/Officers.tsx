@@ -98,7 +98,7 @@ export default function Officers() {
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: 'var(--dispatch-bg, #0d1117)',
-        color: 'var(--dispatch-border, #e6edf3)',
+        color: '#e6edf3',
       }}
     >
       {/* Header */}
@@ -200,7 +200,7 @@ export default function Officers() {
                   backgroundColor: 'var(--dispatch-bg, #0d1117)',
                   border: '1px solid var(--dispatch-border, #30363d)',
                   borderRadius: '6px',
-                  color: 'var(--dispatch-border, #e6edf3)',
+                  color: '#e6edf3',
                   boxSizing: 'border-box',
                 }}
                 onFocus={(e) => {
@@ -238,7 +238,7 @@ export default function Officers() {
                   backgroundColor: 'var(--dispatch-bg, #0d1117)',
                   border: '1px solid var(--dispatch-border, #30363d)',
                   borderRadius: '6px',
-                  color: 'var(--dispatch-border, #e6edf3)',
+                  color: '#e6edf3',
                   boxSizing: 'border-box',
                 }}
                 onFocus={(e) => {
@@ -276,7 +276,7 @@ export default function Officers() {
                   backgroundColor: 'var(--dispatch-bg, #0d1117)',
                   border: '1px solid var(--dispatch-border, #30363d)',
                   borderRadius: '6px',
-                  color: 'var(--dispatch-border, #e6edf3)',
+                  color: '#e6edf3',
                   boxSizing: 'border-box',
                 }}
                 onFocus={(e) => {
@@ -305,7 +305,7 @@ export default function Officers() {
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="••••••••"
+                placeholder="â¢â¢â¢â¢â¢â¢â¢â¢"
                 required
                 style={{
                   width: '100%',
@@ -314,7 +314,7 @@ export default function Officers() {
                   backgroundColor: 'var(--dispatch-bg, #0d1117)',
                   border: '1px solid var(--dispatch-border, #30363d)',
                   borderRadius: '6px',
-                  color: 'var(--dispatch-border, #e6edf3)',
+                  color: '#e6edf3',
                   boxSizing: 'border-box',
                 }}
                 onFocus={(e) => {
@@ -351,7 +351,7 @@ export default function Officers() {
                   backgroundColor: 'var(--dispatch-bg, #0d1117)',
                   border: '1px solid var(--dispatch-border, #30363d)',
                   borderRadius: '6px',
-                  color: 'var(--dispatch-border, #e6edf3)',
+                  color: '#e6edf3',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
                 }}
@@ -424,7 +424,7 @@ export default function Officers() {
               color: 'var(--dispatch-border, #8b949e)',
             }}
           >
-            <p style={{ fontSize: '32px', margin: '0 0 12px 0' }}>👮</p>
+            <p style={{ fontSize: '32px', margin: '0 0 12px 0' }}>ð®</p>
             <p style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0' }}>No officers found</p>
             <p style={{ fontSize: '12px', margin: 0 }}>Add your first dispatcher to get started</p>
           </div>
@@ -498,7 +498,7 @@ export default function Officers() {
                           color: 'var(--dispatch-border, #8b949e)',
                         }}
                       >
-                        {officer.badge_number} • {officer.email}
+                        {officer.badge_number} â¢ {officer.email}
                       </p>
                       <span
                         style={{
@@ -544,7 +544,7 @@ export default function Officers() {
                         padding: '6px 12px',
                         fontSize: '11px',
                         fontWeight: 600,
-                        color: 'var(--dispatch-border, #e6edf3)',
+                        color: '#e6edf3',
                         backgroundColor: 'var(--dispatch-border, #30363d)',
                         border: '1px solid var(--dispatch-border, #30363d)',
                         borderRadius: '4px',
