@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useDispatchAuth } from '../../contexts/DispatchAuthContext';
 
@@ -8,7 +8,6 @@ export default function DispatchLogin() {
   const [badgeNumber, setBadgeNumber] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [userInteracted, setUserInteracted] = useState(false);
   const [, navigate] = useLocation();
   const { login } = useDispatchAuth();
 
@@ -16,32 +15,8 @@ export default function DispatchLogin() {
     if (role === 'OFFICER') {
       navigate('/dispatch/officer-dashboard');
     } else if (role === 'STATION_ADMIN') {
-      navigate('/dispatch/metrics');
-    } else {
-      navigate('/dispatch');
-    }
-  };
-
-  // Auto-login with dispatcher credentials for demo (only if user hasn't interacted)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (userInteracted) return;
-      setEmail('dispatcher@pasay.safesignal.ph');
-      setPassword('password123');
-      setBadgeNumber('PNP-001');
-      setTimeout(async () => {
-        if (userInteracted) return;
-        try {
-          await login('dispatcher@pasay.safesignal.ph', 'password123', 'PNP-001');
-          const storedUser = localStorage.getItem('dispatch_user');
-          const user = storedUser ? JSON.parse(storedUser) : null;
-          routeByRole(user?.role || 'DISPATCHER');
-        } catch {}
-      }, 200);
-    }, 800);
-    return () => clearTimeout(timer);
-  }, [userInteracted]);
-
+      navigate('/dispatch/me
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -59,21 +34,18 @@ export default function DispatchLogin() {
   };
 
   const fillDispatcherCredentials = () => {
-    setUserInteracted(true);
     setEmail('dispatcher@pasay.safesignal.ph');
     setPassword('password123');
     setBadgeNumber('PNP-001');
   };
 
   const fillOfficerCredentials = () => {
-    setUserInteracted(true);
     setEmail('officer@pasay.safesignal.ph');
     setPassword('password123');
     setBadgeNumber('PNP-002');
   };
 
   const fillAdminCredentials = () => {
-    setUserInteracted(true);
     setEmail('admin@pasay.safesignal.ph');
     setPassword('password123');
     setBadgeNumber('PNP-ADM');
@@ -122,7 +94,7 @@ export default function DispatchLogin() {
             <input
               type="email"
               value={email}
-              onChange={e => { setUserInteracted(true); setEmail(e.target.value); }}
+              onChange={e => setEmail(e.target.value)}
               placeholder="dispatcher@pasay.safesignal.ph"
               required
               style={{ width: '100%', padding: '10px 12px', fontSize: '14px', backgroundColor: '#0d1117', border: '1px solid #30363d', borderRadius: '6px', color: '#e6edf3', boxSizing: 'border-box' }}
@@ -137,7 +109,7 @@ export default function DispatchLogin() {
             <input
               type="text"
               value={badgeNumber}
-              onChange={e => { setUserInteracted(true); setBadgeNumber(e.target.value); }}
+              onChange={e => setBadgeNumber(e.target.value)}
               placeholder="PNP-001"
               required
               style={{ width: '100%', padding: '10px 12px', fontSize: '14px', backgroundColor: '#0d1117', border: '1px solid #30363d', borderRadius: '6px', color: '#e6edf3', boxSizing: 'border-box' }}
@@ -152,7 +124,7 @@ export default function DispatchLogin() {
             <input
               type="password"
               value={password}
-              onChange={e => { setUserInteracted(true); setPassword(e.target.value); }}
+              onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               required
               style={{ width: '100%', padding: '10px 12px', fontSize: '14px', backgroundColor: '#0d1117', border: '1px solid #30363d', borderRadius: '6px', color: '#e6edf3', boxSizing: 'border-box' }}
