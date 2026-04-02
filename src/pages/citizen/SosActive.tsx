@@ -66,7 +66,7 @@ export default function SosActive() {
   useEffect(() => {
     if (!sosStatus) return;
 
-    const startTime = new Date(sosStatus.created_at).getTime();
+    const startTime = parseInt(sosStatus.triggered_at, 10);
     const timer = setInterval(() => {
       const now = new Date().getTime();
       setElapsedTime(Math.floor((now - startTime) / 1000));
