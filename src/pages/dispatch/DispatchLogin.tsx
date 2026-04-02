@@ -15,8 +15,11 @@ export default function DispatchLogin() {
     if (role === 'OFFICER') {
       navigate('/dispatch/officer-dashboard');
     } else if (role === 'STATION_ADMIN') {
-      navigate('/dispatch/me
-  
+      navigate('/dispatch/metrics');
+    } else {
+      navigate('/dispatch');
+    }
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
