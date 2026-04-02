@@ -129,7 +129,7 @@ export default function SosActive() {
       }
 
       const map = window.L.map(mapRef.current).setView(
-        [sosStatus.latitude, sosStatus.longitude],
+        [sosStatus?.latitude || 14.5794, sosStatus?.longitude || 120.9749],
         15
       );
 
@@ -138,7 +138,7 @@ export default function SosActive() {
         maxZoom: 19,
       }).addTo(map);
 
-      const marker = window.L.marker([sosStatus.latitude, sosStatus.longitude], {
+      const marker = window.L.marker([sosStatus?.latitude || 14.5794, sosStatus?.longitude || 120.9749], {
         icon: window.L.icon({
           iconUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="red" width="32" height="32"><circle cx="12" cy="12" r="8"/></svg>',
           iconSize: [32, 32],
