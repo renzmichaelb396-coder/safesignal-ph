@@ -8,30 +8,39 @@ export default function DispatchLogin() {
   const [badgeNumber, setBadgeNumber] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [userInteracted, setUserInteracted] = useState(false);
   const [, navigate] = useLocation();
   const { login } = useDispatchAuth();
 
-  // Auto-login with dispatcher credentials for demo
+  const routeByRole = (role: string) => {
+    if (role === 'OFFICER') {
+      navigate('/dispatch/officer-dashboard');
+    } else if (role === 'STATION_ADMIN') {
+      navigate('/dispatch/metrics');
+    } else {
+      navigate('/dispatch');
+    }
+  };
+
+  // Auto-login with dispatcher credentials for demo (only if user hasn't interacted)
   useEffect(() => {
     const timer = setTimeout(() => {
+      if (userInteracted) return;
       setEmail('dispatcher@pasay.safesignal.ph');
       setPassword('password123');
       setBadgeNumber('PNP-001');
       setTimeout(async () => {
+        if (userInteracted) return;
         try {
           await login('dispatcher@pasay.safesignal.ph', 'password123', 'PNP-001');
           const storedUser = localStorage.getItem('dispatch_user');
           const user = storedUser ? JSON.parse(storedUser) : null;
-          if (user?.role === 'OFFICER') {
-            navigate('/dispatch/officer-dashboard');
-          } else {
-            navigate('/dispatch');
-          }
+          routeByRole(user?.role || 'DISPATCHER');
         } catch {}
       }, 200);
     }, 800);
     return () => clearTimeout(timer);
-  }, []);
+  }, [userInteracted]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,11 +50,7 @@ export default function DispatchLogin() {
       await login(email, password, badgeNumber);
       const storedUser = localStorage.getItem('dispatch_user');
       const user = storedUser ? JSON.parse(storedUser) : null;
-      if (user?.role === 'OFFICER') {
-        navigate('/dispatch/officer-dashboard');
-      } else {
-        navigate('/dispatch');
-      }
+      routeByRole(user?.role || 'DISPATCHER');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.');
     } finally {
@@ -54,18 +59,21 @@ export default function DispatchLogin() {
   };
 
   const fillDispatcherCredentials = () => {
+    setUserInteracted(true);
     setEmail('dispatcher@pasay.safesignal.ph');
     setPassword('password123');
     setBadgeNumber('PNP-001');
   };
 
   const fillOfficerCredentials = () => {
-    setEmail('officer1@pasay.safesignal.ph');
-    setPassword('officer123');
-    setBadgeNumber('PNP-101');
+    setUserInteracted(true);
+    setEmail('officer@pasay.safesignal.ph');
+    setPassword('password123');
+    setBadgeNumber('PNP-002');
   };
 
   const fillAdminCredentials = () => {
+    setUserInteracted(true);
     setEmail('admin@pasay.safesignal.ph');
     setPassword('password123');
     setBadgeNumber('PNP-ADM');
@@ -91,7 +99,6 @@ export default function DispatchLogin() {
         boxShadow: '0 10px 40px rgba(0,0,0,0.4)'
       }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          {/* Pasay City Police Badge */}
           <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
             <img
               src="/pasay-police-badge.svg"
@@ -101,10 +108,10 @@ export default function DispatchLogin() {
                 height: 'auto',
                 filter: 'drop-shadow(0 4px 12px rgba(245,158,11,0.4))',
               }}
-              />
-            </div>
+            />
+          </div>
           <h1 style={{ fontSize: '24px', fontWeight: 600, color: '#ffc107', margin: '0 0 8px 0' }}>RespondPH</h1>
-          <p style={{ fontSize: '14px', color: '#8b949e', margin: 0 }}>Police Dispatch Portal</p>
+          <p style={{ fontSize: '14px', color: '#8b949e', margin: 0 }}>Police Dispatch Console</p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -115,7 +122,7 @@ export default function DispatchLogin() {
             <input
               type="email"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={e => { setUserInteracted(true); setEmail(e.target.value); }}
               placeholder="dispatcher@pasay.safesignal.ph"
               required
               style={{ width: '100%', padding: '10px 12px', fontSize: '14px', backgroundColor: '#0d1117', border: '1px solid #30363d', borderRadius: '6px', color: '#e6edf3', boxSizing: 'border-box' }}
@@ -130,7 +137,7 @@ export default function DispatchLogin() {
             <input
               type="text"
               value={badgeNumber}
-              onChange={e => setBadgeNumber(e.target.value)}
+              onChange={e => { setUserInteracted(true); setBadgeNumber(e.target.value); }}
               placeholder="PNP-001"
               required
               style={{ width: '100%', padding: '10px 12px', fontSize: '14px', backgroundColor: '#0d1117', border: '1px solid #30363d', borderRadius: '6px', color: '#e6edf3', boxSizing: 'border-box' }}
@@ -145,8 +152,8 @@ export default function DispatchLogin() {
             <input
               type="password"
               value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="â¢â¢â¢â¢â¢â¢â¢â¢"
+              onChange={e => { setUserInteracted(true); setPassword(e.target.value); }}
+              placeholder="••••••••"
               required
               style={{ width: '100%', padding: '10px 12px', fontSize: '14px', backgroundColor: '#0d1117', border: '1px solid #30363d', borderRadius: '6px', color: '#e6edf3', boxSizing: 'border-box' }}
               onFocus={e => { e.currentTarget.style.borderColor = '#ffc107'; }}
@@ -156,7 +163,7 @@ export default function DispatchLogin() {
 
           {error && (
             <div style={{ padding: '12px', backgroundColor: 'rgba(248,81,73,0.1)', border: '1px solid #f85149', borderRadius: '6px', fontSize: '13px', color: '#f85149' }}>
-             {error}
+              {error}
             </div>
           )}
 
@@ -185,7 +192,7 @@ export default function DispatchLogin() {
             onClick={fillOfficerCredentials}
             style={{ width: '100%', padding: '10px 12px', fontSize: '13px', fontWeight: 600, color: '#3fb950', backgroundColor: 'transparent', border: '1px solid #30363d', borderRadius: '6px', cursor: 'pointer', marginBottom: '8px' }}
           >
-            Officer (Juan dela Cruz / PNP-101)
+            Officer (Carlos Mendoza / PNP-002)
           </button>
           <button
             type="button"
@@ -196,7 +203,7 @@ export default function DispatchLogin() {
           </button>
         </div>
         <p style={{ marginTop: '24px', textAlign: 'center', fontSize: '11px', color: '#8b949e' }}>
-          RespondPH v1.0 â Authorized Personnel Only
+          RespondPH v1.0 — Authorized Personnel Only
         </p>
       </div>
     </div>
