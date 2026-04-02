@@ -112,7 +112,8 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
   };
 
   const formatDate = (dateString: string | number) => {
-    const ts = typeof dateString === 'number' && dateString < 10000000000 ? dateString * 1000 : dateString;
+    const num = Number(dateString);
+    const ts = !isNaN(num) ? (num < 10000000000 ? num * 1000 : num) : NaN;
     const date = new Date(ts);
     return date.toLocaleDateString('en-PH', {
       year: 'numeric',
@@ -125,7 +126,8 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
 
   const statusColor = getStatusColor(alert.status);
   const trustColor = getTrustColor(alert.trust_score);
-  const triggeredMs = typeof alert.triggered_at === 'number' && alert.triggered_at < 10000000000 ? alert.triggered_at * 1000 : new Date(alert.triggered_at).getTime();
+  const tNum = Number(alert.triggered_at);
+  const triggeredMs = !isNaN(tNum) ? (tNum < 10000000000 ? tNum * 1000 : tNum) : new Date(String(alert.triggered_at)).getTime();
   const elapsed = formatElapsed(Date.now() - triggeredMs);
 
   return (
