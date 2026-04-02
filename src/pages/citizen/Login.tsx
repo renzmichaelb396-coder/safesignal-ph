@@ -36,7 +36,7 @@ export default function Login() {
     <div className="citizen-container flex flex-col items-center justify-between min-h-screen"
          style={{ background: 'var(--citizen-bg)', padding: '48px 20px 24px' }}>
       <div className="flex flex-col items-center w-full">
-        <img src="/pasay-police-badge.svg" alt="Pasay City Police"
+        <img src="/pasay-police-badge.png" alt="Pasay City Police"
           style={{ width: 90, height: 100, objectFit: 'contain', marginBottom: 16 }} />
         <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 800, margin: 0, textAlign: 'center' }}>
           RespondPH
