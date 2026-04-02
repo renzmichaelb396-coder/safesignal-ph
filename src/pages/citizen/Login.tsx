@@ -47,11 +47,16 @@ export default function Login() {
     transition: 'border-color 0.2s',
   };
 
-  // Auto-login with demo credentials for instant demo access
+  // Auto-login with demo credentials — fail silently so no error is shown
   useEffect(() => {
     if (phone && pin && phone.length === 11 && pin.length === 4) {
-      const timer = setTimeout(() => {
-        handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+      const timer = setTimeout(async () => {
+        try {
+          await login(phone, pin);
+          navigate('/home');
+        } catch {
+          // Auto-login failed silently — user can log in manually
+        }
       }, 800);
       return () => clearTimeout(timer);
     }
