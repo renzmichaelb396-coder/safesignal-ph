@@ -8,24 +8,23 @@ export default function Metrics() {
   const { officer } = useDispatchAuth();
   const [, navigate] = useLocation();
   const [stats, setStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (loading) return;
     if (!officer) { navigate('/dispatch/login'); return; }
     dispatchApi.getStats()
       .then(setStats)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [officer, loading]);
+  }, [officer]);
 
   const metricCards = stats ? [
-    { label: 'Total Alerts', value: stats.total ?? 0, color: '#e6edf3', icon: 'ð' },
-    { label: 'Active Now', value: stats.active_count ?? 0, color: '#f85149', icon: 'ð¨' },
-    { label: 'Acknowledged', value: stats.acknowledged_count ?? 0, color: '#ffc107', icon: 'ðï¸' },
-    { label: 'Resolved', value: stats.resolved_count ?? 0, color: '#3fb950', icon: 'â' },
-    { label: 'False Alarms', value: stats.false_alarm_count ?? 0, color: '#8b949e', icon: 'â ï¸' },
-    { label: 'Today', value: stats.today_count ?? 0, color: '#58a6ff', icon: 'ð' },
+    { label: 'Total Alerts', value: stats.total ?? 0, color: '#e6edf3', icon: 'Ã°ÂÂÂ' },
+    { label: 'Active Now', value: stats.active_count ?? 0, color: '#f85149', icon: 'Ã°ÂÂÂ¨' },
+    { label: 'Acknowledged', value: stats.acknowledged_count ?? 0, color: '#ffc107', icon: 'Ã°ÂÂÂÃ¯Â¸Â' },
+    { label: 'Resolved', value: stats.resolved_count ?? 0, color: '#3fb950', icon: 'Ã¢ÂÂ' },
+    { label: 'False Alarms', value: stats.false_alarm_count ?? 0, color: '#8b949e', icon: 'Ã¢ÂÂ Ã¯Â¸Â' },
+    { label: 'Today', value: stats.today_count ?? 0, color: '#58a6ff', icon: 'Ã°ÂÂÂ' },
   ] : [];
 
   return (
@@ -33,12 +32,12 @@ export default function Metrics() {
       <div style={{ padding: '24px' }}>
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 600, color: '#e6edf3' }}>Metrics</h1>
-          <p style={{ margin: 0, fontSize: '13px', color: '#8b949e' }}>Pasay City Police Station â performance overview</p>
+          <p style={{ margin: 0, fontSize: '13px', color: '#8b949e' }}>Pasay City Police Station Ã¢ÂÂ performance overview</p>
         </div>
 
         {loading ? (
           <div style={{ textAlign: 'center' as const, padding: '64px', color: '#8b949e' }}>
-            <div style={{ fontSize: '32px', marginBottom: '12px' }}>ð</div>
+            <div style={{ fontSize: '32px', marginBottom: '12px' }}>Ã°ÂÂÂ</div>
             Loading metrics...
           </div>
         ) : !stats ? (
