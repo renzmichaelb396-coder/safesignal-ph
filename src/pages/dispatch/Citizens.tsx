@@ -127,7 +127,7 @@ export default function Citizens() {
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: 'var(--dispatch-bg, #0d1117)',
-        color: 'var(--dispatch-border, #e6edf3)',
+        color: '#e6edf3',
       }}
     >
       {/* Header */}
@@ -167,7 +167,7 @@ export default function Citizens() {
               backgroundColor: 'var(--dispatch-border, #161b22)',
               border: '1px solid var(--dispatch-border, #30363d)',
               borderRadius: '6px',
-              color: 'var(--dispatch-border, #e6edf3)',
+              color: '#e6edf3',
               boxSizing: 'border-box',
               transition: 'border-color 0.2s',
             }}
@@ -247,7 +247,7 @@ export default function Citizens() {
               color: 'var(--dispatch-border, #8b949e)',
             }}
           >
-            <p style={{ fontSize: '32px', margin: '0 0 12px 0' }}>👕</p>
+            <p style={{ fontSize: '32px', margin: '0 0 12px 0' }}>ð</p>
             <p style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0' }}>No citizens found</p>
             <p style={{ fontSize: '12px', margin: 0 }}>
               {search ? 'Try adjusting your search' : 'No citizens in the system'}
@@ -341,7 +341,7 @@ export default function Citizens() {
                           color: 'var(--dispatch-border, #8b949e)',
                         }}
                       >
-                        {citizen.phone} • {citizen.barangay}
+                        {citizen.phone} â¢ {citizen.barangay}
                       </p>
                       <div style={{ display: 'flex', gap: '16px', fontSize: '11px' }}>
                         <div
