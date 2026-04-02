@@ -59,7 +59,7 @@ async function initDb(): Promise<void> {
     `, [stationId]);
     const officers = [
       { badge: 'PNP-001', email: 'dispatcher@pasay.safesignal.ph', full_name: 'Maria Lopez', role: 'DISPATCHER' },
-      { badge: 'PNP-002', email: 'dispatcher2@pasay.safesignal.ph', full_name: 'Carlos Mendoza', role: 'DISPATCHER' },
+      { badge: 'PNP-002', email: 'officer@pasay.safesignal.ph', full_name: 'Carlos Mendoza', role: 'OFFICER' },
       { badge: 'PNP-ADM', email: 'admin@pasay.safesignal.ph', full_name: 'Chief Antonio Reyes', role: 'STATION_ADMIN' },
     ];
     for (const officer of officers) {
@@ -80,6 +80,8 @@ async function initDb(): Promise<void> {
       ON CONFLICT (phone) DO NOTHING
     `, [hashPin('1234')]);
     console.log('[SafeSignal] Demo citizen ensured: 09171234567 / 1234');
+        // Force-correct PNP-002 role/email on every cold start (fixes existing DB rows)
+        await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer@pasay.safesignal.ph' WHERE badge_number = 'PNP-002'`);
         seeded = true;
     console.log('[SafeSignal] initDb complete');
   } catch (err) {
