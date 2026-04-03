@@ -53,7 +53,7 @@ export default function Profile() {
         <div style={{ background: '#1a1a3e', borderRadius: 16, padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{
             width: 64, height: 64, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #1e4c8f 0%, #ffc72c 100%)',
+            background: '#1e4c8f',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 26, fontWeight: 700, color: '#fff', flexShrink: 0,
           }}>
@@ -63,7 +63,7 @@ export default function Profile() {
             <h2 style={{ margin: '0 0 4px 0', fontSize: 18, fontWeight: 700 }}>{citizen.full_name}</h2>
             <p style={{ margin: '0 0 2px 0', fontSize: 13, color: '#888' }}>{citizen.phone}</p>
             <p style={{ margin: 0, fontSize: 13, color: '#888' }}>
-              {citizen.barangay ? `Barangay ${citizen.barangay}, Pasay City` : 'Pasay City'}
+              {citizen.barangay ? `${citizen.barangay}, Pasay City` : 'Pasay City'}
             </p>
           </div>
         </div>
