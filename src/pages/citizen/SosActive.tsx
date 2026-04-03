@@ -107,23 +107,43 @@ export default function SosActive() {
   useEffect(() => {
     if (!mapRef.current || !sosStatus || mapInstance.current) return;
     const loadMap = () => {
-      if (!window.L) { setTimeout(loadMap, 100); return; }
+      if (!window.L) {
+        setTimeout(loadMap, 100);
+        return;
+      }
       const lat = sosStatus?.latitude || 14.5794;
       const lng = sosStatus?.longitude || 120.9749;
       const map = window.L.map(mapRef.current).setView([lat, lng], 15);
-      window.L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+
+      // CARTO Voyager tiles — warm, professional look matching Manus reference
+      window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 19,
       }).addTo(map);
-      const marker = window.L.circleMarker([lat, lng], {
-        radius: 10,
-        fillColor: '#3b82f6',
-        color: '#1d4ed8',
-        weight: 2,
-        opacity: 1,
-        fillOpacity: 0.9,
-      }).addTo(map);
+
+      // Professional pulsing location pin with animated rings
+      const pulseIcon = window.L.divIcon({
+        className: '',
+        html: `
+          <div style="position:relative;width:40px;height:40px;">
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:40px;height:40px;border-radius:50%;background:rgba(59,130,246,0.15);animation:sosPulse 2s ease-out infinite;"></div>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;background:rgba(59,130,246,0.25);animation:sosPulse 2s ease-out infinite 0.5s;"></div>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>
+          </div>
+          <style>
+            @keyframes sosPulse {
+              0% { transform: translate(-50%,-50%) scale(0.5); opacity: 1; }
+              100% { transform: translate(-50%,-50%) scale(1.8); opacity: 0; }
+            }
+          </style>
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+      });
+
+      const marker = window.L.marker([lat, lng], { icon: pulseIcon }).addTo(map);
+
       mapInstance.current = map;
       markerRef.current = marker;
     };
@@ -131,7 +151,10 @@ export default function SosActive() {
   }, [sosStatus, user]);
 
   const handleCancel = async () => {
-    if (!cancelReason) { setError('Please select a reason'); return; }
+    if (!cancelReason) {
+      setError('Please select a reason');
+      return;
+    }
     setLoading(true);
     try {
       await citizenApi.cancelSos(cancelReason);
@@ -161,7 +184,6 @@ export default function SosActive() {
 
   return (
     <div style={{ background: 'var(--citizen-bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-
       {/* "HELP IS ON THE WAY" Header */}
       <div style={{
         background: 'linear-gradient(180deg, #2d0a0a 0%, #1a1a2e 100%)',
@@ -171,12 +193,8 @@ export default function SosActive() {
       }}>
         <span style={{ fontSize: 28 }}>🚨</span>
         <h1 style={{
-          color: '#fff',
-          fontSize: 18,
-          fontWeight: 900,
-          margin: '6px 0 0 0',
-          letterSpacing: 1.5,
-          textTransform: 'uppercase',
+          color: '#fff', fontSize: 18, fontWeight: 900, margin: '6px 0 0 0',
+          letterSpacing: 1.5, textTransform: 'uppercase',
         }}>
           HELP IS ON THE WAY
         </h1>
@@ -184,12 +202,8 @@ export default function SosActive() {
 
       {/* Elapsed Time + Status */}
       <div style={{
-        padding: '12px 20px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        background: 'rgba(0,0,0,0.3)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
         <div>
           <p style={{ color: '#888', fontSize: 10, margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>ELAPSED TIME</p>
@@ -200,8 +214,7 @@ export default function SosActive() {
         <div style={{
           background: `${getStatusColor(sosStatus?.status)}22`,
           border: `1px solid ${getStatusColor(sosStatus?.status)}66`,
-          borderRadius: 8,
-          padding: '4px 12px',
+          borderRadius: 8, padding: '4px 12px',
         }}>
           <p style={{ color: getStatusColor(sosStatus?.status), fontSize: 12, fontWeight: 700, margin: 0, textTransform: 'uppercase' }}>
             {sosStatus?.status || 'PENDING'}
@@ -225,24 +238,17 @@ export default function SosActive() {
       )}
 
       {/* Map */}
-      <div
-        ref={mapRef}
-        style={{
-          flex: 1,
-          minHeight: 220,
-          borderTop: '1px solid rgba(255,255,255,0.06)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-        }}
-      />
+      <div ref={mapRef} style={{
+        flex: 1, minHeight: 220,
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }} />
 
       {/* Location + Accuracy */}
       {sosStatus?.latitude && (
         <div style={{
-          padding: '12px 20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          background: 'rgba(0,0,0,0.3)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          padding: '12px 20px', display: 'flex', justifyContent: 'space-between',
+          background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}>
           <div>
             <p style={{ color: '#888', fontSize: 10, margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>LOCATION</p>
@@ -287,14 +293,11 @@ export default function SosActive() {
           onClick={() => setShowCancelModal(true)}
           disabled={loading || sosStatus?.status === 'CANCELLED'}
           style={{
-            width: '100%',
-            padding: '14px',
-            borderRadius: 12,
+            width: '100%', padding: '14px', borderRadius: 12,
             background: 'rgba(255,255,255,0.07)',
             border: '1px solid rgba(255,255,255,0.15)',
             color: sosStatus?.status === 'CANCELLED' ? '#888' : '#4ade80',
-            fontSize: 15,
-            fontWeight: 700,
+            fontSize: 15, fontWeight: 700,
             cursor: loading || sosStatus?.status === 'CANCELLED' ? 'not-allowed' : 'pointer',
             opacity: loading ? 0.5 : 1,
           }}
@@ -305,13 +308,19 @@ export default function SosActive() {
 
       {/* Cancel Modal */}
       {showCancelModal && (
-        <div
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', zIndex: 50 }}
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', zIndex: 50
+        }}
           onClick={() => setShowCancelModal(false)}
         >
           <div
             className="w-full rounded-t-3xl p-6"
-            style={{ background: 'var(--citizen-bg)', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '70vh', overflow: 'auto' }}
+            style={{
+              background: 'var(--citizen-bg)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              maxHeight: '70vh', overflow: 'auto'
+            }}
             onClick={e => e.stopPropagation()}
           >
             <h2 style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: '0 0 8px 0' }}>Why are you cancelling?</h2>
@@ -322,13 +331,10 @@ export default function SosActive() {
                   key={reason}
                   onClick={() => setCancelReason(reason)}
                   style={{
-                    padding: '12px 16px',
-                    borderRadius: 12,
+                    padding: '12px 16px', borderRadius: 12,
                     background: cancelReason === reason ? 'var(--sos-red)' : 'rgba(255,255,255,0.07)',
                     border: '1px solid ' + (cancelReason === reason ? 'var(--sos-red)' : 'rgba(255,255,255,0.15)'),
-                    color: '#fff',
-                    fontSize: 14,
-                    cursor: 'pointer',
+                    color: '#fff', fontSize: 14, cursor: 'pointer',
                     fontWeight: cancelReason === reason ? 600 : 400,
                     transition: 'all 0.2s',
                   }}
