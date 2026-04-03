@@ -77,6 +77,7 @@ export const dispatchApi = {
   resolve: (id, notes) => request(`/api/dispatch/alerts/${id}/resolve`, { method: 'POST', body: JSON.stringify({ notes }) }, 'officer'),
   falseAlarm: (id, notes) => request(`/api/dispatch/alerts/${id}/false-alarm`, { method: 'POST', body: JSON.stringify({ notes }) }, 'officer'),
   markSuspicious: (id, reason) => request(`/api/dispatch/alerts/${id}/suspicious`, { method: 'POST', body: JSON.stringify({ reason }) }, 'officer'),
+  assignOfficer: (id, officerId) => request(`/api/dispatch/alerts/${id}/assign`, { method: 'POST', body: JSON.stringify({ officer_id: officerId }) }, 'officer'),
   getCitizens: (params) => {
     const qs = new URLSearchParams(params || {}).toString();
     return request(`/api/dispatch/citizens${qs ? `?${qs}` : ''}`, {}, 'officer');
