@@ -46,7 +46,7 @@ export default function DispatchLogin() {
   const fillOfficerCredentials = () => {
     setEmail('officer@pasay.safesignal.ph');
     setPassword('password123');
-    setBadgeNumber('PNP-002B');
+    setBadgeNumber('PNP-002');
   };
 
   const fillAdminCredentials = () => {
@@ -150,7 +150,7 @@ export default function DispatchLogin() {
             onClick={fillOfficerCredentials}
             style={{ width: '100%', padding: '10px 12px', fontSize: '13px', fontWeight: 600, color: '#3fb950', backgroundColor: 'transparent', border: '1px solid #30363d', borderRadius: '6px', cursor: 'pointer', marginBottom: '8px' }}
           >
-            Officer (Carlos Mendoza / PNP-002B)
+            Officer (Carlos Mendoza / PNP-002)
           </button>
           <button
             type="button"
