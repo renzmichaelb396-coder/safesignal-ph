@@ -322,7 +322,7 @@ export default function AlertQueue() {
                           color: '#8b949e',
                         }}
                       >
-                        {alert.barangay} â¢ {elapsed}
+                        {alert.barangay} • {elapsed}
                       </p>
                       <div style={{ display: 'flex', gap: '12px', fontSize: '11px' }}>
                         <span style={{ color: '#8b949e' }}>
