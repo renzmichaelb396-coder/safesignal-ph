@@ -47,12 +47,35 @@ export default function OfficerDashboard() {
       return;
     }
 
-    setOfficerName(dispatchObj?.full_name || officerObj?.name || 'Officer');
+    setOfficerName(dispatchObj?.full_name || officerObj?.full_name || officerObj?.name || 'Officer');
     fetchAssignment();
-    initMap();
+    loadMapLibre();
     const interval = setInterval(fetchAssignment, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  function loadMapLibre() {
+    // Load CSS
+    if (!document.getElementById('maplibre-css')) {
+      const link = document.createElement('link');
+      link.id = 'maplibre-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css';
+      document.head.appendChild(link);
+    }
+    // Load JS
+    if (!(window as any).maplibregl) {
+      if (!document.getElementById('maplibre-js')) {
+        const script = document.createElement('script');
+        script.id = 'maplibre-js';
+        script.src = 'https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js';
+        script.onload = () => initMap();
+        document.head.appendChild(script);
+      }
+    } else {
+      initMap();
+    }
+  }
 
   function initMap() {
     const checkMapLibre = setInterval(() => {
@@ -141,9 +164,6 @@ export default function OfficerDashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', color: '#e6edf3', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
-      <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
-      <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-
       {/* Header */}
       <div style={{ maxWidth: 540, margin: '0 auto', padding: '0 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid #30363d' }}>
@@ -164,7 +184,7 @@ export default function OfficerDashboard() {
 
         {/* Location sharing status */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderBottom: '1px solid #30363d', marginBottom: 20 }}>
-          <span style={{ color: '#3fb950', fontSize: 14 }}>\ud83d\udccd</span>
+          <span style={{ color: '#3fb950', fontSize: 14 }}>ð</span>
           <span style={{ color: '#3fb950', fontSize: 13, fontWeight: 500 }}>Sharing your location with dispatch</span>
         </div>
 
@@ -172,7 +192,7 @@ export default function OfficerDashboard() {
 
         {!assignment ? (
           <div style={{ textAlign: 'center', padding: '48px 0' }}>
-            <div style={{ fontSize: 56, marginBottom: 16 }}>\ud83c\udfaf</div>
+            <div style={{ fontSize: 56, marginBottom: 16 }}>ð¯</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#e6edf3', marginBottom: 8 }}>No active assignment</div>
             <div style={{ color: '#8b949e', fontSize: 14 }}>Waiting for dispatch...</div>
           </div>
