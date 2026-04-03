@@ -270,8 +270,8 @@ export default function Citizens() {
         {!loading && filteredCitizens.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {filteredCitizens.map((citizen) => {
-              const trustColor = getTrustColor((citizen.trust?.score ?? 0));
-              const trustBg = getTrustBg((citizen.trust?.score ?? 0));
+              const trustColor = getTrustColor((citizen.trust_score ?? 0));
+              const trustBg = getTrustBg((citizen.trust_score ?? 0));
 
               return (
                 <div
@@ -318,7 +318,7 @@ export default function Citizens() {
                         <p style={{ margin: 0, fontWeight: 600, fontSize: '14px' }}>
                           {citizen.full_name}
                         </p>
-                        {citizen.is_suspended && (
+                        {!!citizen.is_suspended && (
                           <span
                             style={{
                               padding: '2px 8px',
@@ -353,7 +353,7 @@ export default function Citizens() {
                             fontWeight: 700,
                           }}
                         >
-                          Trust: {(citizen.trust?.score ?? 0)}%
+                          Trust: {(citizen.trust_score ?? 0)}%
                         </div>
                         <div
                           style={{
