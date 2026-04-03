@@ -5,19 +5,26 @@ import { dispatchApi } from '../../lib/api';
 import DispatchLayout from './DispatchLayout';
 
 export default function Metrics() {
-  const { officer } = useDispatchAuth();
+  const { officer, loading: authLoading } = useDispatchAuth();
   const [, navigate] = useLocation();
   const [period, setPeriod] = useState('pilot');
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!officer) { navigate('/dispatch/login'); return; }
+    if (authLoading) return;
+    if (!officer) {
+      navigate('/dispatch/login');
+      return;
+    }
+    setLoading(true);
     dispatchApi.getStats(`?period=${period}`)
       .then(setStats)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [officer]);
+  }, [officer, authLoading, period]);
+
+  if (authLoading) return null;
 
   const metricCards = stats ? [
     { label: 'Total Alerts', value: stats.total ?? 0, color: '#e6edf3', icon: 'Ã°ÂÂÂ' },
