@@ -525,16 +525,16 @@ export default function Officers() {
                         alignItems: 'center',
                         gap: '8px',
                         padding: '6px 12px',
-                        backgroundColor: officer.is_active ? 'rgba(76, 175, 80, 0.1)' : 'rgba(156, 156, 156, 0.1)',
+                        backgroundColor: !!officer.is_active ? 'rgba(76, 175, 80, 0.1)' : 'rgba(156, 156, 156, 0.1)',
                         borderRadius: '4px',
                         fontSize: '11px',
                         fontWeight: 700,
-                        color: officer.is_active ? '#4caf50' : '#9e9e9e',
+                        color: !!officer.is_active ? '#4caf50' : '#9e9e9e',
                         textTransform: 'uppercase',
                       }}
                     >
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block', backgroundColor: officer.is_active ? '#4caf50' : '#9e9e9e' }}></span>
-                      {officer.is_active ? 'Active' : 'Inactive'}
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block', backgroundColor: !!officer.is_active ? '#4caf50' : '#9e9e9e' }}></span>
+                      {!!officer.is_active ? 'Active' : 'Inactive'}
                     </div>
 
                     <button
@@ -565,7 +565,7 @@ export default function Officers() {
                         e.currentTarget.style.borderColor = 'var(--dispatch-border, #30363d)';
                       }}
                     >
-                      {actionLoading === officer.id ? '...' : officer.is_active ? 'Deactivate' : 'Activate'}
+                      {actionLoading === officer.id ? '...' : !!officer.is_active ? 'Deactivate' : 'Activate'}
                     </button>
                   </div>
                 </div>
