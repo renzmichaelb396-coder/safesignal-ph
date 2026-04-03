@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { dispatchApi, formatElapsed, getInitials } from '../../lib/api';
+import DispatchLayout from './DispatchLayout';
 
 interface Alert {
   id: string;
@@ -98,6 +99,7 @@ export default function DispatchHistory() {
   };
 
   return (
+    <DispatchLayout>
     <div
       style={{
         flex: 1,
@@ -443,5 +445,6 @@ export default function DispatchHistory() {
         )}
       </div>
     </div>
+    </DispatchLayout>
   );
 }
