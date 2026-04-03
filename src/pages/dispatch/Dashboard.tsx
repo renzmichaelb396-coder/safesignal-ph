@@ -347,7 +347,7 @@ export default function Dashboard() {
                             {formatElapsed(Date.now() - alert.triggered_at)}
                           </span>
                           <div className="flex items-center gap-1">
-                            {alert.is_suspicious && (
+                            {!!alert.is_suspicious && (
                               <span style={{ fontSize: 12 }} title="Suspicious">🚩</span>
                             )}
                             <span style={{
