@@ -299,7 +299,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                 Phone
               </p>
               <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#e6edf3' }}>
-                {alert.phone || '—'}
+                {alert.phone && alert.phone !== '0' ? alert.phone : '—'}
               </p>
             </div>
             <div>
