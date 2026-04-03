@@ -693,4 +693,57 @@ app.post('/api/dispatch/officer-location', requireOfficerAuth, async (req: any, 
   }
 });
 
+// ───────────────────────── OFFICER ROUTES ─────────────────────────
+// GET /api/officer/active-assignment
+app.get('/api/officer/active-assignment', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const officerPayload = req.officer as OfficerPayload;
+    const result = await pool.query(
+      `SELECT a.id, c.full_name as "citizenName", c.phone as "citizenPhone",
+       c.address, a.lat, a.lng, a.status, a.triggered_at as "createdAt"
+       FROM sos_alerts a
+       JOIN citizens c ON a.citizen_id = c.id
+       WHERE a.assigned_officer_id = $1 AND a.status IN ('ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE')
+       ORDER BY a.triggered_at DESC LIMIT 1`,
+      [officerPayload.id]
+    );
+    res.json({ assignment: result.rows[0] || null });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch assignment' });
+  }
+});
+
+// PATCH /api/officer/assignment/:id/status
+app.patch('/api/officer/assignment/:id/status', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const officerPayload = req.officer as OfficerPayload;
+    const { status } = req.body;
+    const valid = ['EN_ROUTE', 'ON_SCENE', 'RESOLVED'];
+    if (!valid.includes(status)) {
+      res.status(400).json({ error: 'Invalid status' });
+      return;
+    }
+    const alertResult = await pool.query(
+      'SELECT * FROM sos_alerts WHERE id = $1 AND assigned_officer_id = $2',
+      [req.params.id, officerPayload.id]
+    );
+    if (!alertResult.rows[0]) {
+      res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+    const now = Date.now();
+    await pool.query(
+      `UPDATE sos_alerts SET status = $1, resolved_at = CASE WHEN $1 = 'RESOLVED' THEN $2 ELSE resolved_at END WHERE id = $3`,
+      [status, now, req.params.id]
+    );
+    const updated = await getAlertWithCitizen(req.params.id);
+    broadcastEvent('alert_updated', { alert: updated });
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
 export default app;
