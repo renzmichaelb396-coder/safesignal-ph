@@ -45,6 +45,7 @@ async function initDb(): Promise<void> {
     await pool.query(`CREATE TABLE IF NOT EXISTS sos_alerts (id SERIAL PRIMARY KEY, citizen_id INT REFERENCES citizens(id), lat FLOAT NOT NULL, lng FLOAT NOT NULL, status TEXT NOT NULL DEFAULT 'ACTIVE', triggered_at BIGINT, acknowledged_at BIGINT, resolved_at BIGINT, cancelled_at BIGINT, location_accuracy FLOAT, assigned_officer_id INT REFERENCES officers(id), is_suspicious BOOL DEFAULT false, suspicious_reason TEXT, notes TEXT, cancellation_reason TEXT)`);
     await pool.query(`CREATE TABLE IF NOT EXISTS alert_location_history (id SERIAL PRIMARY KEY, alert_id INT REFERENCES sos_alerts(id), lat FLOAT NOT NULL, lng FLOAT NOT NULL, recorded_at BIGINT)`);
     await pool.query(`CREATE TABLE IF NOT EXISTS otp_codes (id SERIAL PRIMARY KEY, citizen_id INT REFERENCES citizens(id), code TEXT NOT NULL, expires_at BIGINT)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS officer_locations (officer_id INT UNIQUE REFERENCES officers(id), lat FLOAT, lng FLOAT, heading FLOAT, status TEXT DEFAULT 'ON_DUTY', updated_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`);
     const stationResult = await pool.query(`
       INSERT INTO stations (name, barangay, latitude, longitude, contact_number)
       VALUES ($1, $2, $3, $4, $5)
@@ -638,6 +639,53 @@ app.post('/api/citizen/resend-otp', async (req: any, res: any) => {
     if (!citizen_id) { res.status(400).json({ error: 'citizen_id is required' }); return; }
     await pool.query(`INSERT INTO otp_codes (citizen_id, code, expires_at) VALUES ($1, '123456', $2)`, [citizen_id, Date.now() + 10 * 60 * 1000]);
     res.json({ message: 'OTP resent' });  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to resend OTP' }); }
+});
+
+// GET /api/dispatch/officer-locations
+app.get('/api/dispatch/officer-locations', requireOfficerAuth, async (_req: any, res: any) => {
+  try {
+    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+    const result = await pool.query(
+      `SELECT ol.officer_id, ol.lat, ol.lng, ol.heading, ol.status, ol.updated_at,
+              o.full_name, o.badge_number, o.role
+       FROM officer_locations ol
+       JOIN officers o ON ol.officer_id = o.id
+       WHERE ol.updated_at > $1
+       ORDER BY ol.updated_at DESC`,
+      [fiveMinAgo]
+    );
+    res.json({ officers: result.rows });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch officer locations' });
+  }
+});
+
+// POST /api/dispatch/officer-location (officer updates own GPS location)
+app.post('/api/dispatch/officer-location', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const officerPayload = req.officer as OfficerPayload;
+    const { lat, lng, heading, status } = req.body;
+    if (lat == null || lng == null) {
+      res.status(400).json({ error: 'lat and lng are required' });
+      return;
+    }
+    await pool.query(
+      `INSERT INTO officer_locations (officer_id, lat, lng, heading, status, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (officer_id) DO UPDATE SET
+         lat = EXCLUDED.lat,
+         lng = EXCLUDED.lng,
+         heading = EXCLUDED.heading,
+         status = EXCLUDED.status,
+         updated_at = EXCLUDED.updated_at`,
+      [officerPayload.id, lat, lng, heading || null, status || 'ON_DUTY', Date.now()]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update officer location' });
+  }
 });
 
 export default app;
