@@ -84,8 +84,17 @@ async function initDb(): Promise<void> {
       ON CONFLICT (phone) DO NOTHING
     `, [hashPin('1234')]);
     console.log('[SafeSignal] Demo citizen ensured: 09171234567 / 1234');
-      // Clean up stale PNP-002B ghost record if it exists (blocks officer@pasay email)
-      await pool.query(`DELETE FROM officers WHERE badge_number = 'PNP-002B'`);
+      // Fix PNP-002/002B conflict: move 002B email out of the way, reassign alerts, then fix 002
+      const ghost = await pool.query(`SELECT id FROM officers WHERE badge_number = 'PNP-002B'`);
+      if (ghost.rows.length > 0) {
+        const ghostId = ghost.rows[0].id;
+        const real = await pool.query(`SELECT id FROM officers WHERE badge_number = 'PNP-002'`);
+        const realId = real.rows.length > 0 ? real.rows[0].id : null;
+        // Move ghost email out of the way so PNP-002 can claim it
+        await pool.query(`UPDATE officers SET email = 'ghost-002b@removed.local', is_active = false WHERE id = $1`, [ghostId]);
+        // Reassign any alerts from ghost to real officer
+        if (realId) { await pool.query(`UPDATE sos_alerts SET assigned_officer_id = $1 WHERE assigned_officer_id = $2`, [realId, ghostId]); }
+      }
       // Force-correct PNP-002 role/email/password on every cold start
       const officerPwHash = await bcrypt.hash('password123', 10);
       await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer@pasay.safesignal.ph', password_hash = $1, is_active = true WHERE badge_number = 'PNP-002'`, [officerPwHash]);
