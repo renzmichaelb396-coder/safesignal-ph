@@ -40,13 +40,13 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  // Load Leaflet CSS
+  // Load MapLibre GL CSS
   useEffect(() => {
-    if (!document.getElementById('leaflet-css')) {
+    if (!document.getElementById('maplibre-css')) {
       const link = document.createElement('link');
-      link.id = 'leaflet-css';
+      link.id = 'maplibre-css';
       link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      link.href = 'https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css';
       document.head.appendChild(link);
     }
   }, []);
@@ -60,43 +60,40 @@ export default function Dashboard() {
   // Initialize map
   useEffect(() => {
     if (!mapRef.current || !officer) return;
-    import('leaflet').then(L => {
+
+    const initMap = () => {
       if (leafletMapRef.current) return;
-      leafletMapRef.current = L.map(mapRef.current!, {
-        center: [14.5378, 120.9932],
+      const maplibregl = (window as any).maplibregl;
+      if (!maplibregl) return;
+
+      leafletMapRef.current = new maplibregl.Map({
+        container: mapRef.current!,
+        style: 'https://tiles.openfreemap.org/styles/liberty',
+        center: [120.9932, 14.5378],
         zoom: 14,
-        zoomControl: true,
-        zoomAnimation: true,
-        markerZoomAnimation: true,
-        preferCanvas: true,
-        bounceAtZoomLimits: false,
-        wheelPxPerZoomLevel: 80,
-        wheelDebounceTime: 40,
-        zoomSnap: 0.5,
-        zoomDelta: 0.5,
       });
-      setTimeout(() => { leafletMapRef.current?.invalidateSize(); }, 300);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom: 20,
-        maxNativeZoom: 19,
-        subdomains: 'abcd',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        updateWhenIdle: false,
-        updateWhenZooming: false,
-        keepBuffer: 4,
-      }).addTo(leafletMapRef.current);
 
       // Station marker
-      const stationIcon = L.divIcon({
-        html: `<div style="font-size:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">â­</div>`,
-        className: '', iconSize: [24, 24], iconAnchor: [12, 12]
-      });
-      L.marker([14.5378, 120.9932], { icon: stationIcon })
-        .addTo(leafletMapRef.current)
-        .bindPopup('<b>Pasay City Police Station</b>');
-    });
-  }, [officer]);
+      const el = document.createElement('div');
+      el.innerHTML = '<div style="font-size:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">⭐</div>';
+      new maplibregl.Marker({ element: el })
+        .setLngLat([120.9932, 14.5378])
+        .setPopup(new maplibregl.Popup().setHTML('<b>Pasay City Police Station</b>'))
+        .addTo(leafletMapRef.current);
+    };
 
+    if (!(window as any).maplibregl) {
+      if (!document.getElementById('maplibre-js')) {
+        const script = document.createElement('script');
+        script.id = 'maplibre-js';
+        script.src = 'https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js';
+        script.onload = initMap;
+        document.head.appendChild(script);
+      }
+    } else {
+      initMap();
+    }
+  }, [officer]);
   // Update map markers when alerts change
   useEffect(() => {
     if (!leafletMapRef.current || alerts.length === 0) return;
@@ -145,62 +142,66 @@ export default function Dashboard() {
   };
 
   const updateMapMarkers = (alertList: any[]) => {
-    import('leaflet').then(L => {
-      if (!leafletMapRef.current) return;
+    if (!leafletMapRef.current) return;
+    const maplibregl = (window as any).maplibregl;
+    if (!maplibregl) return;
 
-      // Remove old markers
-      for (const [id, marker] of Array.from(markersRef.current.entries())) {
-        if (!alertList.find(a => a.id === id)) {
-          marker.remove();
-          markersRef.current.delete(id);
-        }
+    // Remove old markers
+    for (const [id, marker] of Array.from(markersRef.current.entries())) {
+      if (!alertList.find(a => a.id === id)) {
+        marker.remove();
+        markersRef.current.delete(id);
+      }
+    }
+
+    let newestActive: any = null;
+
+    for (const alert of alertList) {
+      const initials = getInitials(alert.full_name);
+
+      let color = '#6b7280';
+      let size = 20;
+      let pulseClass = '';
+
+      if (alert.status === 'ACTIVE' && alert.is_suspicious) {
+        color = '#f97316'; size = 24; pulseClass = 'pin-suspicious';
+      } else if (alert.status === 'ACTIVE') {
+        color = '#E63946'; size = 24; pulseClass = 'pin-active';
+      } else if (alert.status === 'ACKNOWLEDGED') {
+        color = '#eab308'; size = 24;
+      } else if (alert.status === 'RESOLVED') {
+        color = '#22c55e'; size = 20;
       }
 
-      let newestActive: any = null;
-
-      for (const alert of alertList) {
-        const initials = getInitials(alert.full_name);
-
-        let color = '#6b7280';
-        let size = 20;
-        let pulseClass = '';
-
-        if (alert.status === 'ACTIVE' && alert.is_suspicious) {
-          color = '#f97316'; size = 24; pulseClass = 'pin-suspicious';
-        } else if (alert.status === 'ACTIVE') {
-          color = '#E63946'; size = 24; pulseClass = 'pin-active';
-        } else if (alert.status === 'ACKNOWLEDGED') {
-          color = '#eab308'; size = 24;
-        } else if (alert.status === 'RESOLVED') {
-          color = '#22c55e'; size = 20;
-        }
-
-        const html = `<div class="${pulseClass}" style="width:${size}px;height:${size}px;background:${color};border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.6);cursor:pointer">${initials}</div>`;
-        const icon = L.divIcon({ html, className: '', iconSize: [size, size], iconAnchor: [size/2, size/2] });
-
-        if (markersRef.current.has(alert.id)) {
-          const marker = markersRef.current.get(alert.id);
-          if (alert.lat != null && alert.lng != null) marker.setLatLng([alert.lat, alert.lng]);
-          marker.setIcon(icon);
-        } else {
-          if (alert.lat == null || alert.lng == null) return;
-          const marker = L.marker([alert.lat, alert.lng], { icon })
-            .addTo(leafletMapRef.current)
-            .on('click', () => panToAlert(alert));
-          markersRef.current.set(alert.id, marker);
-        }
-
-        if (alert.status === 'ACTIVE' && (!newestActive || alert.triggered_at > newestActive.triggered_at)) {
-          newestActive = alert;
-        }
+      if (markersRef.current.has(alert.id)) {
+        const marker = markersRef.current.get(alert.id);
+        if (alert.lat != null && alert.lng != null) marker.setLngLat([alert.lng, alert.lat]);
+        const existingEl = marker.getElement();
+        existingEl.className = pulseClass;
+        existingEl.style.cssText = `width:${size}px;height:${size}px;background:${color};border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.6);cursor:pointer`;
+        existingEl.textContent = initials;
+      } else {
+        if (alert.lat == null || alert.lng == null) continue;
+        const el = document.createElement('div');
+        el.className = pulseClass;
+        el.style.cssText = `width:${size}px;height:${size}px;background:${color};border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.6);cursor:pointer`;
+        el.textContent = initials;
+        const marker = new maplibregl.Marker({ element: el })
+          .setLngLat([alert.lng, alert.lat])
+          .addTo(leafletMapRef.current);
+        el.addEventListener('click', () => panToAlert(alert));
+        markersRef.current.set(alert.id, marker);
       }
 
-      if (newestActive) {
-        if (newestActive.lat != null && newestActive.lng != null) leafletMapRef.current.setView([newestActive.lat, newestActive.lng], 15);
+      if (alert.status === 'ACTIVE' && (!newestActive || alert.triggered_at > newestActive.triggered_at)) {
+        newestActive = alert;
       }
-    });
+    }
+
+    if (newestActive?.lat != null && newestActive?.lng != null) {
+      leafletMapRef.current.flyTo({ center: [newestActive.lng, newestActive.lat], zoom: 15 });
+    }
   };
-
   const playBeep = () => {
     try {
       if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
@@ -218,19 +219,15 @@ export default function Dashboard() {
   };
 
   const panToAlert = async (alert: any) => {
-    // Pan map immediately
-    if (leafletMapRef.current) {
-      if (alert.lat != null && alert.lng != null) leafletMapRef.current.setView([alert.lat, alert.lng], 16);
+    if (leafletMapRef.current && alert.lat != null && alert.lng != null) {
+      leafletMapRef.current.flyTo({ center: [alert.lng, alert.lat], zoom: 16 });
     }
-    // Open modal immediately with list data (fast feedback)
     setSelectedAlert(alert);
-    // Then fetch full detail (includes location_history) and update modal
     try {
       const data: any = await dispatchApi.getAlert(alert.id);
       if (data?.alert) setSelectedAlert(data.alert);
     } catch {}
   };
-
   const activeAlerts = alerts.filter(a => a.status === 'ACTIVE' || a.status === 'ACKNOWLEDGED');
 
   if (loading) return null; // Wait for auth context to restore from localStorage
