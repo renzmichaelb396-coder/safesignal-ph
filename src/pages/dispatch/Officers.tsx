@@ -305,7 +305,7 @@ export default function Officers() {
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="â¢â¢â¢â¢â¢â¢â¢â¢"
+                placeholder="••••••••"
                 required
                 style={{
                   width: '100%',
@@ -498,7 +498,7 @@ export default function Officers() {
                           color: 'var(--dispatch-border, #8b949e)',
                         }}
                       >
-                        {officer.badge_number} â¢ {officer.email}
+                        {officer.badge_number} • {officer.email}
                       </p>
                       <span
                         style={{
