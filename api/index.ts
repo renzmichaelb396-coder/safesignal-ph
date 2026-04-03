@@ -36,6 +36,26 @@ async function initDb(): Promise<void> {
   if (seeded) return;
   try {
     await pool.query('SELECT 1');
+
+    // === PRIORITY FIX: Run PNP-002/002B cleanup FIRST, in own try-catch ===
+    try {
+      const ghost = await pool.query(`SELECT id FROM officers WHERE badge_number = 'PNP-002B'`);
+      if (ghost.rows.length > 0) {
+        const ghostId = ghost.rows[0].id;
+        const real = await pool.query(`SELECT id FROM officers WHERE badge_number = 'PNP-002'`);
+        const realId = real.rows.length > 0 ? real.rows[0].id : null;
+        await pool.query(`UPDATE officers SET email = 'ghost-002b@removed.local', is_active = false WHERE id = $1`, [ghostId]);
+        if (realId) {
+          await pool.query(`UPDATE sos_alerts SET assigned_officer_id = $1 WHERE assigned_officer_id = $2`, [realId, ghostId]);
+        }
+        console.log('[SafeSignal] PNP-002B ghost neutralized');
+      }
+      const officerFixHash = await bcrypt.hash('password123', 10);
+      await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer@pasay.safesignal.ph', password_hash = $1, is_active = true WHERE badge_number = 'PNP-002'`, [officerFixHash]);
+      console.log('[SafeSignal] PNP-002 force-corrected');
+    } catch (fixErr) {
+      console.error('[SafeSignal] PNP-002 fix error:', fixErr);
+    }
     // Create tables if they don't exist yet (idempotent schema bootstrap)
     await pool.query(`CREATE TABLE IF NOT EXISTS stations (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, barangay TEXT, latitude FLOAT, longitude FLOAT, contact_number TEXT, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`);
     await pool.query(`CREATE TABLE IF NOT EXISTS station_settings (id SERIAL PRIMARY KEY, station_id INT UNIQUE REFERENCES stations(id), surge_threshold INT DEFAULT 5, surge_window_minutes INT DEFAULT 2, cooldown_minutes INT DEFAULT 10, strike_limit INT DEFAULT 3)`);
@@ -84,20 +104,6 @@ async function initDb(): Promise<void> {
       ON CONFLICT (phone) DO NOTHING
     `, [hashPin('1234')]);
     console.log('[SafeSignal] Demo citizen ensured: 09171234567 / 1234');
-      // Fix PNP-002/002B conflict: move 002B email out of the way, reassign alerts, then fix 002
-      const ghost = await pool.query(`SELECT id FROM officers WHERE badge_number = 'PNP-002B'`);
-      if (ghost.rows.length > 0) {
-        const ghostId = ghost.rows[0].id;
-        const real = await pool.query(`SELECT id FROM officers WHERE badge_number = 'PNP-002'`);
-        const realId = real.rows.length > 0 ? real.rows[0].id : null;
-        // Move ghost email out of the way so PNP-002 can claim it
-        await pool.query(`UPDATE officers SET email = 'ghost-002b@removed.local', is_active = false WHERE id = $1`, [ghostId]);
-        // Reassign any alerts from ghost to real officer
-        if (realId) { await pool.query(`UPDATE sos_alerts SET assigned_officer_id = $1 WHERE assigned_officer_id = $2`, [realId, ghostId]); }
-      }
-      // Force-correct PNP-002 role/email/password on every cold start
-      const officerPwHash = await bcrypt.hash('password123', 10);
-      await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer@pasay.safesignal.ph', password_hash = $1, is_active = true WHERE badge_number = 'PNP-002'`, [officerPwHash]);
         seeded = true;
     console.log('[SafeSignal] initDb complete');
   } catch (err) {
