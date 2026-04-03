@@ -44,14 +44,14 @@ async function initDb(): Promise<void> {
         const ghostId = ghost.rows[0].id;
         const real = await pool.query(`SELECT id FROM officers WHERE badge_number = 'PNP-002'`);
         const realId = real.rows.length > 0 ? real.rows[0].id : null;
-        await pool.query(`UPDATE officers SET email = 'ghost-002b@removed.local', is_active = false WHERE id = $1`, [ghostId]);
+        await pool.query(`UPDATE officers SET email = 'ghost-002b@removed.local', is_active = 0 WHERE id = $1`, [ghostId]);
         if (realId) {
           await pool.query(`UPDATE sos_alerts SET assigned_officer_id = $1 WHERE assigned_officer_id = $2`, [realId, ghostId]);
         }
         console.log('[SafeSignal] PNP-002B ghost neutralized');
       }
       const officerFixHash = await bcrypt.hash('password123', 10);
-      await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer@pasay.safesignal.ph', password_hash = $1, is_active = true WHERE badge_number = 'PNP-002'`, [officerFixHash]);
+      await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer@pasay.safesignal.ph', password_hash = $1, is_active = 1 WHERE badge_number = 'PNP-002'`, [officerFixHash]);
       console.log('[SafeSignal] PNP-002 force-corrected');
     } catch (fixErr) {
       console.error('[SafeSignal] PNP-002 fix error:', fixErr);
@@ -786,7 +786,7 @@ app.get('/api/fix-db', async (_req: any, res: any) => {
     let ghostResult = 'no PNP-002B found';
     if (ghost.rows.length > 0) {
       const ghostId = ghost.rows[0].id;
-      await pool.query(`UPDATE officers SET email = 'ghost-002b' || '@' || 'removed.local', is_active = false WHERE id = $1`, [ghostId]);
+      await pool.query(`UPDATE officers SET email = 'ghost-002b' || '@' || 'removed.local', is_active = 0 WHERE id = $1`, [ghostId]);
       // Reassign alerts
       const real = await pool.query(`SELECT id FROM officers WHERE badge_number = 'PNP-002'`);
       if (real.rows.length > 0) {
@@ -796,7 +796,7 @@ app.get('/api/fix-db', async (_req: any, res: any) => {
     }
     // Step 2: force-correct PNP-002
     const pwHash = await bcrypt.hash('password123', 10);
-    await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer' || '@' || 'pasay.safesignal.ph', password_hash = $1, is_active = true WHERE badge_number = 'PNP-002'`, [pwHash]);
+    await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer' || '@' || 'pasay.safesignal.ph', password_hash = $1, is_active = 1 WHERE badge_number = 'PNP-002'`, [pwHash]);
     // Step 3: verify
     const verify = await pool.query(`SELECT id, badge_number, email, role, is_active FROM officers WHERE badge_number IN ('PNP-002', 'PNP-002B') ORDER BY badge_number`);
     res.json({ success: true, ghost: ghostResult, officers: verify.rows });
