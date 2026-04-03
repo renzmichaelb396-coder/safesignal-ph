@@ -84,8 +84,10 @@ async function initDb(): Promise<void> {
       ON CONFLICT (phone) DO NOTHING
     `, [hashPin('1234')]);
     console.log('[SafeSignal] Demo citizen ensured: 09171234567 / 1234');
-        // Force-correct PNP-002 role/email on every cold start (fixes existing DB rows)
-        await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer@pasay.safesignal.ph' WHERE badge_number = 'PNP-002'`);
+      // Force-correct PNP-002 role/email/password on every cold start (fixes existing DB rows)
+      await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer@pasay.safesignal.ph' WHERE badge_number = 'PNP-002'`);
+      const officerPwHash = await bcrypt.hash('password123', 10);
+      await pool.query(`UPDATE officers SET password_hash = $1 WHERE badge_number = 'PNP-002'`, [officerPwHash]);
         seeded = true;
     console.log('[SafeSignal] initDb complete');
   } catch (err) {
