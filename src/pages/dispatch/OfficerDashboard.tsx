@@ -184,7 +184,7 @@ export default function OfficerDashboard() {
 
         {/* Location sharing status */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderBottom: '1px solid #30363d', marginBottom: 20 }}>
-          <span style={{ color: '#3fb950', fontSize: 14 }}>ð</span>
+          <span style={{ color: '#3fb950', fontSize: 14 }}>{String.fromCodePoint(0x1F4CD)}</span>
           <span style={{ color: '#3fb950', fontSize: 13, fontWeight: 500 }}>Sharing your location with dispatch</span>
         </div>
 
@@ -192,7 +192,7 @@ export default function OfficerDashboard() {
 
         {!assignment ? (
           <div style={{ textAlign: 'center', padding: '48px 0' }}>
-            <div style={{ fontSize: 56, marginBottom: 16 }}>ð¯</div>
+            <div style={{ fontSize: 56, marginBottom: 16 }}>{String.fromCodePoint(0x1F3AF)}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#e6edf3', marginBottom: 8 }}>No active assignment</div>
             <div style={{ color: '#8b949e', fontSize: 14 }}>Waiting for dispatch...</div>
           </div>
