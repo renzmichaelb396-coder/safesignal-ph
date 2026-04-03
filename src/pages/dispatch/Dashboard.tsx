@@ -344,7 +344,7 @@ export default function Dashboard() {
                         <p style={{ color: alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED' ? '#6b7280' : '#888', fontSize: 11, margin: '2px 0' }}>{alert.barangay}</p>
                         <div className="flex items-center justify-between">
                           <span style={{ color: alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED' ? '#374151' : '#e1e4ed', fontSize: 12, fontFamily: 'monospace' }}>
-                            {formatElapsed(Date.now() - alert.triggered_at * 1000)}
+                            {formatElapsed(Date.now() - alert.triggered_at)}
                           </span>
                           <div className="flex items-center gap-1">
                             {alert.is_suspicious && (
@@ -370,7 +370,7 @@ export default function Dashboard() {
               {[
                 { label: 'Active', value: alerts.filter(a => a.status === 'ACTIVE').length, color: '#dc2626', bg: 'rgba(220,38,38,0.1)', icon: '🚨' },
                 { label: "Ack'd", value: alerts.filter(a => a.status === 'ACKNOWLEDGED').length, color: '#d97706', bg: 'rgba(217,119,6,0.1)', icon: '✓' },
-                { label: 'Today', value: alerts.filter(a => a.triggered_at * 1000 > Date.now() - 86400000).length, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', icon: '📅' },
+                { label: 'Today', value: alerts.filter(a => a.triggered_at > Date.now() - 86400000).length, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', icon: '📅' },
               ].map((s, i) => (
                 <div key={i} className="text-center p-2 rounded-lg"
                   style={{ background: s.bg }}>
