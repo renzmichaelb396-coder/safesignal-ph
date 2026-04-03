@@ -276,6 +276,21 @@ app.post('/api/dispatch/alerts/:id/acknowledge', requireOfficerAuth, async (req:
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to acknowledge alert' }); }
 });
 
+// POST /api/dispatch/alerts/:id/assign — assign officer to alert
+app.post('/api/dispatch/alerts/:id/assign', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const { officer_id } = req.body;
+    if (!officer_id) { res.status(400).json({ error: 'officer_id is required' }); return; }
+    const alertResult = await pool.query('SELECT * FROM sos_alerts WHERE id = $1', [req.params.id]);
+    const alert = alertResult.rows[0];
+    if (!alert) { res.status(404).json({ error: 'Alert not found' }); return; }
+    await pool.query('UPDATE sos_alerts SET assigned_officer_id = $1 WHERE id = $2', [officer_id, req.params.id]);
+    const updated = await getFullAlert(alert.id);
+    broadcastEvent('alert_updated', { alert: updated });
+    res.json({ alert: updated });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to assign officer' }); }
+});
+
 // POST /api/dispatch/alerts/:id/resolve
 app.post('/api/dispatch/alerts/:id/resolve', requireOfficerAuth, async (req: any, res: any) => {
   try {
