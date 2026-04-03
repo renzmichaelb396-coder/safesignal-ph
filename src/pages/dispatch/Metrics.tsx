@@ -7,12 +7,13 @@ import DispatchLayout from './DispatchLayout';
 export default function Metrics() {
   const { officer } = useDispatchAuth();
   const [, navigate] = useLocation();
+  const [period, setPeriod] = useState('pilot');
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!officer) { navigate('/dispatch/login'); return; }
-    dispatchApi.getStats()
+    dispatchApi.getStats(`?period=${period}`)
       .then(setStats)
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -29,6 +30,17 @@ export default function Metrics() {
 
   return (
     <DispatchLayout>
+        {/* Period selector */}
+        <div style={{display:'flex',gap:8,marginBottom:16}}>
+          {[['pilot','Pilot Period'],['30d','Last 30 Days'],['90d','Last 90 Days']].map(([val,label])=>(
+            <button key={val} onClick={()=>setPeriod(val)}
+              style={{padding:'6px 14px',borderRadius:20,border:'none',cursor:'pointer',fontSize:12,fontWeight:600,
+                background: period===val ? 'var(--ph-gold,#FFC107)' : 'rgba(255,255,255,0.08)',
+                color: period===val ? '#111' : '#aaa'}}>
+              {label}
+            </button>
+          ))}
+        </div>
       <div style={{ padding: '24px' }}>
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 600, color: '#e6edf3' }}>Metrics</h1>
