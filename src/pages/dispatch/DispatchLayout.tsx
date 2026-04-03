@@ -44,7 +44,7 @@ export default function DispatchLayout({ children }: DispatchLayoutProps) {
       }}
     >
       {/* Sidebar */}
-      <div className="dispatch-sidebar">
+      <div className="dispatch-sidebar" style={{ width: 260, backgroundColor: 'var(--dispatch-border, #161b22)', display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0 }}>
         {/* Logo — compact flex layout */}
         <div className="p-4" style={{ borderBottom: '1px solid var(--dispatch-border, #30363d)' }}>
           <div className="flex items-center gap-2 mb-1">
