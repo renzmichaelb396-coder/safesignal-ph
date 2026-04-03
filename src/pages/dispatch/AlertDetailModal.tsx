@@ -241,7 +241,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
               >
                 {alert.status}
               </span>
-              {alert.is_suspicious && (
+              {!!alert.is_suspicious && (
                 <span
                   style={{
                     padding: '6px 12px',
