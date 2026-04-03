@@ -306,7 +306,7 @@ export default function AlertQueue() {
                       >
                         {alert.full_name}
                       </p>
-                      {alert.is_suspicious && (
+                      {!!alert.is_suspicious && (
                         <span
                           style={{
                             fontSize: 9,
