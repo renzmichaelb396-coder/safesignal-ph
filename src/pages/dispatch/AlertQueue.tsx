@@ -255,7 +255,6 @@ export default function AlertQueue() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    color: 'inherit',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = 'var(--dispatch-bg, #0d1117)';
