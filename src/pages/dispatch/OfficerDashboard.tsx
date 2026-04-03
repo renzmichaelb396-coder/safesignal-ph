@@ -36,8 +36,9 @@ export default function OfficerDashboard() {
 
   useEffect(() => {
     const token = localStorage.getItem('safesignal_officer_token');
-    const role = localStorage.getItem('safesignal_officer_role');
-    if (!token || role !== 'OFFICER') {
+    const officerDataRaw = localStorage.getItem('safesignal_officer_data');
+    const officerObj = officerDataRaw ? JSON.parse(officerDataRaw) : null;
+    if (!token || !officerObj || officerObj.role !== 'OFFICER') {
       setLocation('/dispatch/login');
       return;
     }
