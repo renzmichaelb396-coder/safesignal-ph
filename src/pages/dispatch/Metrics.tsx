@@ -27,12 +27,12 @@ export default function Metrics() {
   if (authLoading) return null;
 
   const metricCards = stats ? [
-    { label: 'Total Alerts', value: stats.total ?? 0, color: '#e6edf3', icon: 'Ã°ÂÂÂ' },
-    { label: 'Active Now', value: stats.active ?? 0, color: '#f85149', icon: 'Ã°ÂÂÂ¨' },
-    { label: 'Acknowledged', value: stats.acknowledged ?? 0, color: '#ffc107', icon: 'Ã°ÂÂÂÃ¯Â¸Â' },
-    { label: 'Resolved', value: stats.resolved ?? 0, color: '#3fb950', icon: 'Ã¢ÂÂ' },
-    { label: 'False Alarms', value: stats.false_alarms ?? 0, color: '#8b949e', icon: 'Ã¢ÂÂ Ã¯Â¸Â' },
-    { label: 'Today', value: stats.total ?? 0, color: '#58a6ff', icon: 'Ã°ÂÂÂ' },
+    { label: 'Total Alerts', value: stats.total ?? 0, color: '#e6edf3', icon: '📊' },
+    { label: 'Active Now', value: stats.active ?? 0, color: '#f85149', icon: '🚨' },
+    { label: 'Acknowledged', value: stats.acknowledged ?? 0, color: '#ffc107', icon: '👁️' },
+    { label: 'Resolved', value: stats.resolved ?? 0, color: '#3fb950', icon: '✅' },
+    { label: 'False Alarms', value: stats.false_alarms ?? 0, color: '#8b949e', icon: '⚠️' },
+    { label: 'Today', value: stats.total ?? 0, color: '#58a6ff', icon: '📅' },
   ] : [];
 
   return (
