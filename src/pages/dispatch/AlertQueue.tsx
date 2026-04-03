@@ -300,7 +300,7 @@ export default function AlertQueue() {
                         <p style={{ margin: 0, fontWeight: 600, fontSize: '14px' }}>
                           {alert.full_name}
                         </p>
-                        {alert.is_suspicious && (
+                        {!!alert.is_suspicious && (
                           <span
                             style={{
                               padding: '2px 8px',
