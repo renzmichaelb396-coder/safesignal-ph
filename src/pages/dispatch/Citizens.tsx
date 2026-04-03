@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { dispatchApi, getInitials } from '../../lib/api';
+import DispatchLayout from './DispatchLayout';
 
 interface Citizen {
   id: string;
@@ -121,6 +122,7 @@ export default function Citizens() {
   };
 
   return (
+    <DispatchLayout>
     <div
       style={{
         flex: 1,
@@ -470,5 +472,6 @@ export default function Citizens() {
         )}
       </div>
     </div>
+    </DispatchLayout>
   );
 }
