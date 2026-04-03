@@ -274,7 +274,7 @@ export default function Dashboard() {
               </div>
               {clock && (
                 <p style={{ color: '#6b7280', fontSize: 10, margin: '6px 0 0', fontFamily: 'monospace', letterSpacing: '0.03em' }}>
-                  ð {clock} PST
+                  🕐 {clock} PST
                 </p>
               )}
             </div>
@@ -297,7 +297,7 @@ export default function Dashboard() {
                 </div>
               ) : activeAlerts.length === 0 ? (
                 <div className="text-center py-10">
-                  <div style={{ fontSize: 32 }}>â</div>
+                  <div style={{ fontSize: 32 }}>✌️</div>
                   <p style={{ color: '#888', fontSize: 13, marginTop: 8 }}>No active alerts</p>
                 </div>
               ) : (
@@ -364,9 +364,9 @@ export default function Dashboard() {
             {/* Stats bar */}
             <div className="p-3 grid grid-cols-3 gap-2" style={{ borderTop: '1px solid var(--dispatch-border)' }}>
               {[
-                { label: 'Active', value: alerts.filter(a => a.status === 'ACTIVE').length, color: '#dc2626', bg: 'rgba(220,38,38,0.1)', icon: 'ð¨' },
-                { label: "Ack'd", value: alerts.filter(a => a.status === 'ACKNOWLEDGED').length, color: '#d97706', bg: 'rgba(217,119,6,0.1)', icon: 'â' },
-                { label: 'Today', value: alerts.filter(a => a.triggered_at * 1000 > Date.now() - 86400000).length, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', icon: 'ð' },
+                { label: 'Active', value: alerts.filter(a => a.status === 'ACTIVE').length, color: '#dc2626', bg: 'rgba(220,38,38,0.1)', icon: '🚨' },
+                { label: "Ack'd", value: alerts.filter(a => a.status === 'ACKNOWLEDGED').length, color: '#d97706', bg: 'rgba(217,119,6,0.1)', icon: '✓' },
+                { label: 'Today', value: alerts.filter(a => a.triggered_at * 1000 > Date.now() - 86400000).length, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', icon: '📅' },
               ].map((s, i) => (
                 <div key={i} className="text-center p-2 rounded-lg"
                   style={{ background: s.bg }}>
