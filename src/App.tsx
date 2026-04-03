@@ -3,6 +3,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { CitizenAuthProvider } from "./contexts/CitizenAuthContext";
 import { DispatchAuthProvider } from "./contexts/DispatchAuthContext";
+
 // Citizen Pages
 import Landing from "./pages/citizen/Landing";
 import Register from "./pages/citizen/Register";
@@ -13,6 +14,7 @@ import SosConfirm from "./pages/citizen/SosConfirm";
 import SosActive from "./pages/citizen/SosActive";
 import AlertHistory from "./pages/citizen/History";
 import Profile from "./pages/citizen/Profile";
+
 // Dispatch Pages
 import DispatchLogin from "./pages/dispatch/DispatchLogin";
 import Dashboard from "./pages/dispatch/Dashboard";
@@ -49,6 +51,7 @@ function Router() {
       <Route path="/sos/active" component={SosActive} />
       <Route path="/history" component={AlertHistory} />
       <Route path="/profile" component={Profile} />
+
       {/* Dispatch Routes */}
       <Route path="/dispatch/login" component={DispatchLogin} />
       <Route path="/dispatch" component={Dashboard} />
@@ -59,6 +62,8 @@ function Router() {
       <Route path="/dispatch/settings" component={Settings} />
       <Route path="/dispatch/metrics" component={Metrics} />
       <Route path="/dispatch/officer-dashboard" component={OfficerDashboard} />
+      <Route path="/officer" component={OfficerDashboard} />
+
       <Route component={NotFound} />
     </Switch>
   );
