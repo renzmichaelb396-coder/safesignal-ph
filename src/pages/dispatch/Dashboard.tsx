@@ -380,6 +380,7 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
+        </div>
 
       </DispatchLayout>
       {/* Alert Detail Modal – rendered OUTSIDE DispatchLayout so position:fixed is not clipped by overflow:hidden */}
