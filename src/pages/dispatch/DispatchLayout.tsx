@@ -12,9 +12,9 @@ const navLinks: NavLink[] = [
   { href: '/dispatch', label: 'Live Map' },
   { href: '/dispatch/queue', label: 'Alert Queue' },
   { href: '/dispatch/citizens', label: 'Citizens' },
-  { href: '/dispatch/officers', label: 'Officers', roles: ['DISPATCHER', 'ADMIN'] },
-  { href: '/dispatch/metrics', label: 'Metrics', roles: ['DISPATCHER', 'ADMIN'] },
-  { href: '/dispatch/settings', label: 'Settings', roles: ['ADMIN'] },
+  { href: '/dispatch/officers', label: 'Officers', roles: ['DISPATCHER', 'STATION_ADMIN'] },
+  { href: '/dispatch/metrics', label: 'Metrics', roles: ['DISPATCHER', 'STATION_ADMIN'] },
+  { href: '/dispatch/settings', label: 'Settings', roles: ['STATION_ADMIN'] },
   { href: '/dispatch/officer-dashboard', label: 'My Dashboard', roles: ['OFFICER'] },
 ];
 
