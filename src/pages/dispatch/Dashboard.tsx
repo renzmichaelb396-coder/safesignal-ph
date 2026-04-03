@@ -12,6 +12,8 @@ export default function Dashboard() {
   const [alertsLoading, setAlertsLoading] = useState(true);
   const [selectedAlert, setSelectedAlert] = useState<any>(null);
   const [surgeWarning, setSurgeWarning] = useState<string | null>(null);
+  const [followMode, setFollowMode] = useState(true);
+  const followModeRef = useRef(true);
   const [now, setNow] = useState(Date.now());
   const [clock, setClock] = useState('');
   const mapRef = useRef<HTMLDivElement>(null);
@@ -199,7 +201,7 @@ export default function Dashboard() {
       }
     }
 
-    if (newestActive?.lat != null && newestActive?.lng != null) {
+    if (followModeRef.current && newestActive?.lat != null && newestActive?.lng != null) {
       leafletMapRef.current.flyTo({ center: [newestActive.lng, newestActive.lat], zoom: 15 });
     }
   };
@@ -250,6 +252,21 @@ export default function Dashboard() {
                 ð¨ {surgeWarning}
               </div>
             )}
+            {/* Follow toggle button */}
+            <button
+              onClick={() => { const next = !followMode; setFollowMode(next); followModeRef.current = next; }}
+              style={{
+                position: 'absolute', top: 10, right: 10, zIndex: 10,
+                padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', border: 'none',
+                background: followMode ? 'rgba(255,193,7,0.92)' : 'rgba(30,30,40,0.82)',
+                color: followMode ? '#1a1a1a' : '#aaa',
+                backdropFilter: 'blur(4px)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              }}
+            >
+              📍 Follow
+            </button>
             <div ref={mapRef} style={{ width: '100%', height: '100%', background: '#f8fafc' }} />
           </div>
 
