@@ -19,6 +19,8 @@ export default function Dashboard() {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<any>(null);
   const markersRef = useRef<Map<number, any>>(new Map());
+  const officerMarkersRef = useRef<Map<number, any>>(new Map());
+  const [officerLocations, setOfficerLocations] = useState<any[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevAlertIdsRef = useRef<Set<number>>(new Set());
 
@@ -102,6 +104,12 @@ export default function Dashboard() {
     if (!leafletMapRef.current || alerts.length === 0) return;
     updateMapMarkers(alerts);
   }, [alerts]);
+
+  // Update officer markers when officerLocations changes
+  useEffect(() => {
+    if (!leafletMapRef.current) return;
+    updateOfficerMarkers(officerLocations);
+  }, [officerLocations]);
 
   // Poll for alerts every 3 seconds (SSE not supported on Vercel serverless)
   useEffect(() => {
@@ -233,6 +241,41 @@ export default function Dashboard() {
   };
   const activeAlerts = alerts.filter(a => a.status === 'ACTIVE' || a.status === 'ACKNOWLEDGED');
 
+
+  const updateOfficerMarkers = (officers: any[]) => {
+    if (!leafletMapRef.current) return;
+    const maplibregl = (window as any).maplibregl;
+    if (!maplibregl) return;
+    // Remove stale markers
+    for (const [id, marker] of Array.from(officerMarkersRef.current.entries())) {
+      if (!officers.find((o: any) => o.officer_id === id)) {
+        marker.remove();
+        officerMarkersRef.current.delete(id);
+      }
+    }
+    for (const officer of officers) {
+      if (officer.lat == null || officer.lng == null) continue;
+      const initials = officer.full_name ? officer.full_name.split(' ').map((n: string) => n[0]).join('').substring(0,2).toUpperCase() : 'OF';
+      if (officerMarkersRef.current.has(officer.officer_id)) {
+        const marker = officerMarkersRef.current.get(officer.officer_id);
+        marker.setLngLat([officer.lng, officer.lat]);
+        const el = marker.getElement();
+        el.title = `${officer.full_name} (${officer.badge_number}) - ${officer.status}`;
+      } else {
+        const el = document.createElement('div');
+        el.style.cssText = 'width:24px;height:24px;background:#3b82f6;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;box-shadow:0 2px 8px rgba(59,130,246,0.6);cursor:pointer;';
+        el.textContent = initials;
+        el.title = `${officer.full_name} (${officer.badge_number}) - ${officer.status}`;
+        const marker = new maplibregl.Marker({ element: el })
+          .setLngLat([officer.lng, officer.lat])
+          .setPopup(new maplibregl.Popup({ offset: 25 }).setHTML(
+            `<b>${officer.full_name}</b><br/>${officer.badge_number}<br/><span style="color:#3b82f6">${officer.status}</span>`
+          ))
+          .addTo(leafletMapRef.current);
+        officerMarkersRef.current.set(officer.officer_id, marker);
+      }
+    }
+  };
   if (loading) return null; // Wait for auth context to restore from localStorage
   if (!officer) {
     navigate('/dispatch/login');
