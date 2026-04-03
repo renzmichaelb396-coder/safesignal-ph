@@ -80,6 +80,7 @@ export default function Dashboard() {
         .setLngLat([120.9932, 14.5378])
         .setPopup(new maplibregl.Popup().setHTML('<b>Pasay City Police Station</b>'))
         .addTo(leafletMapRef.current);
+      leafletMapRef.current.addControl(new maplibregl.NavigationControl(), 'top-left');
     };
 
     if (!(window as any).maplibregl) {
