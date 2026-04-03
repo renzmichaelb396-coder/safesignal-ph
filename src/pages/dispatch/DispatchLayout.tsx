@@ -8,8 +8,8 @@ interface NavLink {
 }
 
 const navLinks: NavLink[] = [
-  { href: '/dispatch/dashboard', label: 'Live Map' },
-  { href: '/dispatch/alerts', label: 'Alert Queue' },
+  { href: '/dispatch', label: 'Live Map' },
+  { href: '/dispatch/queue', label: 'Alert Queue' },
   { href: '/dispatch/citizens', label: 'Citizens' },
   { href: '/dispatch/officers', label: 'Officers', roles: ['DISPATCHER', 'ADMIN'] },
   { href: '/dispatch/metrics', label: 'Metrics', roles: ['DISPATCHER', 'ADMIN'] },
