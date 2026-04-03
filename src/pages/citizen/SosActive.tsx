@@ -18,6 +18,7 @@ export default function SosActive() {
   const [cancelReason, setCancelReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [gpsAvailable, setGpsAvailable] = useState(true);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markerRef = useRef<any>(null);
@@ -26,19 +27,14 @@ export default function SosActive() {
   const sosId = sosIdRef.current || localStorage.getItem('active_sos_id');
 
   useEffect(() => {
-    if (sosId) {
-      sosIdRef.current = sosId;
-    }
+    if (sosId) sosIdRef.current = sosId;
   }, [sosId]);
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
-      navigate('/home');
-    }
+    if (!user) navigate('/home');
   }, [user, authLoading, navigate]);
 
-  // Fetch SOS status via getActiveAlert
   useEffect(() => {
     const fetchStatus = async () => {
       try {
@@ -56,112 +52,86 @@ export default function SosActive() {
         setError('Failed to fetch status');
       }
     };
-
     fetchStatus();
     const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  // Timer
   useEffect(() => {
     if (!sosStatus) return;
-
     const startTime = parseInt(sosStatus.triggered_at, 10);
     const timer = setInterval(() => {
       const now = new Date().getTime();
       setElapsedTime(Math.floor((now - startTime) / 1000));
     }, 1000);
-
     return () => clearInterval(timer);
   }, [sosStatus]);
 
-  // Update location every 30 seconds
   useEffect(() => {
     if (!sosId) return;
-
     const updateLocation = async () => {
       try {
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             async position => {
+              setGpsAvailable(true);
               try {
                 await citizenApi.updateLocation(
                   position.coords.latitude,
                   position.coords.longitude,
                 );
-
                 if (mapInstance.current && markerRef.current) {
-                  markerRef.current.setLatLng([
-                    position.coords.latitude,
-                    position.coords.longitude,
-                  ]);
-                  mapInstance.current.setView(
-                    [position.coords.latitude, position.coords.longitude],
-                    15
-                  );
+                  markerRef.current.setLatLng([position.coords.latitude, position.coords.longitude]);
+                  mapInstance.current.setView([position.coords.latitude, position.coords.longitude], 15);
                 }
               } catch (err) {
                 console.error('Failed to update location', err);
               }
             },
-            error => {
-              console.error('Geolocation error:', error);
+            () => {
+              setGpsAvailable(false);
             }
           );
+        } else {
+          setGpsAvailable(false);
         }
       } catch (err) {
         console.error('Location update error:', err);
       }
     };
-
     updateLocation();
     const interval = setInterval(updateLocation, 30000);
     return () => clearInterval(interval);
   }, [sosId]);
 
-  // Initialize map
   useEffect(() => {
     if (!mapRef.current || !sosStatus || mapInstance.current) return;
-
     const loadMap = () => {
-      if (!window.L) {
-        setTimeout(loadMap, 100);
-        return;
-      }
-
-      const map = window.L.map(mapRef.current).setView(
-        [sosStatus?.latitude || 14.5794, sosStatus?.longitude || 120.9749],
-        15
-      );
-
-      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: 'Â© OpenStreetMap contributors',
+      if (!window.L) { setTimeout(loadMap, 100); return; }
+      const lat = sosStatus?.latitude || 14.5794;
+      const lng = sosStatus?.longitude || 120.9749;
+      const map = window.L.map(mapRef.current).setView([lat, lng], 15);
+      window.L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
         maxZoom: 19,
       }).addTo(map);
-
-      const marker = window.L.marker([sosStatus?.latitude || 14.5794, sosStatus?.longitude || 120.9749], {
-        icon: window.L.icon({
-          iconUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="red" width="32" height="32"><circle cx="12" cy="12" r="8"/></svg>',
-          iconSize: [32, 32],
-          iconAnchor: [16, 16],
-        }),
+      const marker = window.L.circleMarker([lat, lng], {
+        radius: 10,
+        fillColor: '#3b82f6',
+        color: '#1d4ed8',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.9,
       }).addTo(map);
-
-      marker.bindPopup(`<strong>${user?.full_name}</strong><br/>SOS Active`);
-
       mapInstance.current = map;
       markerRef.current = marker;
     };
-
     loadMap();
   }, [sosStatus, user]);
 
   const handleCancel = async () => {
-    if (!cancelReason) {
-      setError('Please select a reason');
-      return;
-    }
-
+    if (!cancelReason) { setError('Please select a reason'); return; }
     setLoading(true);
     try {
       await citizenApi.cancelSos(cancelReason);
@@ -173,126 +143,179 @@ export default function SosActive() {
     }
   };
 
-  const formatTime = (seconds: number) => {
+  const formatElapsed = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}m  ${secs}s`;
   };
 
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case 'ACTIVE':
-        return '#ff6b6b';
-      case 'ACKNOWLEDGED':
-        return '#4ade80';
-      case 'ARRIVED':
-        return '#60a5fa';
-      case 'CANCELLED':
-        return '#888';
-      default:
-        return '#888';
+      case 'ACTIVE': return '#ff6b6b';
+      case 'ACKNOWLEDGED': return '#4ade80';
+      case 'ARRIVED': return '#60a5fa';
+      case 'CANCELLED': return '#888';
+      default: return '#888';
     }
   };
 
   return (
-    <div className="citizen-container px-5 py-6 flex flex-col h-screen" style={{ background: 'var(--citizen-bg)' }}>
-      {/* Status Bar */}
-      <div className="mb-4 p-4 rounded-xl" style={{ background: `${getStatusColor(sosStatus?.status)}22`, border: `1px solid ${getStatusColor(sosStatus?.status)}44` }}>
-        <div className="flex justify-between items-center mb-2">
+    <div style={{ background: 'var(--citizen-bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+
+      {/* "HELP IS ON THE WAY" Header */}
+      <div style={{
+        background: 'linear-gradient(180deg, #2d0a0a 0%, #1a1a2e 100%)',
+        padding: '20px 20px 16px',
+        textAlign: 'center',
+        borderBottom: '1px solid rgba(255,100,100,0.2)',
+      }}>
+        <span style={{ fontSize: 28 }}>🚨</span>
+        <h1 style={{
+          color: '#fff',
+          fontSize: 18,
+          fontWeight: 900,
+          margin: '6px 0 0 0',
+          letterSpacing: 1.5,
+          textTransform: 'uppercase',
+        }}>
+          HELP IS ON THE WAY
+        </h1>
+      </div>
+
+      {/* Elapsed Time + Status */}
+      <div style={{
+        padding: '12px 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: 'rgba(0,0,0,0.3)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        <div>
+          <p style={{ color: '#888', fontSize: 10, margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>ELAPSED TIME</p>
+          <p style={{ color: '#fff', fontSize: 22, fontWeight: 800, margin: 0, fontVariantNumeric: 'tabular-nums' }}>
+            {formatElapsed(elapsedTime)}
+          </p>
+        </div>
+        <div style={{
+          background: `${getStatusColor(sosStatus?.status)}22`,
+          border: `1px solid ${getStatusColor(sosStatus?.status)}66`,
+          borderRadius: 8,
+          padding: '4px 12px',
+        }}>
           <p style={{ color: getStatusColor(sosStatus?.status), fontSize: 12, fontWeight: 700, margin: 0, textTransform: 'uppercase' }}>
             {sosStatus?.status || 'PENDING'}
           </p>
-          <p style={{ color: '#fff', fontSize: 20, fontWeight: 800, margin: 0 }}>
-            {formatTime(elapsedTime)}
+        </div>
+      </div>
+
+      {/* GPS Warning */}
+      {!gpsAvailable && (
+        <div style={{ padding: '8px 20px', background: 'rgba(250,193,21,0.1)', borderBottom: '1px solid rgba(250,193,21,0.2)' }}>
+          <p style={{ color: '#facc15', fontSize: 12, margin: 0, fontWeight: 600 }}>
+            ⚠️ GPS Unavailable
           </p>
         </div>
-        <p style={{ color: '#ccc', fontSize: 12, margin: 0 }}>
-          {sosStatus?.status === 'ACTIVE' ? 'Waiting for police response...' : ''}
-          {sosStatus?.status === 'ACKNOWLEDGED' ? 'Police acknowledged your call' : ''}
-          {sosStatus?.status === 'ARRIVED' ? 'Officers have arrived' : ''}
-        </p>
-      </div>
+      )}
+
+      {error && (
+        <div style={{ padding: '8px 20px', background: 'rgba(230,57,70,0.15)' }}>
+          <p style={{ color: '#ff6b6b', fontSize: 12, margin: 0 }}>{error}</p>
+        </div>
+      )}
 
       {/* Map */}
       <div
         ref={mapRef}
         style={{
           flex: 1,
-          borderRadius: 12,
-          overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,0.1)',
-          marginBottom: 16,
+          minHeight: 220,
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}
       />
 
+      {/* Location + Accuracy */}
+      {sosStatus?.latitude && (
+        <div style={{
+          padding: '12px 20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          background: 'rgba(0,0,0,0.3)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          <div>
+            <p style={{ color: '#888', fontSize: 10, margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>LOCATION</p>
+            <p style={{ color: '#ccc', fontSize: 13, margin: 0, fontVariantNumeric: 'tabular-nums' }}>
+              {Number(sosStatus.latitude).toFixed(4)}, {Number(sosStatus.longitude).toFixed(4)}
+            </p>
+          </div>
+          {sosStatus.accuracy && (
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ color: '#888', fontSize: 10, margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>ACCURACY</p>
+              <p style={{ color: '#ccc', fontSize: 13, margin: 0 }}>±{Math.round(sosStatus.accuracy)}m</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Safety Tips */}
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        {[
+          'Stay calm and stay where you are',
+          'Keep your phone on and charged',
+          'Answer calls from police officers',
+        ].map((tip, i) => (
+          <p key={i} style={{ color: '#aaa', fontSize: 13, margin: '4px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: '#4ade80', flexShrink: 0 }}>✓</span> {tip}
+          </p>
+        ))}
+      </div>
+
       {/* Strike Warning */}
       {sosStatus?.citizen_strikes >= 2 && (
-        <div className="p-3 rounded-xl mb-4" style={{ background: 'rgba(230,57,70,0.2)', border: '1px solid rgba(230,57,70,0.4)' }}>
+        <div style={{ padding: '10px 20px', background: 'rgba(230,57,70,0.15)', borderBottom: '1px solid rgba(230,57,70,0.25)' }}>
           <p style={{ color: '#ff6b6b', fontSize: 12, margin: 0, fontWeight: 600 }}>
-            ⚠️ Strike {sosStatus.citizen_strikes}/3 - One more false alarm will suspend your account
+            ⚠️ Strike {sosStatus.citizen_strikes}/3 — One more false alarm will suspend your account
           </p>
         </div>
       )}
 
-      {error && (
-        <div className="p-3 rounded-xl mb-4" style={{ background: 'rgba(230,57,70,0.2)', color: '#ff6b6b', fontSize: 12 }}>
-          {error}
-        </div>
-      )}
-
-      {/* Cancel Button */}
-      <button
-        onClick={() => setShowCancelModal(true)}
-        disabled={loading || sosStatus?.status === 'CANCELLED'}
-        style={{
-          width: '100%',
-          padding: '12px',
-          borderRadius: 12,
-          background: 'rgba(255,255,255,0.07)',
-          border: '1px solid rgba(255,255,255,0.15)',
-          color: '#ff6b6b',
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: loading || sosStatus?.status === 'CANCELLED' ? 'not-allowed' : 'pointer',
-          opacity: loading ? 0.5 : 1,
-        }}
-      >
-        {sosStatus?.status === 'CANCELLED' ? 'SOS Cancelled' : 'Cancel SOS'}
-      </button>
+      {/* I'm Safe Now Button */}
+      <div style={{ padding: '16px 20px 24px' }}>
+        <button
+          onClick={() => setShowCancelModal(true)}
+          disabled={loading || sosStatus?.status === 'CANCELLED'}
+          style={{
+            width: '100%',
+            padding: '14px',
+            borderRadius: 12,
+            background: 'rgba(255,255,255,0.07)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            color: sosStatus?.status === 'CANCELLED' ? '#888' : '#4ade80',
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: loading || sosStatus?.status === 'CANCELLED' ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.5 : 1,
+          }}
+        >
+          {sosStatus?.status === 'CANCELLED' ? 'SOS Cancelled' : '✅ I\'m Safe Now'}
+        </button>
+      </div>
 
       {/* Cancel Modal */}
       {showCancelModal && (
         <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.6)',
-            display: 'flex',
-            alignItems: 'flex-end',
-            zIndex: 50,
-          }}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', zIndex: 50 }}
           onClick={() => setShowCancelModal(false)}
         >
           <div
             className="w-full rounded-t-3xl p-6"
-            style={{
-              background: 'var(--citizen-bg)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              maxHeight: '70vh',
-              overflow: 'auto',
-            }}
+            style={{ background: 'var(--citizen-bg)', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '70vh', overflow: 'auto' }}
             onClick={e => e.stopPropagation()}
           >
-            <h2 style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: '0 0 12px 0' }}>
-              Why are you cancelling?
-            </h2>
-            <p style={{ color: '#888', fontSize: 12, margin: '0 0 16px 0' }}>
-              False alarms result in strikes on your account.
-            </p>
-
+            <h2 style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: '0 0 8px 0' }}>Why are you cancelling?</h2>
+            <p style={{ color: '#888', fontSize: 12, margin: '0 0 16px 0' }}>False alarms result in strikes on your account.</p>
             <div className="flex flex-col gap-3 mb-6">
               {['Accidental', 'Already Resolved', 'False Alarm', 'Other'].map(reason => (
                 <button
@@ -314,39 +337,27 @@ export default function SosActive() {
                 </button>
               ))}
             </div>
-
             <button
               onClick={handleCancel}
               disabled={!cancelReason || loading}
               style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: 12,
+                width: '100%', padding: '12px', borderRadius: 12,
                 background: cancelReason && !loading ? 'var(--sos-red)' : '#555',
-                border: 'none',
-                color: '#fff',
-                fontSize: 14,
-                fontWeight: 600,
+                border: 'none', color: '#fff', fontSize: 14, fontWeight: 600,
                 cursor: !cancelReason || loading ? 'not-allowed' : 'pointer',
                 marginBottom: 8,
               }}
             >
               {loading ? 'Cancelling...' : 'Confirm Cancellation'}
             </button>
-
             <button
               onClick={() => setShowCancelModal(false)}
               disabled={loading}
               style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: 12,
+                width: '100%', padding: '12px', borderRadius: 12,
                 background: 'rgba(255,255,255,0.07)',
                 border: '1px solid rgba(255,255,255,0.15)',
-                color: '#fff',
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: 'pointer',
+                color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
               }}
             >
               Keep SOS Active
