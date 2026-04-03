@@ -19,7 +19,7 @@ export default function Metrics() {
     }
     setLoading(true);
     dispatchApi.getStats(`?period=${period}`)
-      .then(setStats)
+      .then(data => setStats(data.stats || data))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [officer, authLoading, period]);
@@ -28,11 +28,11 @@ export default function Metrics() {
 
   const metricCards = stats ? [
     { label: 'Total Alerts', value: stats.total ?? 0, color: '#e6edf3', icon: 'Ã°ÂÂÂ' },
-    { label: 'Active Now', value: stats.active_count ?? 0, color: '#f85149', icon: 'Ã°ÂÂÂ¨' },
-    { label: 'Acknowledged', value: stats.acknowledged_count ?? 0, color: '#ffc107', icon: 'Ã°ÂÂÂÃ¯Â¸Â' },
-    { label: 'Resolved', value: stats.resolved_count ?? 0, color: '#3fb950', icon: 'Ã¢ÂÂ' },
-    { label: 'False Alarms', value: stats.false_alarm_count ?? 0, color: '#8b949e', icon: 'Ã¢ÂÂ Ã¯Â¸Â' },
-    { label: 'Today', value: stats.today_count ?? 0, color: '#58a6ff', icon: 'Ã°ÂÂÂ' },
+    { label: 'Active Now', value: stats.active ?? 0, color: '#f85149', icon: 'Ã°ÂÂÂ¨' },
+    { label: 'Acknowledged', value: stats.acknowledged ?? 0, color: '#ffc107', icon: 'Ã°ÂÂÂÃ¯Â¸Â' },
+    { label: 'Resolved', value: stats.resolved ?? 0, color: '#3fb950', icon: 'Ã¢ÂÂ' },
+    { label: 'False Alarms', value: stats.false_alarms ?? 0, color: '#8b949e', icon: 'Ã¢ÂÂ Ã¯Â¸Â' },
+    { label: 'Today', value: stats.total ?? 0, color: '#58a6ff', icon: 'Ã°ÂÂÂ' },
   ] : [];
 
   return (
@@ -78,10 +78,10 @@ export default function Metrics() {
                 <h3 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 600, color: '#e6edf3' }}>Resolution Rate</h3>
                 <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#8b949e' }}>
                   <span>Resolved</span>
-                  <span style={{ color: '#3fb950' }}>{stats.total > 0 ? Math.round(((stats.resolved_count ?? 0) / stats.total) * 100) : 0}%</span>
+                  <span style={{ color: '#3fb950' }}>{stats.total > 0 ? Math.round(((stats.resolved ?? 0) / stats.total) * 100) : 0}%</span>
                 </div>
                 <div style={{ height: '8px', backgroundColor: '#21262d', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${stats.total > 0 ? Math.round(((stats.resolved_count ?? 0) / stats.total) * 100) : 0}%`, backgroundColor: '#3fb950', borderRadius: '4px', transition: 'width 0.5s ease' }} />
+                  <div style={{ height: '100%', width: `${stats.total > 0 ? Math.round(((stats.resolved ?? 0) / stats.total) * 100) : 0}%`, backgroundColor: '#3fb950', borderRadius: '4px', transition: 'width 0.5s ease' }} />
                 </div>
               </div>
             )}
