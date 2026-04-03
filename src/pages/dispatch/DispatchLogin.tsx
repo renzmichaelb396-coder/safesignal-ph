@@ -3,9 +3,9 @@ import { useLocation } from 'wouter';
 import { useDispatchAuth } from '../../contexts/DispatchAuthContext';
 
 export default function DispatchLogin() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [badgeNumber, setBadgeNumber] = useState('');
+  const [email, setEmail] = useState('dispatcher@pasay.safesignal.ph');
+  const [password, setPassword] = useState('password123');
+  const [badgeNumber, setBadgeNumber] = useState('PNP-001');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [, navigate] = useLocation();
@@ -13,13 +13,14 @@ export default function DispatchLogin() {
 
   const routeByRole = (role: string) => {
     if (role === 'OFFICER') {
-      navigate('/dispatch/officer-dashboard');
+      navigate('/officer');
     } else if (role === 'STATION_ADMIN') {
       navigate('/dispatch/metrics');
     } else {
       navigate('/dispatch');
     }
   };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -55,34 +56,14 @@ export default function DispatchLogin() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: '#0d1117',
-      padding: '16px',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '420px',
-        backgroundColor: '#161b22',
-        border: '1px solid #30363d',
-        borderRadius: '8px',
-        padding: '40px 32px',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.4)'
-      }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0d1117', padding: '16px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+      <div style={{ width: '100%', maxWidth: '420px', backgroundColor: '#161b22', border: '1px solid #30363d', borderRadius: '8px', padding: '40px 32px', boxShadow: '0 10px 40px rgba(0,0,0,0.4)' }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
             <img
               src="/pasay-police-badge.svg"
               alt="Pasay City Police"
-              style={{
-                width: '96px',
-                height: 'auto',
-                filter: 'drop-shadow(0 4px 12px rgba(245,158,11,0.4))',
-              }}
+              style={{ width: '96px', height: 'auto', filter: 'drop-shadow(0 4px 12px rgba(245,158,11,0.4))' }}
             />
           </div>
           <h1 style={{ fontSize: '24px', fontWeight: 600, color: '#ffc107', margin: '0 0 8px 0' }}>RespondPH</h1>
@@ -105,6 +86,7 @@ export default function DispatchLogin() {
               onBlur={e => { e.currentTarget.style.borderColor = '#30363d'; }}
             />
           </div>
+
           <div>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#c9d1d9', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Badge Number
@@ -120,6 +102,7 @@ export default function DispatchLogin() {
               onBlur={e => { e.currentTarget.style.borderColor = '#30363d'; }}
             />
           </div>
+
           <div>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#c9d1d9', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Password
@@ -128,7 +111,7 @@ export default function DispatchLogin() {
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
               required
               style={{ width: '100%', padding: '10px 12px', fontSize: '14px', backgroundColor: '#0d1117', border: '1px solid #30363d', borderRadius: '6px', color: '#e6edf3', boxSizing: 'border-box' }}
               onFocus={e => { e.currentTarget.style.borderColor = '#ffc107'; }}
@@ -177,8 +160,9 @@ export default function DispatchLogin() {
             Admin (Chief Antonio Reyes / PNP-ADM)
           </button>
         </div>
+
         <p style={{ marginTop: '24px', textAlign: 'center', fontSize: '11px', color: '#8b949e' }}>
-          RespondPH v1.0 — Authorized Personnel Only
+          RespondPH v1.0 \u2014 Authorized Personnel Only
         </p>
       </div>
     </div>
