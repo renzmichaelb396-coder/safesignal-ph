@@ -51,7 +51,7 @@ export default function Metrics() {
       <div style={{ padding: '24px' }}>
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 600, color: '#e6edf3' }}>Metrics</h1>
-          <p style={{ margin: 0, fontSize: '13px', color: '#8b949e' }}>Pasay City Police Station Ã¢ÂÂ performance overview</p>
+          <p style={{ margin: 0, fontSize: '13px', color: '#8b949e' }}>Pasay City Police Station — performance overview</p>
         </div>
 
         {loading ? (
