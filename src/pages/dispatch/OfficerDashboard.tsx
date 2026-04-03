@@ -54,6 +54,11 @@ export default function OfficerDashboard() {
         setLocation('/dispatch/login');
         return;
       }
+      if (!res.ok) {
+        setAssignment(null);
+        setLoading(false);
+        return;
+      }
       const data = await res.json();
       setAssignment(data.assignment || null);
       setLoading(false);
@@ -61,11 +66,11 @@ export default function OfficerDashboard() {
         updateMap(data.assignment.lat, data.assignment.lng);
       }
     } catch (err) {
-      setError('Failed to load assignment');
+      // Network error or missing endpoint — show empty state, not error
+      setAssignment(null);
       setLoading(false);
     }
   }
-
   function updateMap(lat: number, lng: number) {
     if (!(window as any).maplibregl) return;
     const maplibregl = (window as any).maplibregl;
