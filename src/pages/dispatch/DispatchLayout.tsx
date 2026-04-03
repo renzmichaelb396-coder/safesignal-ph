@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'wouter';
+import { useDispatchAuth } from '../../contexts/DispatchAuthContext';
 
 interface NavLink {
   href: string;
@@ -19,24 +20,17 @@ const navLinks: NavLink[] = [
 
 export default function DispatchLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const [officerRole, setOfficerRole] = useState('');
-  const [officerName, setOfficerName] = useState('');
+  const { officer, logout } = useDispatchAuth();
 
-  useEffect(() => {
-    const role = localStorage.getItem('safesignal_officer_role') || '';
-    const name = localStorage.getItem('safesignal_officer_name') || 'User';
-    setOfficerRole(role);
-    setOfficerName(name);
-  }, []);
+  const officerRole = officer?.role || '';
+  const officerName = officer?.full_name || 'User';
 
   const filteredNav = navLinks.filter(
     (link) => !link.roles || link.roles.includes(officerRole)
   );
 
   function handleLogout() {
-    localStorage.removeItem('safesignal_officer_token');
-    localStorage.removeItem('safesignal_officer_role');
-    localStorage.removeItem('safesignal_officer_name');
+    logout();
     window.location.href = '/dispatch/login';
   }
 
