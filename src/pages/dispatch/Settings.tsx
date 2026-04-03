@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { dispatchApi } from '../../lib/api';
+import DispatchLayout from './DispatchLayout';
 
 interface Settings {
   surge_threshold: number;
@@ -111,6 +112,7 @@ export default function Settings() {
   ];
 
   return (
+    <DispatchLayout>
     <div
       style={{
         flex: 1,
@@ -367,5 +369,6 @@ export default function Settings() {
         )}
       </div>
     </div>
+    </DispatchLayout>
   );
 }
