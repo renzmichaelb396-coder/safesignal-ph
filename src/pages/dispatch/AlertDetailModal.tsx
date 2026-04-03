@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { dispatchApi, formatElapsed } from '../../lib/api';
 
 interface Alert {
@@ -27,6 +27,29 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
   const [suspiciousReason, setSuspiciousReason] = useState('');
   const [showResolveForm, setShowResolveForm] = useState(false);
   const [showSuspiciousForm, setShowSuspiciousForm] = useState(false);
+  const [officers, setOfficers] = useState<any[]>([]);
+  const [selectedOfficerId, setSelectedOfficerId] = useState('');
+
+  useEffect(() => {
+    dispatchApi.getOfficers().then((data: any) => {
+      setOfficers(data.officers || []);
+    }).catch(() => {});
+  }, []);
+
+  const handleAssignOfficer = async () => {
+    if (!selectedOfficerId) return;
+    setActionLoading(true);
+    setActionError('');
+    try {
+      const result = await dispatchApi.assignOfficer(alert.id, selectedOfficerId);
+      onUpdate(result.alert || result);
+      setSelectedOfficerId('');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to assign officer');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const handleAcknowledge = async () => {
     setActionLoading(true);
@@ -404,6 +427,30 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                   {alert.location_history.length} location update{alert.location_history.length !== 1 ? 's' : ''}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* ASSIGN OFFICER */}
+          {(alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED') && (
+            <div style={{ padding: '16px', backgroundColor: 'var(--dispatch-bg, #0d1117)', borderRadius: '8px', border: '1px solid var(--dispatch-border, #30363d)' }}>
+              <p style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ASSIGN OFFICER</p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <select value={selectedOfficerId} onChange={(e) => setSelectedOfficerId(e.target.value)} style={{ flex: 1, padding: '10px 12px', fontSize: '13px', backgroundColor: 'var(--dispatch-border, #161b22)', border: '1px solid var(--dispatch-border, #30363d)', borderRadius: '6px', color: '#e6edf3', cursor: 'pointer' }}>
+                  <option value="">— Select officer —</option>
+                  {officers.map((o: any) => (
+                    <option key={o.id} value={o.id}>{o.full_name} ({o.badge_number})</option>
+                  ))}
+                </select>
+                <button onClick={handleAssignOfficer} disabled={!selectedOfficerId || actionLoading} style={{ padding: '10px 20px', fontSize: '12px', fontWeight: 600, color: '#0d1117', backgroundColor: 'var(--ph-gold, #ffc107)', border: 'none', borderRadius: '6px', cursor: !selectedOfficerId || actionLoading ? 'not-allowed' : 'pointer', opacity: !selectedOfficerId || actionLoading ? 0.5 : 1, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Assign</button>
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          {(alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED') && (
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#8b949e', marginBottom: '8px', textTransform: 'uppercase' }}>Notes (optional)</label>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add notes about this alert..." style={{ width: '100%', padding: '10px 12px', fontSize: '13px', backgroundColor: 'var(--dispatch-border, #161b22)', border: '1px solid var(--dispatch-border, #30363d)', borderRadius: '6px', color: '#e6edf3', resize: 'vertical', minHeight: '60px', boxSizing: 'border-box', fontFamily: 'inherit' }} />
             </div>
           )}
 
