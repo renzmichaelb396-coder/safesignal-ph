@@ -341,7 +341,7 @@ export default function Citizens() {
                           color: 'var(--dispatch-border, #8b949e)',
                         }}
                       >
-                        {citizen.phone} â¢ {citizen.barangay}
+                        {citizen.phone} • {citizen.barangay}
                       </p>
                       <div style={{ display: 'flex', gap: '16px', fontSize: '11px' }}>
                         <div
