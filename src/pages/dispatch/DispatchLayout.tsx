@@ -30,7 +30,7 @@ export default function DispatchLayout({ children }: DispatchLayoutProps) {
     ? (officer.full_name || (officer as any).name || 'Unknown')
     : '';
   const officerRole = officer
-    ? ((officer as any).role || 'DISPATCHER')
+    ? ((officer as any).role || 'DISPATCHER').toUpperCase()
     : 'DISPATCHER';
 
   return (
@@ -151,8 +151,11 @@ export default function DispatchLayout({ children }: DispatchLayoutProps) {
                   color: active
                     ? 'var(--ph-gold, #ffc107)'
                     : 'var(--dispatch-text-secondary, #8b949e)',
-                  background: active ? 'rgba(255,193,7,0.1)' : 'transparent',
-                  border: `1px solid ${ active ? 'rgba(255,193,7,0.15)' : 'transparent'}`,
+                  background: active ? 'rgba(255,193,7,0.08)' : 'transparent',
+                  borderLeft: active ? '3px solid #ffc107' : '3px solid transparent',
+                  borderTop: '1px solid transparent',
+                  borderRight: '1px solid transparent',
+                  borderBottom: '1px solid transparent',
                   textDecoration: 'none',
                   transition: 'all 0.15s',
                 }}
@@ -168,17 +171,7 @@ export default function DispatchLayout({ children }: DispatchLayoutProps) {
                   }
                 }}
               >
-                {active && (
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      background: 'var(--ph-gold, #ffc107)',
-                      flexShrink: 0,
-                    }}
-                  />
-                )}
+
                 <span style={{ fontSize: 15, width: 20, textAlign: 'center', flexShrink: 0 }}>
                   {link.icon}
                 </span>
