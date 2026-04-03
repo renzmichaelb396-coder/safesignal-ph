@@ -12,15 +12,11 @@ export default function Dashboard() {
   const [alertsLoading, setAlertsLoading] = useState(true);
   const [selectedAlert, setSelectedAlert] = useState<any>(null);
   const [surgeWarning, setSurgeWarning] = useState<string | null>(null);
-  const [followMode, setFollowMode] = useState(true);
-  const followModeRef = useRef(true);
   const [now, setNow] = useState(Date.now());
   const [clock, setClock] = useState('');
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<any>(null);
   const markersRef = useRef<Map<number, any>>(new Map());
-  const officerMarkersRef = useRef<Map<number, any>>(new Map());
-  const [officerLocations, setOfficerLocations] = useState<any[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevAlertIdsRef = useRef<Set<number>>(new Set());
 
@@ -69,6 +65,8 @@ export default function Dashboard() {
       if (leafletMapRef.current) return;
       const maplibregl = (window as any).maplibregl;
       if (!maplibregl) return;
+      // Fix blank tiles on Vercel: use CDN worker instead of blob URL
+      if (!maplibregl.workerUrl) maplibregl.workerUrl = 'https://unpkg.com/maplibre-gl@4/dist/maplibre-gl-csp-worker.js';
 
       leafletMapRef.current = new maplibregl.Map({
         container: mapRef.current!,
@@ -84,7 +82,6 @@ export default function Dashboard() {
         .setLngLat([120.9932, 14.5378])
         .setPopup(new maplibregl.Popup().setHTML('<b>Pasay City Police Station</b>'))
         .addTo(leafletMapRef.current);
-      leafletMapRef.current.addControl(new maplibregl.NavigationControl(), 'top-left');
     };
 
     if (!(window as any).maplibregl) {
@@ -99,17 +96,12 @@ export default function Dashboard() {
       initMap();
     }
   }, [officer]);
+
   // Update map markers when alerts change
   useEffect(() => {
     if (!leafletMapRef.current || alerts.length === 0) return;
     updateMapMarkers(alerts);
   }, [alerts]);
-
-  // Update officer markers when officerLocations changes
-  useEffect(() => {
-    if (!leafletMapRef.current) return;
-    updateOfficerMarkers(officerLocations);
-  }, [officerLocations]);
 
   // Poll for alerts every 3 seconds (SSE not supported on Vercel serverless)
   useEffect(() => {
@@ -209,10 +201,11 @@ export default function Dashboard() {
       }
     }
 
-    if (followModeRef.current && newestActive?.lat != null && newestActive?.lng != null) {
+    if (newestActive?.lat != null && newestActive?.lng != null) {
       leafletMapRef.current.flyTo({ center: [newestActive.lng, newestActive.lat], zoom: 15 });
     }
   };
+
   const playBeep = () => {
     try {
       if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
@@ -239,43 +232,9 @@ export default function Dashboard() {
       if (data?.alert) setSelectedAlert(data.alert);
     } catch {}
   };
+
   const activeAlerts = alerts.filter(a => a.status === 'ACTIVE' || a.status === 'ACKNOWLEDGED');
 
-
-  const updateOfficerMarkers = (officers: any[]) => {
-    if (!leafletMapRef.current) return;
-    const maplibregl = (window as any).maplibregl;
-    if (!maplibregl) return;
-    // Remove stale markers
-    for (const [id, marker] of Array.from(officerMarkersRef.current.entries())) {
-      if (!officers.find((o: any) => o.officer_id === id)) {
-        marker.remove();
-        officerMarkersRef.current.delete(id);
-      }
-    }
-    for (const officer of officers) {
-      if (officer.lat == null || officer.lng == null) continue;
-      const initials = officer.full_name ? officer.full_name.split(' ').map((n: string) => n[0]).join('').substring(0,2).toUpperCase() : 'OF';
-      if (officerMarkersRef.current.has(officer.officer_id)) {
-        const marker = officerMarkersRef.current.get(officer.officer_id);
-        marker.setLngLat([officer.lng, officer.lat]);
-        const el = marker.getElement();
-        el.title = `${officer.full_name} (${officer.badge_number}) - ${officer.status}`;
-      } else {
-        const el = document.createElement('div');
-        el.style.cssText = 'width:24px;height:24px;background:#3b82f6;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;box-shadow:0 2px 8px rgba(59,130,246,0.6);cursor:pointer;';
-        el.textContent = initials;
-        el.title = `${officer.full_name} (${officer.badge_number}) - ${officer.status}`;
-        const marker = new maplibregl.Marker({ element: el })
-          .setLngLat([officer.lng, officer.lat])
-          .setPopup(new maplibregl.Popup({ offset: 25 }).setHTML(
-            `<b>${officer.full_name}</b><br/>${officer.badge_number}<br/><span style="color:#3b82f6">${officer.status}</span>`
-          ))
-          .addTo(leafletMapRef.current);
-        officerMarkersRef.current.set(officer.officer_id, marker);
-      }
-    }
-  };
   if (loading) return null; // Wait for auth context to restore from localStorage
   if (!officer) {
     navigate('/dispatch/login');
@@ -292,28 +251,13 @@ export default function Dashboard() {
             {surgeWarning && (
               <div className="absolute top-0 left-0 right-0 z-50 p-3 text-center"
                 style={{ background: 'rgba(230,57,70,0.9)', color: '#fff', fontSize: 13, fontWeight: 600 }}>
-                ð¨ {surgeWarning}
+                🚨 {surgeWarning}
               </div>
             )}
-            {/* Follow toggle button */}
-            <button
-              onClick={() => { const next = !followMode; setFollowMode(next); followModeRef.current = next; }}
-              style={{
-                position: 'absolute', top: 10, right: 10, zIndex: 10,
-                padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                cursor: 'pointer', border: 'none',
-                background: followMode ? 'rgba(255,193,7,0.92)' : 'rgba(30,30,40,0.82)',
-                color: followMode ? '#1a1a1a' : '#aaa',
-                backdropFilter: 'blur(4px)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-              }}
-            >
-              📍 Follow
-            </button>
             <div ref={mapRef} style={{ width: '100%', height: '100%', background: '#f8fafc' }} />
           </div>
 
-          {/* RIGHT PANEL â Active Alerts */}
+          {/* RIGHT PANEL – Active Alerts */}
           <div className="dispatch-right-panel">
             <div className="p-4" style={{ borderBottom: '1px solid var(--dispatch-border)' }}>
               <div className="flex items-center justify-between">
@@ -400,11 +344,11 @@ export default function Dashboard() {
                         <p style={{ color: alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED' ? '#6b7280' : '#888', fontSize: 11, margin: '2px 0' }}>{alert.barangay}</p>
                         <div className="flex items-center justify-between">
                           <span style={{ color: alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED' ? '#374151' : '#e1e4ed', fontSize: 12, fontFamily: 'monospace' }}>
-                            {formatElapsed(Date.now() - Number(alert.triggered_at))}
+                            {formatElapsed(Date.now() - alert.triggered_at * 1000)}
                           </span>
                           <div className="flex items-center gap-1">
-                            {!!alert.is_suspicious && (
-                              <span style={{ fontSize: 12 }} title="Suspicious">ð©</span>
+                            {alert.is_suspicious && (
+                              <span style={{ fontSize: 12 }} title="Suspicious">🚩</span>
                             )}
                             <span style={{
                               fontSize: 10, fontWeight: 600,
@@ -426,7 +370,7 @@ export default function Dashboard() {
               {[
                 { label: 'Active', value: alerts.filter(a => a.status === 'ACTIVE').length, color: '#dc2626', bg: 'rgba(220,38,38,0.1)', icon: '🚨' },
                 { label: "Ack'd", value: alerts.filter(a => a.status === 'ACKNOWLEDGED').length, color: '#d97706', bg: 'rgba(217,119,6,0.1)', icon: '✓' },
-                { label: 'Today', value: alerts.filter(a => Number(a.triggered_at) > Date.now() - 86400000).length, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', icon: '📅' },
+                { label: 'Today', value: alerts.filter(a => a.triggered_at * 1000 > Date.now() - 86400000).length, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', icon: '📅' },
               ].map((s, i) => (
                 <div key={i} className="text-center p-2 rounded-lg"
                   style={{ background: s.bg }}>
@@ -436,10 +380,9 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-        </div>
 
       </DispatchLayout>
-      {/* Alert Detail Modal â rendered OUTSIDE DispatchLayout so position:fixed is not clipped by overflow:hidden */}
+      {/* Alert Detail Modal – rendered OUTSIDE DispatchLayout so position:fixed is not clipped by overflow:hidden */}
       {selectedAlert && (
         <AlertDetailModal
           alert={selectedAlert}
