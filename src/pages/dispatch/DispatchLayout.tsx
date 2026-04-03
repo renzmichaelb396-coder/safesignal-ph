@@ -50,8 +50,8 @@ export default function DispatchLayout({ children }: DispatchLayoutProps) {
           <div className="flex items-center gap-2 mb-1">
             <img
               src="/pasay-police-badge.svg"
-              alt="SPD Logo"
-              style={{ width: 28, height: 28, objectFit: 'contain', flexShrink: 0 }}
+              alt="Pasay City Police Badge"
+              style={{ width: 40, height: 40, objectFit: 'contain', flexShrink: 0 }}
             />
             <span
               style={{
