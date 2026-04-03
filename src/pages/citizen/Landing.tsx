@@ -17,43 +17,12 @@ export default function Landing() {
 
       {/* Logo and Branding */}
       <div className="flex flex-col items-center text-center gap-6">
-        {/* Custom SOS Shield Logo */}
-        <div style={{ width: 120, height: 140 }}>
-          <svg viewBox="0 0 120 140" width="120" height="140" xmlns="http://www.w3.org/2000/svg">
-            {/* Shield shape */}
-            <path
-              d="M60 5 L110 25 L110 75 Q110 115 60 135 Q10 115 10 75 L10 25 Z"
-              fill="#1a237e"
-              stroke="#ffc107"
-              strokeWidth="3"
-            />
-            {/* Inner shield */}
-            <path
-              d="M60 15 L100 32 L100 75 Q100 108 60 125 Q20 108 20 75 L20 32 Z"
-              fill="#283593"
-            />
-            {/* 5 stars in arc at top */}
-            <text x="60" y="35" textAnchor="middle" fontSize="11" fill="#ffc107">★</text>
-            <text x="38" y="45" textAnchor="middle" fontSize="11" fill="#ffc107">★</text>
-            <text x="82" y="45" textAnchor="middle" fontSize="11" fill="#ffc107">★</text>
-            <text x="26" y="62" textAnchor="middle" fontSize="11" fill="#ffc107">★</text>
-            <text x="94" y="62" textAnchor="middle" fontSize="11" fill="#ffc107">★</text>
-            {/* Gold circle behind SOS */}
-            <circle cx="60" cy="88" r="24" fill="#ffc107" />
-            {/* SOS text */}
-            <text
-              x="60"
-              y="96"
-              textAnchor="middle"
-              fontSize="20"
-              fontWeight="900"
-              fill="#1a237e"
-              fontFamily="Arial, sans-serif"
-            >
-              SOS
-            </text>
-          </svg>
-        </div>
+        {/* Pasay Police Badge */}
+          <img
+            src="/pasay-police-badge.svg"
+            alt="Pasay City Police Station Badge"
+            style={{ width: 140, height: 160, objectFit: 'contain', filter: 'drop-shadow(0 4px 12px rgba(255, 193, 7, 0.3))' }}
+          />
 
         <div>
           <h1
