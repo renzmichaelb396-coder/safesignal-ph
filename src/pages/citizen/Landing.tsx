@@ -32,23 +32,25 @@ export default function Landing() {
               d="M60 15 L100 32 L100 75 Q100 108 60 125 Q20 108 20 75 L20 32 Z"
               fill="#283593"
             />
-            {/* Stars row */}
-            <text x="60" y="48" textAnchor="middle" fontSize="14" fill="#ffc107">★ ★ ★</text>
+            {/* 5 stars in arc at top */}
+            <text x="60" y="35" textAnchor="middle" fontSize="11" fill="#ffc107">★</text>
+            <text x="38" y="45" textAnchor="middle" fontSize="11" fill="#ffc107">★</text>
+            <text x="82" y="45" textAnchor="middle" fontSize="11" fill="#ffc107">★</text>
+            <text x="26" y="62" textAnchor="middle" fontSize="11" fill="#ffc107">★</text>
+            <text x="94" y="62" textAnchor="middle" fontSize="11" fill="#ffc107">★</text>
+            {/* Gold circle behind SOS */}
+            <circle cx="60" cy="88" r="24" fill="#ffc107" />
             {/* SOS text */}
             <text
               x="60"
-              y="85"
+              y="96"
               textAnchor="middle"
-              fontSize="28"
+              fontSize="20"
               fontWeight="900"
-              fill="#ffffff"
+              fill="#1a237e"
               fontFamily="Arial, sans-serif"
             >
               SOS
-            </text>
-            {/* Bottom text */}
-            <text x="60" y="108" textAnchor="middle" fontSize="8" fill="#ffc107" fontFamily="Arial, sans-serif">
-              EMERGENCY RESPONSE
             </text>
           </svg>
         </div>
@@ -125,3 +127,4 @@ export default function Landing() {
     </div>
   );
 }
+
