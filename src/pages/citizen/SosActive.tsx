@@ -378,7 +378,7 @@ export default function SosActive() {
         position: 'fixed', bottom: 0, left: 0, right: 0,
         padding: '12px 20px 28px',
         background: 'linear-gradient(to top, rgba(13,13,20,0.98) 80%, transparent)',
-        zIndex: 40,
+        zIndex: 1000,
       }}>
         <button
           onClick={() => setShowCancelModal(true)}
@@ -400,11 +400,11 @@ export default function SosActive() {
         </button>
       </div>
 
-      {/* Cancel Modal */}
+      {/* Cancel Modal — zIndex must exceed Leaflet's internal panes (200–700) */}
       {showCancelModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', zIndex: 50
+          background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-end', zIndex: 9999
         }}
           onClick={() => setShowCancelModal(false)}
         >
