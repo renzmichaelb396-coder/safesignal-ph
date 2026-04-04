@@ -28,7 +28,17 @@ export default function DispatchLogin() {
     try {
       await login(email, password, badgeNumber);
       const storedUser = localStorage.getItem('dispatch_user');
+      const storedToken = localStorage.getItem('dispatch_token');
       const user = storedUser ? JSON.parse(storedUser) : null;
+
+      // OFFICER role uses OfficerDashboard which checks safesignal_officer_* keys.
+      // DispatchAuthContext only writes dispatch_* keys (BUG-007), so we bridge
+      // the key gap here at the routing layer — copy the session into officer keys.
+      if (user?.role === 'OFFICER' && storedToken) {
+        localStorage.setItem('safesignal_officer_token', storedToken);
+        localStorage.setItem('safesignal_officer_data', JSON.stringify(user));
+      }
+
       routeByRole(user?.role || 'DISPATCHER');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.');
