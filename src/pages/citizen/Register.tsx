@@ -17,6 +17,7 @@ export default function Register() {
     e.preventDefault();
     setError('');
 
+    if (!form.photo_url) { setError('Please upload your selfie photo'); return; }
     if (!form.terms) { setError('Please accept the terms'); return; }
     if (!/^09\d{9}$/.test(form.phone)) { setError('Phone must be 11 digits starting with 09'); return; }
     if (!/^\d{4}$/.test(form.pin)) { setError('PIN must be exactly 4 digits'); return; }
@@ -74,20 +75,23 @@ export default function Register() {
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col items-center gap-2 mb-2">
-          <div className="relative" style={{ width: 80, height: 80 }}>
-            {form.photo_url ? (
-              <img src={form.photo_url} alt="Selfie" className="w-full h-full rounded-full object-cover"
-                style={{ border: '2px solid var(--ph-gold)' }} />
-            ) : (
-              <div className="w-full h-full rounded-full flex items-center justify-center"
-                style={{ background: 'rgba(255,255,255,0.1)', border: '2px dashed rgba(255,255,255,0.3)' }}>
-                <span style={{ fontSize: 28 }}>📷</span>
-              </div>
-            )}
-          </div>
-          <label style={{ color: 'var(--ph-gold)', fontSize: 12, cursor: 'pointer' }}>
-            Upload Selfie Photo (Required)
-            <input type="file" accept="image/*" capture="user" onChange={handlePhotoUpload}
+          {/* Entire selfie block wrapped in label so tapping the circle opens the picker */}
+          <label htmlFor="selfie-upload" style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 80, height: 80, position: 'relative' }}>
+              {form.photo_url ? (
+                <img src={form.photo_url} alt="Selfie" className="w-full h-full rounded-full object-cover"
+                  style={{ border: '2px solid var(--ph-gold)' }} />
+              ) : (
+                <div className="w-full h-full rounded-full flex items-center justify-center"
+                  style={{ background: 'rgba(255,255,255,0.1)', border: '2px dashed rgba(255,255,255,0.3)' }}>
+                  <span style={{ fontSize: 28 }}>📷</span>
+                </div>
+              )}
+            </div>
+            <span style={{ color: 'var(--ph-gold)', fontSize: 12 }}>
+              {form.photo_url ? '✓ Selfie Uploaded — Tap to Change' : 'Tap Here to Upload Selfie (Required)'}
+            </span>
+            <input id="selfie-upload" type="file" accept="image/*" capture="user" onChange={handlePhotoUpload}
               style={{ display: 'none' }} />
           </label>
         </div>
