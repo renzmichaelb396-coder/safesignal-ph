@@ -16,7 +16,7 @@ const navLinks: NavLink[] = [
   { href: '/dispatch/history', label: 'History', icon: '📋' },
   { href: '/dispatch/citizens', label: 'Citizens', icon: '👥' },
   { href: '/dispatch/officers', label: 'Officers', icon: '👮', roles: ['DISPATCHER', 'STATION_ADMIN'] },
-  { href: '/dispatch/settings', label: 'Settings', icon: '⚙️' },
+  { href: '/dispatch/settings', label: 'Settings', icon: '⚙️', roles: ['STATION_ADMIN'] },
   { href: '/dispatch/metrics', label: 'Metrics', icon: '📊', roles: ['DISPATCHER', 'STATION_ADMIN'] },
   { href: '/dispatch/officer-dashboard', label: 'My Dashboard', icon: '🏠', roles: ['OFFICER'] },
 ];
