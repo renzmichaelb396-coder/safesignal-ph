@@ -416,7 +416,7 @@ app.post('/api/dispatch/citizens/:id/reset-strikes', requireOfficerAuth, async (
 // GET /api/dispatch/officers
 app.get('/api/dispatch/officers', requireOfficerAuth, async (_req: any, res: any) => {
   try {
-    const result = await pool.query(`SELECT o.*, s.name as station_name FROM officers o LEFT JOIN stations s ON o.station_id = s.id ORDER BY o.created_at DESC`);
+    const result = await pool.query(`SELECT o.*, s.name as station_name FROM officers o LEFT JOIN stations s ON o.station_id = s.id WHERE o.is_active = 1 ORDER BY o.created_at DESC`);
     res.json({ officers: result.rows.map((o: any) => { const r = { ...o }; delete r.password_hash; return r; }) });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch officers' }); }
 });
@@ -734,7 +734,7 @@ app.get('/api/officer/active-assignment', requireOfficerAuth, async (req: any, r
        c.address, a.lat, a.lng, a.status, a.triggered_at as "createdAt"
        FROM sos_alerts a
        JOIN citizens c ON a.citizen_id = c.id
-       WHERE a.assigned_officer_id = $1 AND a.status IN ('ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE')
+       WHERE a.assigned_officer_id = $1 AND a.status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE')
        ORDER BY a.triggered_at DESC LIMIT 1`,
       [officerPayload.id]
     );
