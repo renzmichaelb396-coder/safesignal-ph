@@ -212,12 +212,27 @@ export default function Dashboard() {
     finally { setAlertsLoading(false); }
   };
 
+  const STATION_CENTER: [number, number] = [120.9932, 14.5378];
+
+  const centerOnStation = () => {
+    if (!leafletMapRef.current) return;
+    leafletMapRef.current.flyTo({ center: STATION_CENTER, zoom: 14 });
+  };
+
   const updateMapMarkers = (alertList: any[]) => {
     if (!leafletMapRef.current) return;
+
+    // BUG-002 guard: map style must be loaded before markers/flyTo work correctly.
+    // If called before tiles are ready, defer until map emits 'load' then retry.
+    if (!leafletMapRef.current.isStyleLoaded()) {
+      leafletMapRef.current.once('load', () => updateMapMarkers(alertList));
+      return;
+    }
+
     const maplibregl = (window as any).maplibregl;
     if (!maplibregl) return;
 
-    // Remove old markers
+    // Remove stale markers for resolved/cancelled alerts
     for (const [id, marker] of Array.from(markersRef.current.entries())) {
       if (!alertList.find(a => a.id === id)) {
         marker.remove();
@@ -234,8 +249,6 @@ export default function Dashboard() {
       let size = 20;
       let pulseClass = '';
 
-      if (!['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(alert.status)) continue;
-      if (!['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(alert.status)) continue;
       if (!['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(alert.status)) continue;
       if (alert.status === 'ACTIVE' && alert.is_suspicious) {
         color = '#f97316'; size = 24; pulseClass = 'pin-suspicious';
@@ -287,6 +300,9 @@ export default function Dashboard() {
     }
     if (priorityAlert?.lat != null && priorityAlert?.lng != null) {
       leafletMapRef.current.flyTo({ center: [priorityAlert.lng, priorityAlert.lat], zoom: 15 });
+    } else {
+      // No active emergency — return camera to Pasay Police Station
+      leafletMapRef.current.flyTo({ center: STATION_CENTER, zoom: 14 });
     }
   };
 
@@ -339,6 +355,20 @@ export default function Dashboard() {
               </div>
             )}
             <div ref={mapRef} style={{ width: '100%', height: '100%', background: '#f8fafc' }} />
+            {/* Re-center on Pasay Police Station button */}
+            <button
+              onClick={centerOnStation}
+              title="Center on Pasay Police Station"
+              style={{
+                position: 'absolute', bottom: 12, right: 12, zIndex: 10,
+                background: '#1a2332', border: '1px solid #30363d', borderRadius: 8,
+                color: '#e6edf3', padding: '8px 12px', fontSize: 13, fontWeight: 600,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+              }}
+            >
+              ⭐ Station
+            </button>
           </div>
 
           {/* RIGHT PANEL – Active Alerts */}
