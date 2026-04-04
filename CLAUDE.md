@@ -360,3 +360,74 @@ scope examples: citizen, dispatch, officer, api, auth, map
 Example: `fix(api): include EN_ROUTE and ON_SCENE in citizen active-alert query`
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+## Demo Accounts (Production + Local)
+
+All accounts use Pasay Police Station data seeded via `initializeDatabase()`.
+
+| Role | Username / Phone | Password / PIN | URL |
+|---|---|---|---|
+| Dispatcher | `PNP-001` | `password123` | /dispatch/login |
+| Field Officer | `PNP-002` | `password123` | /dispatch/login |
+| Station Admin | `PNP-ADM` | `password123` | /dispatch/login |
+| Citizen | `09171234567` | PIN: `1234` | /citizen/login |
+
+Station Admin (PNP-ADM) is the only role that can access /dispatch/settings.
+
+---
+
+## Bug Fix Log — Apr 4 2026 (8 fixes shipped)
+
+### BUG-MAP-01: Dispatch map auto-zoom lock
+**Root cause:** Every 3s poll → `setAlerts` → `useEffect([alerts])` → `updateMapMarkers` → unconditional `flyTo`. User could not zoom out manually.
+**Fix:** Added `autoZoomAlertIdRef`. `flyTo` only fires when the priority alert ID *changes*, not on every poll cycle.
+**File:** `src/pages/dispatch/Dashboard.tsx`
+
+### BUG-OFFICER-01: Officer status update silent failure
+**Root cause:** `updateStatus` called `await officerFetch(...)` but never checked `res.ok`. Toast fired regardless of HTTP 4xx/5xx response — dispatch dashboard and citizen app never updated.
+**Fix:** Added `if (!res.ok) throw new Error(...)` before `fetchAssignment()`. Error is now shown to officer; success toast only fires on confirmed server update.
+**File:** `src/pages/dispatch/OfficerDashboard.tsx`
+
+### BUG-SELFIE-01: Citizen registration selfie not clickable
+**Root cause:** Camera circle `<div>` was a *sibling* of `<label>`, not inside it. Tapping the circle did nothing.
+**Fix:** Wrapped entire selfie block (circle + text + `<input type="file">`) in one `<label htmlFor="selfie-upload">`. Also added required validation: form blocks submission if no photo uploaded.
+**File:** `src/pages/citizen/Register.tsx`
+
+### BUG-HISTORY-01: Dispatch history notes field blank
+**Root cause:** DB column is `notes` but frontend read `resolution_notes` (old column name).
+**Fix:** Added `notes?: string` to Alert interface; display reads `alert.notes || alert.resolution_notes` for backward compat.
+**File:** `src/pages/dispatch/DispatchHistory.tsx`
+
+### BUG-AUTH-01: Settings page accessible to non-admin roles
+**Fix (2 parts):**
+1. `DispatchLayout.tsx` — Settings nav item now has `roles: ['STATION_ADMIN']` restriction (hidden from DISPATCHER/OFFICER)
+2. `Settings.tsx` — Added hard guard: if `officer.role !== 'STATION_ADMIN'`, renders locked screen instead of form
+**Files:** `src/pages/dispatch/DispatchLayout.tsx`, `src/pages/dispatch/Settings.tsx`
+
+### BUG-EMOJI-01: Citizens page broken emoji
+**Root cause:** Corrupted UTF-8 bytes `\u00f0\u009f\u0091\u0095` stored as 4 separate characters instead of `👤` (U+1F464).
+**Fix:** Replaced with `String.fromCodePoint(0x1f464)` / literal `👤`.
+**File:** `src/pages/dispatch/Citizens.tsx`
+
+---
+
+## Map Configuration
+
+**Pasay Police Station center:** `[120.9987, 14.5547]` (lng, lat)
+Map auto-centers here when no active emergency. Dispatch map uses MapLibre GL (Mapbox-compatible API). Officer map uses Leaflet.
+
+**Auto-zoom rule:** Only zoom to alert on *new* alert ID. Never flyTo on every poll cycle (breaks manual zoom).
+
+---
+
+## Authentication Architecture
+
+Three completely isolated auth systems. Never mix tokens:
+
+| System | Token key | Context |
+|---|---|---|
+| Citizen | `safesignal_citizen_token` | CitizenAuthContext |
+| Dispatch/Officer | `dispatch_token` | DispatchAuthContext |
+| Officer view only | `safesignal_officer_token` | bridged from dispatch_token on OFFICER role login |
+
+**Critical:** Dispatch login bridges token to `safesignal_officer_token` for officers. Never clear `dispatch_token` from officer logout — only clear `safesignal_officer_token`.
