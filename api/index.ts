@@ -621,7 +621,7 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
 app.get('/api/citizen/active-alert', requireCitizenAuth, async (req: any, res: any) => {
   try {
     const cp = req.citizen as CitizenPayload;
-    const alertResult = await pool.query(`SELECT a.*, o.full_name as officer_name, o.badge_number as officer_badge FROM sos_alerts a LEFT JOIN officers o ON a.assigned_officer_id = o.id WHERE a.citizen_id = $1 AND a.status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE') ORDER BY a.triggered_at DESC LIMIT 1`, [cp.id]);
+    const alertResult = await pool.query(`SELECT a.*, o.full_name as officer_name, o.badge_number as officer_badge, ol.lat as officer_lat, ol.lng as officer_lng FROM sos_alerts a LEFT JOIN officers o ON a.assigned_officer_id = o.id LEFT JOIN officer_locations ol ON ol.officer_id = o.id WHERE a.citizen_id = $1 AND a.status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE') ORDER BY a.triggered_at DESC LIMIT 1`, [cp.id]);
     const alert = alertResult.rows[0];
     if (!alert) { res.json({ alert: null }); return; }
     const locResult = await pool.query(`SELECT lat, lng, recorded_at FROM alert_location_history WHERE alert_id = $1 ORDER BY recorded_at ASC`, [alert.id]);

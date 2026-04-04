@@ -22,6 +22,7 @@ export default function SosActive() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markerRef = useRef<any>(null);
+  const officerMarkerRef = useRef<any>(null);
   const sosIdRef = useRef<string | null>(null);
 
   const sosId = sosIdRef.current || localStorage.getItem('active_sos_id');
@@ -103,6 +104,27 @@ export default function SosActive() {
     const interval = setInterval(updateLocation, 10000);
     return () => clearInterval(interval);
   }, [sosId]);
+
+  // Show officer live location on citizen map (EN_ROUTE / ON_SCENE)
+  useEffect(() => {
+    if (!mapInstance.current) return;
+    const officerLat = sosStatus?.officer_lat;
+    const officerLng = sosStatus?.officer_lng;
+    if (!officerLat || !officerLng) {
+      if (officerMarkerRef.current) { officerMarkerRef.current.remove(); officerMarkerRef.current = null; }
+      return;
+    }
+    if (officerMarkerRef.current) {
+      officerMarkerRef.current.setLatLng([officerLat, officerLng]);
+    } else {
+      const icon = window.L.divIcon({
+        className: '',
+        html: `<div style="position:relative;width:32px;height:32px;"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:32px;height:32px;border-radius:50%;background:rgba(59,130,246,0.2);animation:officerPulse 2s ease-out infinite;"></div><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 2px 8px rgba(59,130,246,0.8);"></div></div><style>@keyframes officerPulse{0%{transform:translate(-50%,-50%) scale(0.5);opacity:1;}100%{transform:translate(-50%,-50%) scale(2);opacity:0;}}</style>`,
+        iconSize: [32, 32], iconAnchor: [16, 16],
+      });
+      officerMarkerRef.current = window.L.marker([officerLat, officerLng], { icon }).addTo(mapInstance.current).bindPopup('\ud83d\udc6e Officer Location');
+    }
+  }, [sosStatus?.officer_lat, sosStatus?.officer_lng, sosStatus]);
 
   useEffect(() => {
     if (!mapRef.current || !sosStatus || mapInstance.current) return;
@@ -292,10 +314,20 @@ export default function SosActive() {
 
       {/* Map */}
       <div ref={mapRef} style={{
-        flex: 1, minHeight: 220,
+        flex: 1, minHeight: 240,
         borderTop: '1px solid rgba(255,255,255,0.06)',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }} />
+
+
+
+      {/* Map legend */}
+      {(sosStatus?.status === 'EN_ROUTE' || sosStatus?.status === 'ON_SCENE') && (
+        <div style={{ padding: '8px 20px', background: 'rgba(59,130,246,0.08)', borderBottom: '1px solid rgba(59,130,246,0.2)', display: 'flex', gap: 16 }}>
+          <span style={{ fontSize: 11, color: '#93c5fd', display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: '#e63946' }} /> Your location</span>
+          <span style={{ fontSize: 11, color: '#93c5fd', display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: '#3b82f6' }} /> Officer location</span>
+        </div>
+      )}
 
       {/* Location + Accuracy */}
       {sosStatus?.lat && (
