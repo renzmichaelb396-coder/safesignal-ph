@@ -86,11 +86,10 @@ export default function Officers() {
     }
   };
 
-  const const getRoleColor = (role: string) => {
+  const getRoleColor = (role: string) => {
   if (role === 'STATION_ADMIN') return { bg: 'rgba(255, 193, 7, 0.1)', text: 'var(--ph-gold, #ffc107)' };
   if (role === 'OFFICER') return { bg: 'rgba(76, 175, 80, 0.1)', text: '#66bb6a' };
   return { bg: 'rgba(33, 150, 243, 0.1)', text: '#42a5f5' };
-};
   };
 
   return (
