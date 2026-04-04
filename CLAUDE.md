@@ -43,6 +43,8 @@ npm run start          # Production server (NODE_ENV=production)
 ## Architecture Overview
 
 ### Two Separate Backends — Only One Is Production
+> **CRITICAL RULE:** When you add or rename columns in `api/index.ts`, you MUST also update
+> `server/safesignal/database.ts` initSchema() in the same change. They are a synchronized pair.
 
 | Path | Purpose | Used in production? |
 |------|---------|-------------------|
@@ -306,6 +308,81 @@ grep -rn "safesignal_officer_token\|dispatch_token\|dispatch_user\|safesignal_of
 
 ---
 
+## Local Dev — SQLite Server (`server/`)
+
+The `server/` directory is **local development only** — it runs Express + SQLite (`better-sqlite3`) instead of PostgreSQL. It is **never deployed to production**.
+
+### How It Works
+- `npm run dev` starts BOTH Vite (port 5173) AND Express/SQLite (port 3001) via `concurrently`
+- SQLite DB auto-creates at project root: `safesignal.db` (gitignored, along with `.db-shm`, `.db-wal`)
+- Schema + seed initialized on first run via `initSchema()` + `seedData()` in `server/safesignal/database.ts`
+
+### Migration Guard (self-healing DB)
+On every cold start, the server checks:
+```typescript
+const o = db.prepare("SELECT email FROM officers WHERE email = 'dispatcher@pasay.safesignal.ph'").get();
+if (!o) throw new Error('stale seed');
+```
+If that query fails (missing `email` column) OR returns null (wrong seed data), the server:
+1. Closes the DB connection
+2. Deletes `safesignal.db`
+3. Recreates with correct schema + seed
+
+**Zero manual steps needed.** Just restart the dev server after schema changes.
+
+### SQLite Column Map (must match route files exactly)
+| Table | Key Columns |
+|---|---|
+| `officers` | `id, station_id, badge_number, email, full_name, role, password_hash, is_active, last_login` |
+| `citizens` | `id, full_name, phone, address, barangay, city, photo_url, pin_hash, verified, strike_count, is_suspended, suspension_reason, registered_at, last_active` |
+| `sos_alerts` | `id, citizen_id, station_id, status, alert_type, lat, lng, triggered_at, acknowledged_at, assigned_officer_id, resolved_at, cancelled_at, notes, cancellation_reason, is_suspicious, suspicious_reason` |
+| `citizen_trust_scores` | `id, citizen_id, score, total_alerts, false_alarms, resolved_emergencies, last_updated` |
+| `otp_codes` | `id, citizen_id, code, expires_at, is_used` (note: `citizen_id`, NOT `officer_id`) |
+| `alert_location_history` | `id, alert_id, lat, lng, recorded_at` |
+
+### Schema Change Checklist (run every time you add a column)
+- [ ] Add column to `api/index.ts` production route
+- [ ] Add column to `server/safesignal/database.ts` initSchema()
+- [ ] Add value in seedData() if the column needs seed data
+- [ ] Update migration guard check string if the change is breaking (forces rebuild on restart)
+- [ ] Restart dev server — migration guard auto-rebuilds DB
+
+---
+
+## Developer Workflow (VS Code + Chrome + Cowork)
+
+### The Write Path (no PAT required)
+| Task | Tool |
+|---|---|
+| Read any file | `gh.read(path)` in Chrome console (uses browser session) |
+| Edit existing file | GitHub CM6 web editor → targeted `.replace()` patch → commit |
+| Create new file | `github.com/.../new/main?filename=path` → inject via CM6 |
+| Pull to local | VS Code "Sync Changes N↓" (autofetch detects within 30s) |
+
+### VS Code Autofetch
+`.vscode/settings.json` is committed:
+```json
+{ "git.autofetch": true, "git.autofetchPeriod": 30, "git.confirmSync": false }
+```
+After pushing to GitHub, VS Code shows "Sync Changes N↓" within 30 seconds. One click pulls.
+
+### CM6 Targeted Patch Pattern
+```javascript
+const view = document.querySelector('.cm-content')?.cmTile?.view;
+const src = view.state.doc.toString();
+const patched = src.replace('EXACT_OLD_STRING', 'NEW_STRING');
+// SAFETY CHECK: if patched === src, the string wasn't found — do NOT dispatch
+view.dispatch({ changes: { from: 0, to: src.length, insert: patched } });
+```
+
+### CM6 Safety Rules
+1. **Always use `to: view.state.doc.length`** for full-file replacements — never a hardcoded number
+2. **Verify `patched !== src`** before dispatching — if equal, the match failed, abort
+3. **Check line count after injection** — if it's higher than expected, duplicate content was introduced
+4. **Never use partial `to:`** — it leaves the original tail and creates duplicate exports/functions
+
+---
+
 ## Pre-Deploy Checklist (run EVERY time before `git push`)
 
 ```bash
@@ -365,12 +442,12 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
 All accounts use Pasay Police Station data seeded via `initializeDatabase()`.
 
-| Role | Username / Phone | Password / PIN | URL |
-|---|---|---|---|
-| Dispatcher | `PNP-001` | `password123` | /dispatch/login |
-| Field Officer | `PNP-002` | `password123` | /dispatch/login |
-| Station Admin | `PNP-ADM` | `password123` | /dispatch/login |
-| Citizen | `09171234567` | PIN: `1234` | /citizen/login |
+| Role | Email | Badge | Password / PIN | URL |
+|---|---|---|---|---|
+| Dispatcher | `dispatcher@pasay.safesignal.ph` | `PNP-001` | `password123` | /dispatch/login |
+| Field Officer | `officer@pasay.safesignal.ph` | `PNP-002` | `password123` | /dispatch/login |
+| Station Admin | `admin@pasay.safesignal.ph` | `PNP-ADM` | `password123` | /dispatch/login |
+| Citizen | *(phone-based)* | `09171234567` | PIN: `1234` | / (Login button) |
 
 Station Admin (PNP-ADM) is the only role that can access /dispatch/settings.
 
@@ -431,3 +508,32 @@ Three completely isolated auth systems. Never mix tokens:
 | Officer view only | `safesignal_officer_token` | bridged from dispatch_token on OFFICER role login |
 
 **Critical:** Dispatch login bridges token to `safesignal_officer_token` for officers. Never clear `dispatch_token` from officer logout — only clear `safesignal_officer_token`.
+
+---
+
+## Bug Fix Log — Apr 5 2026 (Dev Environment Fix)
+
+### BUG-SCHEMA-01: SQLite dev schema completely out of sync with route files
+**Root cause:** `server/safesignal/database.ts` was never updated when production routes evolved.
+Used old column names: `name` (not `full_name`), `status` (not `is_active`), no `email`,
+no `last_login`, `latitude`/`longitude` (not `lat`/`lng`), `officer_id` in otp_codes (should be `citizen_id`).
+**Fix:** Rewrote initSchema() with correct schema + migration guard that auto-rebuilds DB on stale schema.
+**Files:** `server/safesignal/database.ts`
+
+### BUG-SEED-01: Officer seed credentials didn't match frontend demo buttons
+**Root cause:** Seeded `pnp001@safesignal.ph` / badge `ADM-001` but frontend expected
+`dispatcher@pasay.safesignal.ph` / badge `PNP-ADM`. Login returned 401.
+**Fix:** Read login page DOM to capture exact demo credential values, updated seedData() to match.
+**Files:** `server/safesignal/database.ts`
+
+### BUG-EXPORT-01: CM6 patch in previous session duplicated server/safesignal/index.ts
+**Root cause:** CM6 dispatch used `to:` value smaller than actual file length. Replacement stopped
+early, original tail remained, new content was prepended creating `registerSafeSignalRoutes` twice.
+**Fix:** Detected via line count (25-line file reporting errors on line 32). Replaced entire content.
+**Files:** `server/safesignal/index.ts`
+
+### WORKFLOW-01: VS Code autofetch + CM6 pipeline established
+- `.vscode/settings.json` committed: autofetch every 30s, no sync confirmation prompt
+- `.gitignore` updated: SQLite WAL files excluded from tracking
+- `.claude/cowork-bridge.js` committed: `gh.read()` fast file read helper
+- Dev workflow documented in new "Developer Workflow" section above
