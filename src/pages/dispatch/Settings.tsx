@@ -188,7 +188,7 @@ export default function Settings() {
         )}
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--dispatch-border, #8b949e)' }}>
+          <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
             <p style={{ fontSize: '14px' }}>Loading settings...</p>
           </div>
         ) : (
@@ -219,7 +219,7 @@ export default function Settings() {
                     style={{
                       margin: '0 0 10px 0',
                       fontSize: '12px',
-                      color: 'var(--dispatch-border, #8b949e)',
+                      color: '#94a3b8',
                     }}
                   >
                     {description}
@@ -253,7 +253,7 @@ export default function Settings() {
                     <span
                       style={{
                         fontSize: '12px',
-                        color: 'var(--dispatch-border, #8b949e)',
+                        color: '#94a3b8',
                         fontWeight: 600,
                         textTransform: 'uppercase',
                         whiteSpace: 'nowrap',
@@ -275,7 +275,7 @@ export default function Settings() {
                 border: '1px solid var(--dispatch-border, #30363d)',
                 borderRadius: '6px',
                 fontSize: '12px',
-                color: 'var(--dispatch-border, #8b949e)',
+                color: '#94a3b8',
                 lineHeight: '1.6',
               }}
             >
@@ -326,7 +326,7 @@ export default function Settings() {
                 }}
                 onMouseEnter={(e) => {
                   if (hasChanges && !saving) {
-                    e.currentTarget.style.borderColor = 'var(--dispatch-border, #8b949e)';
+                    e.currentTarget.style.borderColor = '#94a3b8';
                     e.currentTarget.style.backgroundColor = 'rgba(139, 148, 158, 0.1)';
                   }
                 }}
