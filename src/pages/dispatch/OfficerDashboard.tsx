@@ -30,6 +30,7 @@ export default function OfficerDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updating, setUpdating] = useState(false);
+  const [citizenAddress, setCitizenAddress] = useState('');
   const [officerName, setOfficerName] = useState('Officer');
   const [now, setNow] = useState(Date.now());
   const mapRef = useRef<HTMLDivElement>(null);
@@ -37,6 +38,14 @@ export default function OfficerDashboard() {
   const markerRef = useRef<any>(null);
   const officerMarkerRef = useRef<any>(null);
   const officerLatLngRef = useRef<{lat: number; lng: number} | null>(null);
+
+  useEffect(() => {
+    if (assignment?.lat != null && assignment?.lng != null) {
+      setCitizenAddress('');
+      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${assignment.lat}&lon=${assignment.lng}&zoom=18&addressdetails=1`, { headers: { 'Accept-Language': 'en' } })
+        .then(r => r.json()).then(data => { if (data.display_name) { setCitizenAddress(data.display_name.split(',').slice(0,4).map((s: string) => s.trim()).join(', ')); } }).catch(() => {});
+    }
+  }, [assignment?.lat, assignment?.lng]);
 
   // Live elapsed timer
   useEffect(() => {
@@ -306,7 +315,7 @@ export default function OfficerDashboard() {
                     {Number(assignment.lat).toFixed(6)}, {Number(assignment.lng).toFixed(6)}
                   </div>
                   <a
-                    href={'https://www.google.com/maps?q=' + assignment.lat + ',' + assignment.lng}
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${assignment.lat},${assignment.lng}&travelmode=driving`}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: '#58a6ff', fontSize: 13, textDecoration: 'none' }}
