@@ -50,6 +50,7 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
   const [officers, setOfficers] = useState<any[]>([]);
   const [selectedOfficerId, setSelectedOfficerId] = useState('');
   const [reverseGeoAddress, setReverseGeoAddress] = useState('');
+  const [assignSuccess, setAssignSuccess] = useState(false);
 
   useEffect(() => {
     dispatchApi.getOfficers().then((data: any) => {
@@ -82,6 +83,8 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
       const result = await dispatchApi.assignOfficer(alert.id, selectedOfficerId);
       onUpdate(result.alert || result);
       setSelectedOfficerId('');
+      setAssignSuccess(true);
+      setTimeout(() => setAssignSuccess(false), 2500);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to assign officer');
     } finally {
@@ -93,8 +96,8 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
     setActionLoading(true);
     setActionError('');
     try {
-      const updatedAlert = await dispatchApi.acknowledge(alert.id);
-      onUpdate(updatedAlert);
+      const result = await dispatchApi.acknowledge(alert.id);
+      onUpdate((result as any)?.alert || result);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to acknowledge alert');
     } finally {
@@ -106,8 +109,8 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
     setActionLoading(true);
     setActionError('');
     try {
-      const updatedAlert = await dispatchApi.resolve(alert.id, notes);
-      onUpdate(updatedAlert);
+      const result = await dispatchApi.resolve(alert.id, notes);
+      onUpdate((result as any)?.alert || result);
       setNotes('');
       setShowResolveForm(false);
     } catch (err) {
@@ -121,8 +124,8 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
     setActionLoading(true);
     setActionError('');
     try {
-      const updatedAlert = await dispatchApi.falseAlarm(alert.id, notes);
-      onUpdate(updatedAlert);
+      const result = await dispatchApi.falseAlarm(alert.id, notes);
+      onUpdate((result as any)?.alert || result);
       setNotes('');
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to mark as false alarm');
@@ -135,8 +138,8 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
     setActionLoading(true);
     setActionError('');
     try {
-      const updatedAlert = await dispatchApi.markSuspicious(alert.id, suspiciousReason);
-      onUpdate(updatedAlert);
+      const result = await dispatchApi.markSuspicious(alert.id, suspiciousReason);
+      onUpdate((result as any)?.alert || result);
       setSuspiciousReason('');
       setShowSuspiciousForm(false);
     } catch (err) {
@@ -330,6 +333,11 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                 </select>
                 <button onClick={handleAssignOfficer} disabled={!selectedOfficerId || actionLoading} style={{ padding: '10px 20px', fontSize: '12px', fontWeight: 600, color: '#161b22', backgroundColor: '#ffc107', border: 'none', borderRadius: '6px', cursor: !selectedOfficerId || actionLoading ? 'not-allowed' : 'pointer', opacity: !selectedOfficerId || actionLoading ? 0.5 : 1, whiteSpace: 'nowrap' }}>Assign</button>
               </div>
+              {assignSuccess && (
+                <div style={{ marginTop: '8px', padding: '8px 12px', backgroundColor: 'rgba(63,185,80,0.12)', border: '1px solid #3fb950', borderRadius: '6px', color: '#3fb950', fontSize: '12px', fontWeight: 600 }}>
+                  ✓ Officer assigned successfully
+                </div>
+              )}
             </div>
           )}
 
