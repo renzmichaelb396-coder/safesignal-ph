@@ -68,7 +68,8 @@ export default function History() {
       {/* Header */}
       <div
         style={{
-          background: 'linear-gradient(135deg, var(--ph-blue, #1e4c8f) 0%, var(--ph-gold, #ffc72c) 100%)',
+          background: '#0d1117',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
           padding: '16px',
           paddingTop: '20px',
           paddingBottom: '20px',
