@@ -249,7 +249,7 @@ export default function Dashboard() {
       let size = 20;
       let pulseClass = '';
 
-      if (!['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(alert.status)) continue;
+      if (!["ACTIVE","ACKNOWLEDGED","EN_ROUTE","ON_SCENE"].includes(alert.status)) continue;
       if (alert.status === 'ACTIVE' && alert.is_suspicious) {
         color = '#f97316'; size = 24; pulseClass = 'pin-suspicious';
       } else if (alert.status === 'ACTIVE') {
@@ -293,7 +293,7 @@ export default function Dashboard() {
     if (!priorityAlert) {
       // No ACTIVE alert — find the most recent in-progress alert (EN_ROUTE, ON_SCENE, etc.)
       for (const alert of alertList) {
-        if (['ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(alert.status)) {
+        if (["ACKNOWLEDGED","EN_ROUTE","ON_SCENE"].includes(alert.status)) {
           if (!priorityAlert || alert.triggered_at > priorityAlert.triggered_at) priorityAlert = alert;
         }
       }
@@ -310,15 +310,27 @@ export default function Dashboard() {
     try {
       if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
       const ctx = audioCtxRef.current;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.5);
+      // Siren pattern: 3 urgent beeps — high-low sweep, then repeat twice more
+      const playTone = (startTime: number, freqHigh: number, freqLow: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freqHigh, startTime);
+        osc.frequency.linearRampToValueAtTime(freqLow, startTime + duration);
+        gain.gain.setValueAtTime(0.0, startTime);
+        gain.gain.linearRampToValueAtTime(0.6, startTime + 0.02);
+        gain.gain.setValueAtTime(0.6, startTime + duration - 0.05);
+        gain.gain.linearRampToValueAtTime(0.0, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      const now = ctx.currentTime;
+      // 3 wail cycles: 960Hz → 640Hz, 0.35s each, 0.1s gap between
+      playTone(now,        960, 640, 0.35);
+      playTone(now + 0.45, 960, 640, 0.35);
+      playTone(now + 0.90, 960, 640, 0.35);
     } catch {}
   };
 
@@ -333,7 +345,7 @@ export default function Dashboard() {
     } catch {}
   };
 
-  const activeAlerts = alerts.filter(a => ['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(a.status));
+  const activeAlerts = alerts.filter(a => ["ACTIVE","ACKNOWLEDGED","EN_ROUTE","ON_SCENE"].includes(a.status));
 
   if (loading) return null; // Wait for auth context to restore from localStorage
   if (!officer) {
@@ -489,8 +501,8 @@ export default function Dashboard() {
             {/* Stats bar */}
             <div className="p-3 grid grid-cols-3 gap-2" style={{ borderTop: '1px solid var(--dispatch-border)' }}>
               {[
-                { label: 'Active', value: alerts.filter(a => ['ACTIVE','ACKNOWLEDGED'].includes(a.status)).length, color: '#dc2626', bg: 'rgba(220,38,38,0.1)', icon: '🚨' },
-                { label: "En Route", value: alerts.filter(a => ['EN_ROUTE','ON_SCENE'].includes(a.status)).length, color: '#0ea5e9', bg: 'rgba(14,165,233,0.1)', icon: '🚔' },
+                { label: 'Active', value: alerts.filter(a => ["ACTIVE","ACKNOWLEDGED"].includes(a.status)).length, color: '#dc2626', bg: 'rgba(220,38,38,0.1)', icon: '🚨' },
+                { label: "En Route", value: alerts.filter(a => ["EN_ROUTE","ON_SCENE"].includes(a.status)).length, color: '#0ea5e9', bg: 'rgba(14,165,233,0.1)', icon: '🚔' },
                 { label: 'Today', value: alerts.filter(a => a.triggered_at > Date.now() - 86400000).length, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', icon: '📅' },
               ].map((s, i) => (
                 <div key={i} className="text-center p-2 rounded-lg"

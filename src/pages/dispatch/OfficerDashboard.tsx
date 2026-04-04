@@ -207,7 +207,9 @@ export default function OfficerDashboard() {
     const maplibregl = (window as any).maplibregl;
     mapInstanceRef.current.flyTo({ center: [lng, lat], zoom: 16 });
     if (markerRef.current) { markerRef.current.setLngLat([lng, lat]); } else {
-      const popup = new maplibregl.Popup({ offset: 28, closeOnClick: false }).setText('⚠ SOS — Citizen Location');
+      const popup = new maplibregl.Popup({ offset: 28, closeOnClick: false }).setHTML(
+        '<div style="background:#7f0000;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.6);">🚨 SOS — Citizen Location</div>'
+      );
       markerRef.current = new maplibregl.Marker({ color: '#e63946' }).setLngLat([lng, lat]).setPopup(popup).addTo(mapInstanceRef.current);
       markerRef.current.togglePopup();
     }
