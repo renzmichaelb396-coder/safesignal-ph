@@ -176,9 +176,32 @@ export default function SosActive() {
     switch (status) {
       case 'ACTIVE': return '#ff6b6b';
       case 'ACKNOWLEDGED': return '#4ade80';
-      case 'ARRIVED': return '#60a5fa';
+      case 'EN_ROUTE': return '#60a5fa';
+      case 'ON_SCENE': return '#f97316';
       case 'CANCELLED': return '#888';
       default: return '#888';
+    }
+  };
+
+  const getStatusLabel = (status?: string) => {
+    switch (status) {
+      case 'ACTIVE': return 'Waiting for Response';
+      case 'ACKNOWLEDGED': return 'Officer Assigned';
+      case 'EN_ROUTE': return 'Officer En Route';
+      case 'ON_SCENE': return 'Officer On Scene';
+      case 'CANCELLED': return 'Cancelled';
+      default: return status || 'PENDING';
+    }
+  };
+
+  const getStatusMessage = (status?: string, officerName?: string) => {
+    const name = officerName || 'An officer';
+    switch (status) {
+      case 'ACTIVE': return 'Your alert has been received. Dispatch is reviewing.';
+      case 'ACKNOWLEDGED': return `${name} has been assigned and is responding.`;
+      case 'EN_ROUTE': return `${name} is on the way to your location.`;
+      case 'ON_SCENE': return `${name} has arrived at your location.`;
+      default: return 'Stay calm and stay where you are.';
     }
   };
 
@@ -217,10 +240,39 @@ export default function SosActive() {
           borderRadius: 8, padding: '4px 12px',
         }}>
           <p style={{ color: getStatusColor(sosStatus?.status), fontSize: 12, fontWeight: 700, margin: 0, textTransform: 'uppercase' }}>
-            {sosStatus?.status || 'PENDING'}
+            {getStatusLabel(sosStatus?.status)}
           </p>
         </div>
       </div>
+
+      {/* Officer Assignment Card — visible once officer is assigned */}
+      {sosStatus?.officer_name && (
+        <div style={{
+          margin: '12px 20px 0', padding: '14px 16px',
+          background: `${getStatusColor(sosStatus.status)}11`,
+          border: `1px solid ${getStatusColor(sosStatus.status)}44`,
+          borderRadius: 10,
+          display: 'flex', alignItems: 'center', gap: 14,
+        }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: '50%',
+            background: getStatusColor(sosStatus.status),
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 20, flexShrink: 0,
+          }}>
+            {sosStatus.status === 'ON_SCENE' ? '🚔' : '👮'}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ color: '#fff', fontWeight: 700, fontSize: 14, margin: 0 }}>{sosStatus.officer_name}</p>
+            {sosStatus.officer_badge && (
+              <p style={{ color: '#aaa', fontSize: 11, margin: '2px 0 4px' }}>Badge: {sosStatus.officer_badge}</p>
+            )}
+            <p style={{ color: getStatusColor(sosStatus.status), fontSize: 12, fontWeight: 600, margin: 0 }}>
+              {getStatusMessage(sosStatus.status, sosStatus.officer_name)}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* GPS Warning */}
       {!gpsAvailable && (
@@ -265,13 +317,14 @@ export default function SosActive() {
         </div>
       )}
 
-      {/* Safety Tips */}
+      {/* Safety Tips — context-aware */}
       <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        {[
-          'Stay calm and stay where you are',
-          'Keep your phone on and charged',
-          'Answer calls from police officers',
-        ].map((tip, i) => (
+        {(sosStatus?.status === 'ON_SCENE'
+          ? ['Officer is at your location — approach them safely', 'Keep your phone visible and accessible', 'Follow officer instructions']
+          : sosStatus?.status === 'EN_ROUTE'
+          ? ['Stay where you are — officer is coming to you', 'Keep your phone on and charged', 'Answer any incoming calls from police']
+          : ['Stay calm and stay where you are', 'Keep your phone on and charged', 'Answer calls from police officers']
+        ).map((tip, i) => (
           <p key={i} style={{ color: '#aaa', fontSize: 13, margin: '4px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: '#4ade80', flexShrink: 0 }}>✓</span> {tip}
           </p>

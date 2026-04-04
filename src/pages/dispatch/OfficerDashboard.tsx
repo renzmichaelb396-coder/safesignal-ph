@@ -159,6 +159,10 @@ export default function OfficerDashboard() {
           center: PASAY_CENTER,
           zoom: 14,
         });
+        // Place the blue dot immediately once the map is ready
+        mapInstanceRef.current.on('load', () => {
+          reportLocation();
+        });
       }
     }, 200);
     setTimeout(() => clearInterval(checkMapLibre), 10000);
@@ -317,18 +321,38 @@ export default function OfficerDashboard() {
               {String.fromCodePoint(0x1F504)} Refresh
             </button>
 
-            {/* Status update buttons */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
-              <button onClick={() => updateStatus('EN_ROUTE')} disabled={updating} style={{ background: assignment.status === 'EN_ROUTE' ? '#d97706' : '#161b22', border: '1px solid #d97706', color: assignment.status === 'EN_ROUTE' ? '#fff' : '#d97706', padding: '12px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const }}>
-                En Route
+            {/* Status update buttons — linear flow */}
+            {/* Step 1: Acknowledge — only shown when status is ACTIVE (just assigned, not yet ack'd) */}
+            {assignment.status === 'ACTIVE' && (
+              <button
+                onClick={() => updateStatus('ACKNOWLEDGED')}
+                disabled={updating}
+                style={{
+                  width: '100%', padding: '14px', borderRadius: 8, marginBottom: 8,
+                  background: '#1e40af', border: '2px solid #3b82f6',
+                  color: '#fff', fontSize: 14, fontWeight: 700,
+                  cursor: updating ? 'not-allowed' : 'pointer',
+                  opacity: updating ? 0.6 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                ✅ Acknowledge Assignment
               </button>
-              <button onClick={() => updateStatus('ON_SCENE')} disabled={updating} style={{ background: assignment.status === 'ON_SCENE' ? '#ea580c' : '#161b22', border: '1px solid #ea580c', color: assignment.status === 'ON_SCENE' ? '#fff' : '#ea580c', padding: '12px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const }}>
-                On Scene
-              </button>
-              <button onClick={() => updateStatus('RESOLVED')} disabled={updating} style={{ background: assignment.status === 'RESOLVED' ? '#16a34a' : '#161b22', border: '1px solid #16a34a', color: assignment.status === 'RESOLVED' ? '#fff' : '#16a34a', padding: '12px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const }}>
-                Resolved
-              </button>
-            </div>
+            )}
+            {/* Steps 2-4: En Route → On Scene → Resolved — only after acknowledged */}
+            {assignment.status !== 'ACTIVE' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
+                <button onClick={() => updateStatus('EN_ROUTE')} disabled={updating || assignment.status === 'EN_ROUTE'} style={{ background: assignment.status === 'EN_ROUTE' ? '#d97706' : '#161b22', border: '1px solid #d97706', color: assignment.status === 'EN_ROUTE' ? '#fff' : '#d97706', padding: '12px 6px', borderRadius: 8, cursor: updating ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const, opacity: updating ? 0.6 : 1 }}>
+                  En Route
+                </button>
+                <button onClick={() => updateStatus('ON_SCENE')} disabled={updating || assignment.status === 'ON_SCENE'} style={{ background: assignment.status === 'ON_SCENE' ? '#ea580c' : '#161b22', border: '1px solid #ea580c', color: assignment.status === 'ON_SCENE' ? '#fff' : '#ea580c', padding: '12px 6px', borderRadius: 8, cursor: updating ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const, opacity: updating ? 0.6 : 1 }}>
+                  On Scene
+                </button>
+                <button onClick={() => updateStatus('RESOLVED')} disabled={updating} style={{ background: assignment.status === 'RESOLVED' ? '#16a34a' : '#161b22', border: '1px solid #16a34a', color: assignment.status === 'RESOLVED' ? '#fff' : '#16a34a', padding: '12px 6px', borderRadius: 8, cursor: updating ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const, opacity: updating ? 0.6 : 1 }}>
+                  Resolved
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

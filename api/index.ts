@@ -614,7 +614,7 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
 app.get('/api/citizen/active-alert', requireCitizenAuth, async (req: any, res: any) => {
   try {
     const cp = req.citizen as CitizenPayload;
-    const alertResult = await pool.query(`SELECT a.*, o.full_name as officer_name, o.badge_number as officer_badge FROM sos_alerts a LEFT JOIN officers o ON a.assigned_officer_id = o.id WHERE a.citizen_id = $1 AND a.status IN ('ACTIVE', 'ACKNOWLEDGED') ORDER BY a.triggered_at DESC LIMIT 1`, [cp.id]);
+    const alertResult = await pool.query(`SELECT a.*, o.full_name as officer_name, o.badge_number as officer_badge FROM sos_alerts a LEFT JOIN officers o ON a.assigned_officer_id = o.id WHERE a.citizen_id = $1 AND a.status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE') ORDER BY a.triggered_at DESC LIMIT 1`, [cp.id]);
     const alert = alertResult.rows[0];
     if (!alert) { res.json({ alert: null }); return; }
     const locResult = await pool.query(`SELECT lat, lng, recorded_at FROM alert_location_history WHERE alert_id = $1 ORDER BY recorded_at ASC`, [alert.id]);
@@ -627,7 +627,7 @@ app.post('/api/citizen/sos/cancel', requireCitizenAuth, async (req: any, res: an
   try {
     const cp = req.citizen as CitizenPayload;
     const { reason } = req.body;
-    const alertResult = await pool.query(`SELECT * FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED') ORDER BY triggered_at DESC LIMIT 1`, [cp.id]);
+    const alertResult = await pool.query(`SELECT * FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE') ORDER BY triggered_at DESC LIMIT 1`, [cp.id]);
     const alert = alertResult.rows[0];
     if (!alert) { res.status(404).json({ error: 'No active alert found' }); return; }
     const now = Date.now();
@@ -649,7 +649,7 @@ app.post('/api/citizen/location-update', requireCitizenAuth, async (req: any, re
     const cp = req.citizen as CitizenPayload;
     const { lat, lng } = req.body;
     if (!lat || !lng) { res.status(400).json({ error: 'lat and lng are required' }); return; }
-    const alertResult = await pool.query(`SELECT id FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED') ORDER BY triggered_at DESC LIMIT 1`, [cp.id]);
+    const alertResult = await pool.query(`SELECT id FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE') ORDER BY triggered_at DESC LIMIT 1`, [cp.id]);
     const alert = alertResult.rows[0];
     if (!alert) { res.json({ success: false, message: 'No active alert' }); return; }
     const now = Date.now();
@@ -750,7 +750,7 @@ app.patch('/api/officer/assignment/:id/status', requireOfficerAuth, async (req: 
   try {
     const officerPayload = req.officer as OfficerPayload;
     const { status } = req.body;
-    const valid = ['EN_ROUTE', 'ON_SCENE', 'RESOLVED'];
+    const valid = ['ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE', 'RESOLVED'];
     if (!valid.includes(status)) {
       res.status(400).json({ error: 'Invalid status' });
       return;
