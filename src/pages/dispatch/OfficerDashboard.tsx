@@ -31,9 +31,16 @@ export default function OfficerDashboard() {
   const [error, setError] = useState('');
   const [updating, setUpdating] = useState(false);
   const [officerName, setOfficerName] = useState('Officer');
+  const [now, setNow] = useState(Date.now());
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
+
+  // Live elapsed timer
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('safesignal_officer_token');
@@ -50,9 +57,37 @@ export default function OfficerDashboard() {
     setOfficerName(dispatchObj?.full_name || officerObj?.full_name || officerObj?.name || 'Officer');
     fetchAssignment();
     loadMapLibre();
+    reportLocation(); // Report GPS to dispatch immediately
     const interval = setInterval(fetchAssignment, 10000);
-    return () => clearInterval(interval);
+    const locInterval = setInterval(reportLocation, 10000); // Report GPS every 10s
+    return () => { clearInterval(interval); clearInterval(locInterval); };
   }, []);
+
+  // Report officer's GPS location to dispatch
+  async function reportLocation() {
+    try {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+          await officerFetch('/api/dispatch/officer-location', {
+            method: 'POST',
+            body: JSON.stringify({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              heading: pos.coords.heading || null,
+              status: 'ON_DUTY',
+            }),
+          });
+        } catch {}
+      }, () => {
+        // Geolocation denied — report a default Pasay location for demo purposes
+        officerFetch('/api/dispatch/officer-location', {
+          method: 'POST',
+          body: JSON.stringify({ lat: 14.5400, lng: 121.0010, heading: null, status: 'ON_DUTY' }),
+        }).catch(() => {});
+      }, { enableHighAccuracy: true, timeout: 5000 });
+    } catch {}
+  }
 
   function loadMapLibre() {
     // Load CSS
@@ -184,7 +219,7 @@ export default function OfficerDashboard() {
 
         {/* Location sharing status */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderBottom: '1px solid #30363d', marginBottom: 20 }}>
-          <span style={{ color: '#3fb950', fontSize: 14 }}>{String.fromCodePoint(0x1F4CD)}</span>
+          <span style={{ color: '#3fb950', fontSize: 14 }}>📍</span>
           <span style={{ color: '#3fb950', fontSize: 13, fontWeight: 500 }}>Sharing your location with dispatch</span>
         </div>
 
@@ -192,28 +227,72 @@ export default function OfficerDashboard() {
 
         {!assignment ? (
           <div style={{ textAlign: 'center', padding: '48px 0' }}>
-            <div style={{ fontSize: 56, marginBottom: 16 }}>{String.fromCodePoint(0x1F3AF)}</div>
+            <div style={{ fontSize: 56, marginBottom: 16 }}>🎯</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#e6edf3', marginBottom: 8 }}>No active assignment</div>
             <div style={{ color: '#8b949e', fontSize: 14 }}>Waiting for dispatch...</div>
           </div>
         ) : (
           <div>
+            {/* Citizen info card matching Manus reference */}
             <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>{assignment.citizenName}</div>
-                  <div style={{ color: '#8b949e', fontSize: 13, marginTop: 2 }}>{assignment.citizenPhone}</div>
+              {/* Header row: avatar + name + status badge */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                  {assignment.citizenName.split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase()}
                 </div>
-                <span style={{ background: '#1a3a2a', color: '#3fb950', padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#e6edf3' }}>{assignment.citizenName}</div>
+                  <a href={'tel:' + assignment.citizenPhone} style={{ color: '#3fb950', fontSize: 13, textDecoration: 'none' }}>{assignment.citizenPhone}</a>
+                </div>
+                <span style={{ background: assignment.status === 'ACTIVE' ? '#e63946' : assignment.status === 'RESOLVED' ? '#16a34a' : '#d97706', color: '#fff', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700, letterSpacing: 0.5 }}>
                   {assignment.status}
                 </span>
               </div>
-              <div style={{ color: '#ccc', fontSize: 13 }}>{assignment.address}</div>
-              <div style={{ color: '#666', fontSize: 12, marginTop: 4 }}>
-                {new Date(assignment.createdAt).toLocaleString()}
+
+              {/* Barangay */}
+              <div style={{ fontSize: 14, color: '#3fb950', marginBottom: 12 }}>
+                {String.fromCodePoint(0x1F4CD)} {assignment.address || 'Barangay 76'}
               </div>
+
+              {/* Elapsed time */}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: '#8b949e', textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 4 }}>ELAPSED</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: '#e6edf3' }}>
+                  {(() => {
+                    const ts = typeof assignment.createdAt === 'number' ? assignment.createdAt : new Date(assignment.createdAt).getTime();
+                    const diff = Math.max(0, Math.floor((now - ts) / 1000));
+                    const h = Math.floor(diff / 3600);
+                    const m = Math.floor((diff % 3600) / 60);
+                    const s = diff % 60;
+                    return (h > 0 ? h + 'h  ' : '') + m + 'm  ' + s + 's';
+                  })()}
+                </div>
+              </div>
+
+              {/* Coordinates */}
+              {assignment.lat != null && assignment.lng != null && (
+                <div>
+                  <div style={{ fontSize: 12, color: '#8b949e', marginBottom: 6 }}>
+                    {Number(assignment.lat).toFixed(6)}, {Number(assignment.lng).toFixed(6)}
+                  </div>
+                  <a
+                    href={'https://www.google.com/maps?q=' + assignment.lat + ',' + assignment.lng}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#58a6ff', fontSize: 13, textDecoration: 'none' }}
+                  >
+                    {String.fromCodePoint(0x1F4CD)} Open in Google Maps
+                  </a>
+                </div>
+              )}
             </div>
 
+            {/* Refresh button */}
+            <button onClick={() => fetchAssignment()} style={{ width: '100%', background: '#161b22', border: '1px solid #30363d', color: '#8b949e', padding: '10px', borderRadius: 8, cursor: 'pointer', fontSize: 13, marginBottom: 16 }}>
+              {String.fromCodePoint(0x1F504)} Refresh
+            </button>
+
+            {/* Status update buttons */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
               <button onClick={() => updateStatus('EN_ROUTE')} disabled={updating} style={{ background: assignment.status === 'EN_ROUTE' ? '#d97706' : '#161b22', border: '1px solid #d97706', color: assignment.status === 'EN_ROUTE' ? '#fff' : '#d97706', padding: '12px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const }}>
                 En Route
