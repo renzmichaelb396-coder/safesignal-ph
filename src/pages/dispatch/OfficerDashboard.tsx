@@ -35,6 +35,8 @@ export default function OfficerDashboard() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
+  const officerMarkerRef = useRef<any>(null);
+  const officerLatLngRef = useRef<{lat: number; lng: number} | null>(null);
 
   // Live elapsed timer
   useEffect(() => {
@@ -63,30 +65,63 @@ export default function OfficerDashboard() {
     return () => { clearInterval(interval); clearInterval(locInterval); };
   }, []);
 
-  // Report officer's GPS location to dispatch
+  // Report officer's GPS location to dispatch + update own marker on map
   async function reportLocation() {
     try {
-      if (!navigator.geolocation) return;
+      if (!navigator.geolocation) {
+        // No geolocation — use demo Pasay coords
+        updateOfficerMarker(14.5400, 121.0010);
+        officerFetch('/api/dispatch/officer-location', {
+          method: 'POST',
+          body: JSON.stringify({ lat: 14.5400, lng: 121.0010, heading: null, status: 'ON_DUTY' }),
+        }).catch(() => {});
+        return;
+      }
       navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        officerLatLngRef.current = { lat, lng };
+        updateOfficerMarker(lat, lng);
         try {
           await officerFetch('/api/dispatch/officer-location', {
             method: 'POST',
             body: JSON.stringify({
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
+              lat,
+              lng,
               heading: pos.coords.heading || null,
               status: 'ON_DUTY',
             }),
           });
         } catch {}
       }, () => {
-        // Geolocation denied — report a default Pasay location for demo purposes
+        // Geolocation denied — use demo Pasay location
+        const lat = 14.5400;
+        const lng = 121.0010;
+        officerLatLngRef.current = { lat, lng };
+        updateOfficerMarker(lat, lng);
         officerFetch('/api/dispatch/officer-location', {
           method: 'POST',
-          body: JSON.stringify({ lat: 14.5400, lng: 121.0010, heading: null, status: 'ON_DUTY' }),
+          body: JSON.stringify({ lat, lng, heading: null, status: 'ON_DUTY' }),
         }).catch(() => {});
       }, { enableHighAccuracy: true, timeout: 5000 });
     } catch {}
+  }
+
+  // Update officer's own GPS marker on map (blue dot)
+  function updateOfficerMarker(lat: number, lng: number) {
+    if (!mapInstanceRef.current) return;
+    const maplibregl = (window as any).maplibregl;
+    if (!maplibregl) return;
+    if (officerMarkerRef.current) {
+      officerMarkerRef.current.setLngLat([lng, lat]);
+    } else {
+      const el = document.createElement('div');
+      el.style.cssText = 'width:18px;height:18px;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(59,130,246,0.8);cursor:default';
+      el.title = 'Your location';
+      officerMarkerRef.current = new maplibregl.Marker({ element: el })
+        .setLngLat([lng, lat])
+        .addTo(mapInstanceRef.current);
+    }
   }
 
   function loadMapLibre() {
@@ -120,18 +155,7 @@ export default function OfficerDashboard() {
         const PASAY_CENTER: [number, number] = [120.9982, 14.5378];
         mapInstanceRef.current = new maplibregl.Map({
           container: mapRef.current,
-          style: {
-            version: 8,
-            sources: {
-              osm: {
-                type: 'raster',
-                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-                tileSize: 256,
-                attribution: '\u00a9 OpenStreetMap contributors',
-              },
-            },
-            layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-          },
+          style: 'https://tiles.openfreemap.org/styles/liberty',
           center: PASAY_CENTER,
           zoom: 14,
         });
