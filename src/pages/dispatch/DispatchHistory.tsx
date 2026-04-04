@@ -11,7 +11,8 @@ interface Alert {
   barangay: string;
   is_suspicious: boolean;
   trust_score: number;
-  resolution_notes?: string;
+  notes?: string;
+  resolution_notes?: string; // legacy alias
   resolved_by?: string;
   phone?: string;
 }
@@ -435,9 +436,9 @@ export default function DispatchHistory() {
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                     }}
-                    title={alert.resolution_notes}
+                    title={alert.notes || alert.resolution_notes}
                   >
-                    {alert.resolution_notes || '—'}
+                    {alert.notes || alert.resolution_notes || '—'}
                   </div>
                 </div>
               );
