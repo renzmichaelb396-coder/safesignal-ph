@@ -297,10 +297,15 @@ export default function OfficerDashboard() {
                 <span style={{ background: getStatusColor(assignment.status), color: '#fff', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>{getStatusLabel(assignment.status)}</span>
               </div>
 
-              {/* Barangay */}
-              <div style={{ fontSize: 14, color: '#3fb950', marginBottom: 12 }}>
-                {String.fromCodePoint(0x1F4CD)} {assignment.address || 'Barangay 76'}
+              {/* Location — show reverse-geocoded address, fall back to DB address, then barangay */}
+              <div style={{ fontSize: 14, color: '#3fb950', marginBottom: 4 }}>
+                {String.fromCodePoint(0x1F4CD)} {citizenAddress || assignment.address || (assignment as any).barangay || 'Locating...'}
               </div>
+              {citizenAddress && (assignment.address || (assignment as any).barangay) && (
+                <div style={{ fontSize: 11, color: '#8b949e', marginBottom: 8 }}>
+                  {(assignment as any).barangay || assignment.address}
+                </div>
+              )}
 
               {/* Elapsed time */}
               <div style={{ marginBottom: 12 }}>
@@ -337,9 +342,9 @@ export default function OfficerDashboard() {
             </div>
 
             {assignment.status === 'ACTIVE' && (<button onClick={() => updateStatus('ACKNOWLEDGED')} disabled={updating} style={{ width: '100%', padding: '18px', borderRadius: 10, marginBottom: 8, background: '#1e40af', border: '2px solid #3b82f6', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>✅ Acknowledge Assignment</button>)}
-            {assignment.status === 'ACKNOWLEDGED' && (<button onClick={() => updateStatus('EN_ROUTE')} disabled={updating} style={{ width: '100%', padding: '18px', borderRadius: 10, marginBottom: 8, background: '#0c4a6e', border: '2px solid #0ea5e9', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>?? En Route to Citizen</button>)}
-            {assignment.status === 'EN_ROUTE' && (<><div style={{ background: '#0c4a6e22', border: '1px solid #0ea5e9', borderRadius: 8, padding: '8px 14px', marginBottom: 10, fontSize: 13, color: '#7dd3fc' }}>?? En Route</div><button onClick={() => updateStatus('ON_SCENE')} disabled={updating} style={{ width: '100%', padding: '18px', borderRadius: 10, marginBottom: 8, background: '#7c2d12', border: '2px solid #f97316', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>?? Arrived - On Scene</button></>)}
-            {assignment.status === 'ON_SCENE' && (<><div style={{ background: '#f9731622', border: '1px solid #f97316', borderRadius: 8, padding: '8px 14px', marginBottom: 10, fontSize: 13, color: '#fdba74' }}>?? On Scene</div><button onClick={() => updateStatus('RESOLVED')} disabled={updating} style={{ width: '100%', padding: '18px', borderRadius: 10, marginBottom: 8, background: '#14532d', border: '2px solid #16a34a', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>✅ Mark as Resolved</button></>)}
+            {assignment.status === 'ACKNOWLEDGED' && (<button onClick={() => updateStatus('EN_ROUTE')} disabled={updating} style={{ width: '100%', padding: '18px', borderRadius: 10, marginBottom: 8, background: '#0c4a6e', border: '2px solid #0ea5e9', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>{String.fromCodePoint(0x1F694)} En Route to Citizen</button>)}
+            {assignment.status === 'EN_ROUTE' && (<><div style={{ background: '#0c4a6e22', border: '1px solid #0ea5e9', borderRadius: 8, padding: '8px 14px', marginBottom: 10, fontSize: 13, color: '#7dd3fc' }}>{String.fromCodePoint(0x1F694)} En Route</div><button onClick={() => updateStatus('ON_SCENE')} disabled={updating} style={{ width: '100%', padding: '18px', borderRadius: 10, marginBottom: 8, background: '#7c2d12', border: '2px solid #f97316', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>{String.fromCodePoint(0x1F6A8)} Arrived - On Scene</button></>)}
+            {assignment.status === 'ON_SCENE' && (<><div style={{ background: '#f9731622', border: '1px solid #f97316', borderRadius: 8, padding: '8px 14px', marginBottom: 10, fontSize: 13, color: '#fdba74' }}>{String.fromCodePoint(0x1F6A8)} On Scene</div><button onClick={() => updateStatus('RESOLVED')} disabled={updating} style={{ width: '100%', padding: '18px', borderRadius: 10, marginBottom: 8, background: '#14532d', border: '2px solid #16a34a', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>✅ Mark as Resolved</button></>)}
             {assignment.status === 'RESOLVED' && (<div style={{ background: '#14532d33', border: '1px solid #16a34a', borderRadius: 10, padding: 16, marginBottom: 8, textAlign: 'center' }}><div style={{ fontSize: 24 }}>✅</div><div style={{ color: '#4ade80', fontWeight: 700 }}>Case Resolved</div><div style={{ color: '#8b949e', fontSize: 12 }}>Waiting for next assignment...</div></div>)}
           </div>
         )}

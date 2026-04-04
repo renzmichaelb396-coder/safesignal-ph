@@ -274,8 +274,19 @@ export default function Dashboard() {
       }
     }
 
-    if (newestActive?.lat != null && newestActive?.lng != null) {
-      leafletMapRef.current.flyTo({ center: [newestActive.lng, newestActive.lat], zoom: 15 });
+    // Pan to the most urgent active alert — prioritize ACTIVE, then any in-progress status.
+    // This ensures the dispatcher map is ALWAYS centered on the emergency, not the officer.
+    let priorityAlert = newestActive;
+    if (!priorityAlert) {
+      // No ACTIVE alert — find the most recent in-progress alert (EN_ROUTE, ON_SCENE, etc.)
+      for (const alert of alertList) {
+        if (['ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(alert.status)) {
+          if (!priorityAlert || alert.triggered_at > priorityAlert.triggered_at) priorityAlert = alert;
+        }
+      }
+    }
+    if (priorityAlert?.lat != null && priorityAlert?.lng != null) {
+      leafletMapRef.current.flyTo({ center: [priorityAlert.lng, priorityAlert.lat], zoom: 15 });
     }
   };
 
@@ -414,7 +425,14 @@ export default function Dashboard() {
                             {alert.status}
                           </span>
                         </div>
-                        <p style={{ color: alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED' ? '#6b7280' : '#888', fontSize: 11, margin: '2px 0' }}>{alert.barangay}</p>
+                        <p style={{ color: alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED' ? '#6b7280' : '#888', fontSize: 11, margin: '2px 0' }}>
+                          {alert.address ? `${alert.address}, ${alert.barangay || ''}` : alert.barangay}
+                          {alert.lat != null && alert.lng != null && (
+                            <span style={{ color: '#6b7280', fontSize: 10, marginLeft: 4 }}>
+                              ({Number(alert.lat).toFixed(4)}, {Number(alert.lng).toFixed(4)})
+                            </span>
+                          )}
+                        </p>
                         <div className="flex items-center justify-between">
                           <span style={{ color: alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED' ? '#374151' : '#e1e4ed', fontSize: 12, fontFamily: 'monospace' }}>
                             {formatElapsed(Date.now() - alert.triggered_at)}
@@ -441,8 +459,8 @@ export default function Dashboard() {
             {/* Stats bar */}
             <div className="p-3 grid grid-cols-3 gap-2" style={{ borderTop: '1px solid var(--dispatch-border)' }}>
               {[
-                { label: 'Active', value: alerts.filter(a => a.status === 'ACTIVE').length, color: '#dc2626', bg: 'rgba(220,38,38,0.1)', icon: '🚨' },
-                { label: "Ack'd", value: alerts.filter(a => a.status === 'ACKNOWLEDGED').length, color: '#d97706', bg: 'rgba(217,119,6,0.1)', icon: '✓' },
+                { label: 'Active', value: alerts.filter(a => ['ACTIVE','ACKNOWLEDGED'].includes(a.status)).length, color: '#dc2626', bg: 'rgba(220,38,38,0.1)', icon: '🚨' },
+                { label: "En Route", value: alerts.filter(a => ['EN_ROUTE','ON_SCENE'].includes(a.status)).length, color: '#0ea5e9', bg: 'rgba(14,165,233,0.1)', icon: '🚔' },
                 { label: 'Today', value: alerts.filter(a => a.triggered_at > Date.now() - 86400000).length, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', icon: '📅' },
               ].map((s, i) => (
                 <div key={i} className="text-center p-2 rounded-lg"
