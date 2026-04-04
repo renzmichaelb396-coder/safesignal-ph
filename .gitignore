@@ -3,3 +3,8 @@ dist/
 .env
 *.db
 .DS_Store
+
+# SQLite local dev WAL files
+safesignal.db
+safesignal.db-shm
+safesignal.db-wal
