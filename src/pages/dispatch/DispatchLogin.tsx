@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useDispatchAuth } from '../../contexts/DispatchAuthContext';
 
@@ -9,7 +9,7 @@ export default function DispatchLogin() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [, navigate] = useLocation();
-  const { login } = useDispatchAuth();
+  const { login, officer } = useDispatchAuth();
 
   const routeByRole = (role: string) => {
     if (role === 'OFFICER') {
@@ -20,6 +20,13 @@ export default function DispatchLogin() {
       navigate('/dispatch');
     }
   };
+
+  // Redirect if already authenticated (handles post-login race condition)
+  useEffect(() => {
+    if (officer) {
+      routeByRole(officer.role);
+    }
+  }, [officer]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
