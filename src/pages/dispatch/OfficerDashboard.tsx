@@ -47,21 +47,22 @@ export default function OfficerDashboard() {
   useEffect(() => {
     const token = localStorage.getItem('safesignal_officer_token');
     const officerDataRaw = localStorage.getItem('safesignal_officer_data');
-    const dispatchUser = localStorage.getItem('dispatch_user');
     const officerObj = officerDataRaw ? JSON.parse(officerDataRaw) : null;
-    const dispatchObj = dispatchUser ? JSON.parse(dispatchUser) : null;
 
+    // Only read officer-specific keys — never read dispatch_user or dispatch_token here.
+    // Dispatch session is managed by DispatchAuthContext and must not bleed into officer view.
     if (!token || !officerObj || officerObj.role !== 'OFFICER') {
       setLocation('/dispatch/login');
       return;
     }
 
-    setOfficerName(dispatchObj?.full_name || officerObj?.full_name || officerObj?.name || 'Officer');
+    setOfficerName(officerObj?.full_name || officerObj?.name || 'Officer');
     fetchAssignment();
     loadMapLibre();
-    reportLocation(); // Report GPS to dispatch immediately
+    // NOTE: do NOT call reportLocation() here — map isn't ready yet.
+    // map.on('load') inside initMap() handles the first location report.
     const interval = setInterval(fetchAssignment, 10000);
-    const locInterval = setInterval(reportLocation, 10000); // Report GPS every 10s
+    const locInterval = setInterval(reportLocation, 10000); // Report GPS every 10s after map ready
     return () => { clearInterval(interval); clearInterval(locInterval); };
   }, []);
 
@@ -209,11 +210,11 @@ export default function OfficerDashboard() {
   }
 
   function handleLogout() {
+    // Only clear officer-specific keys — never touch dispatch_user or dispatch_token.
+    // Dispatch session is independent and must survive an officer logout.
     localStorage.removeItem('safesignal_officer_token');
     localStorage.removeItem('safesignal_officer_role');
     localStorage.removeItem('safesignal_officer_data');
-    localStorage.removeItem('dispatch_user');
-    localStorage.removeItem('dispatch_token');
     setLocation('/dispatch/login');
   }
 

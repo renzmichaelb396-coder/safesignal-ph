@@ -23,17 +23,17 @@ interface DispatchAuthContextType {
 const DispatchAuthContext = createContext<DispatchAuthContextType | null>(null);
 
 function saveSession(token: string, user: OfficerUser) {
+  // Only write dispatch-specific keys — never touch officer keys (safesignal_officer_token/data).
+  // Cross-writing causes session contamination when both roles are used in the same browser.
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
-  localStorage.setItem('safesignal_officer_token', token);
-  localStorage.setItem('safesignal_officer_data', JSON.stringify(user));
 }
 
 function clearSession() {
+  // Only clear dispatch-specific keys — never touch officer keys.
+  // OfficerDashboard manages its own session independently.
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
-  localStorage.removeItem('safesignal_officer_token');
-  localStorage.removeItem('safesignal_officer_data');
 }
 
 export function DispatchAuthProvider({ children }: { children: ReactNode }) {

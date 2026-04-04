@@ -585,9 +585,11 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
     const settingsResult = await pool.query('SELECT * FROM station_settings LIMIT 1');
     const settings = settingsResult.rows[0];
     const cooldownMs = (settings?.cooldown_minutes || 10) * 60 * 1000;
-    const recentAlert = await pool.query(`SELECT id FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED') AND triggered_at > $2`, [cp.id, Date.now() - cooldownMs]);
+    // Cooldown and duplicate checks must cover ALL in-progress statuses.
+    // If an officer is already EN_ROUTE or ON_SCENE, the citizen must not trigger a second SOS.
+    const recentAlert = await pool.query(`SELECT id FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE') AND triggered_at > $2`, [cp.id, Date.now() - cooldownMs]);
     if (recentAlert.rows.length > 0) { res.status(429).json({ error: 'Cooldown active. Please wait before sending another alert.' }); return; }
-    const activeAlert = await pool.query(`SELECT id FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED')`, [cp.id]);
+    const activeAlert = await pool.query(`SELECT id FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE')`, [cp.id]);
     if (activeAlert.rows.length > 0) { res.status(409).json({ error: 'You already have an active alert', alert_id: activeAlert.rows[0].id }); return; }
     const now = Date.now();
     const result = await pool.query(`INSERT INTO sos_alerts (citizen_id, lat, lng, status, triggered_at, location_accuracy) VALUES ($1, $2, $3, 'ACTIVE', $4, $5) RETURNING id`, [cp.id, lat, lng, now, accuracy || null]);
@@ -599,7 +601,8 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
     broadcastEvent('new_alert', { alert: alertWithCitizen });
     if (citizen.barangay) {
       const windowMs = (settings?.surge_window_minutes || 2) * 60 * 1000;
-      const surgeResult = await pool.query(`SELECT COUNT(*) as count FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id WHERE c.barangay = $1 AND a.triggered_at > $2 AND a.status IN ('ACTIVE', 'ACKNOWLEDGED')`, [citizen.barangay, Date.now() - windowMs]);
+      // Surge count includes all in-progress statuses — an EN_ROUTE/ON_SCENE alert is still an active emergency.
+      const surgeResult = await pool.query(`SELECT COUNT(*) as count FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id WHERE c.barangay = $1 AND a.triggered_at > $2 AND a.status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE')`, [citizen.barangay, Date.now() - windowMs]);
       const surgeCount = parseInt(surgeResult.rows[0].count, 10);
       const threshold = settings?.surge_threshold || 5;
       if (surgeCount >= threshold) {
