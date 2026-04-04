@@ -13,6 +13,10 @@ function officerFetch(path: string, options: RequestInit = {}) {
   });
 }
 
+
+function getStatusLabel(s: string) { switch(s) { case "ACTIVE": return "New Assignment"; case "ACKNOWLEDGED": return "Acknowledged"; case "EN_ROUTE": return "En Route"; case "ON_SCENE": return "On Scene"; case "RESOLVED": return "Resolved"; default: return s; } }
+function getStatusColor(s: string) { switch(s) { case "ACTIVE": return "#e63946"; case "ACKNOWLEDGED": return "#3b82f6"; case "EN_ROUTE": return "#0ea5e9"; case "ON_SCENE": return "#f97316"; case "RESOLVED": return "#16a34a"; default: return "#8b949e"; } }
+
 interface Assignment {
   id: number;
   citizenName: string;
@@ -38,6 +42,8 @@ export default function OfficerDashboard() {
   const markerRef = useRef<any>(null);
   const officerMarkerRef = useRef<any>(null);
   const officerLatLngRef = useRef<{lat: number; lng: number} | null>(null);
+  const pendingCitizenRef = useRef<{lat: number; lng: number} | null>(null);
+  const [toastMsg, setToastMsg] = useState('');
 
   useEffect(() => {
     if (assignment?.lat != null && assignment?.lng != null) {
@@ -70,10 +76,12 @@ export default function OfficerDashboard() {
     loadMapLibre();
     // NOTE: do NOT call reportLocation() here — map isn't ready yet.
     // map.on('load') inside initMap() handles the first location report.
-    const interval = setInterval(fetchAssignment, 10000);
+    const interval = setInterval(fetchAssignment, 5000);
     const locInterval = setInterval(reportLocation, 10000); // Report GPS every 10s after map ready
     return () => { clearInterval(interval); clearInterval(locInterval); };
   }, []);
+
+  function showToast(msg: string) { setToastMsg(msg); setTimeout(() => setToastMsg(''), 2500); }
 
   // Report officer's GPS location to dispatch + update own marker on map
   async function reportLocation() {
@@ -172,6 +180,7 @@ export default function OfficerDashboard() {
         // Place the blue dot immediately once the map is ready
         mapInstanceRef.current.on('load', () => {
           reportLocation();
+          if (pendingCitizenRef.current) { const { lat, lng } = pendingCitizenRef.current; pendingCitizenRef.current = null; updateMap(lat, lng); }
         });
       }
     }, 200);
@@ -194,14 +203,13 @@ export default function OfficerDashboard() {
   }
 
   function updateMap(lat: number, lng: number) {
-    if (!mapInstanceRef.current) return;
+    if (!mapInstanceRef.current) { pendingCitizenRef.current = { lat, lng }; return; }
     const maplibregl = (window as any).maplibregl;
-    mapInstanceRef.current.flyTo({ center: [lng, lat], zoom: 15 });
-    if (markerRef.current) markerRef.current.setLngLat([lng, lat]);
-    else {
-      markerRef.current = new maplibregl.Marker({ color: '#e63946' })
-        .setLngLat([lng, lat])
-        .addTo(mapInstanceRef.current);
+    mapInstanceRef.current.flyTo({ center: [lng, lat], zoom: 16 });
+    if (markerRef.current) { markerRef.current.setLngLat([lng, lat]); } else {
+      const popup = new maplibregl.Popup({ offset: 28, closeOnClick: false }).setText('⚠ SOS — Citizen Location');
+      markerRef.current = new maplibregl.Marker({ color: '#e63946' }).setLngLat([lng, lat]).setPopup(popup).addTo(mapInstanceRef.current);
+      markerRef.current.togglePopup();
     }
   }
 
@@ -214,7 +222,8 @@ export default function OfficerDashboard() {
         body: JSON.stringify({ status }),
       });
       await fetchAssignment();
-    } catch { setError('Failed to update status'); }
+      showToast('✅ Status updated to ' + getStatusLabel(status));
+    } catch { setError('Failed to update status. Try again.'); }
     setUpdating(false);
   }
 
@@ -237,6 +246,8 @@ export default function OfficerDashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', color: '#e6edf3', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+      {toastMsg && (<div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', background: '#1a472a', border: '1px solid #3fb950', color: '#4ade80', padding: '10px 20px', borderRadius: 8, fontSize: 14, fontWeight: 600, zIndex: 9999, whiteSpace: 'nowrap' }}>{toastMsg}</div>)}
+
       {/* Header */}
       <div style={{ maxWidth: 540, margin: '0 auto', padding: '0 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid #30363d' }}>
@@ -253,8 +264,9 @@ export default function OfficerDashboard() {
 
       {/* Map */}
       <div style={{ maxWidth: 540, margin: '0 auto', padding: '16px' }}>
-        <div ref={mapRef} style={{ height: 260, borderRadius: 10, overflow: 'hidden', border: '1px solid #30363d', background: '#161b22', marginBottom: 12 }} />
+        <div ref={mapRef} style={{ height: 340, borderRadius: 10, overflow: 'hidden', border: '1px solid #30363d', background: '#161b22', marginBottom: 12 }} />
 
+        <div style={{ display: 'flex', gap: 16, padding: '4px', marginBottom: 4, fontSize: 11, color: '#8b949e' }}><span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: '#e63946', marginRight: 4 }} />SOS</span><span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: '#3b82f6', marginRight: 4 }} />You</span></div>
         {/* Location sharing status */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderBottom: '1px solid #30363d', marginBottom: 20 }}>
           <span style={{ color: '#3fb950', fontSize: 14 }}>📍</span>
@@ -282,9 +294,7 @@ export default function OfficerDashboard() {
                   <div style={{ fontSize: 18, fontWeight: 700, color: '#e6edf3' }}>{assignment.citizenName}</div>
                   <a href={'tel:' + assignment.citizenPhone} style={{ color: '#3fb950', fontSize: 13, textDecoration: 'none' }}>{assignment.citizenPhone}</a>
                 </div>
-                <span style={{ background: assignment.status === 'ACTIVE' ? '#e63946' : assignment.status === 'RESOLVED' ? '#16a34a' : '#d97706', color: '#fff', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700, letterSpacing: 0.5 }}>
-                  {assignment.status}
-                </span>
+                <span style={{ background: getStatusColor(assignment.status), color: '#fff', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>{getStatusLabel(assignment.status)}</span>
               </div>
 
               {/* Barangay */}
@@ -326,43 +336,11 @@ export default function OfficerDashboard() {
               )}
             </div>
 
-            {/* Refresh button */}
-            <button onClick={() => fetchAssignment()} style={{ width: '100%', background: '#161b22', border: '1px solid #30363d', color: '#8b949e', padding: '10px', borderRadius: 8, cursor: 'pointer', fontSize: 13, marginBottom: 16 }}>
-              {String.fromCodePoint(0x1F504)} Refresh
-            </button>
-
-            {/* Status update buttons — linear flow */}
-            {/* Step 1: Acknowledge — only shown when status is ACTIVE (just assigned, not yet ack'd) */}
-            {assignment.status === 'ACTIVE' && (
-              <button
-                onClick={() => updateStatus('ACKNOWLEDGED')}
-                disabled={updating}
-                style={{
-                  width: '100%', padding: '14px', borderRadius: 8, marginBottom: 8,
-                  background: '#1e40af', border: '2px solid #3b82f6',
-                  color: '#fff', fontSize: 14, fontWeight: 700,
-                  cursor: updating ? 'not-allowed' : 'pointer',
-                  opacity: updating ? 0.6 : 1,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                }}
-              >
-                ✅ Acknowledge Assignment
-              </button>
-            )}
-            {/* Steps 2-4: En Route → On Scene → Resolved — only after acknowledged */}
-            {assignment.status !== 'ACTIVE' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
-                <button onClick={() => updateStatus('EN_ROUTE')} disabled={updating || assignment.status === 'EN_ROUTE'} style={{ background: assignment.status === 'EN_ROUTE' ? '#d97706' : '#161b22', border: '1px solid #d97706', color: assignment.status === 'EN_ROUTE' ? '#fff' : '#d97706', padding: '12px 6px', borderRadius: 8, cursor: updating ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const, opacity: updating ? 0.6 : 1 }}>
-                  En Route
-                </button>
-                <button onClick={() => updateStatus('ON_SCENE')} disabled={updating || assignment.status === 'ON_SCENE'} style={{ background: assignment.status === 'ON_SCENE' ? '#ea580c' : '#161b22', border: '1px solid #ea580c', color: assignment.status === 'ON_SCENE' ? '#fff' : '#ea580c', padding: '12px 6px', borderRadius: 8, cursor: updating ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const, opacity: updating ? 0.6 : 1 }}>
-                  On Scene
-                </button>
-                <button onClick={() => updateStatus('RESOLVED')} disabled={updating} style={{ background: assignment.status === 'RESOLVED' ? '#16a34a' : '#161b22', border: '1px solid #16a34a', color: assignment.status === 'RESOLVED' ? '#fff' : '#16a34a', padding: '12px 6px', borderRadius: 8, cursor: updating ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const, opacity: updating ? 0.6 : 1 }}>
-                  Resolved
-                </button>
-              </div>
-            )}
+            {assignment.status === 'ACTIVE' && (<button onClick={() => updateStatus('ACKNOWLEDGED')} disabled={updating} style={{ width: '100%', padding: '18px', borderRadius: 10, marginBottom: 8, background: '#1e40af', border: '2px solid #3b82f6', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>✅ Acknowledge Assignment</button>)}
+            {assignment.status === 'ACKNOWLEDGED' && (<button onClick={() => updateStatus('EN_ROUTE')} disabled={updating} style={{ width: '100%', padding: '18px', borderRadius: 10, marginBottom: 8, background: '#0c4a6e', border: '2px solid #0ea5e9', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>?? En Route to Citizen</button>)}
+            {assignment.status === 'EN_ROUTE' && (<><div style={{ background: '#0c4a6e22', border: '1px solid #0ea5e9', borderRadius: 8, padding: '8px 14px', marginBottom: 10, fontSize: 13, color: '#7dd3fc' }}>?? En Route</div><button onClick={() => updateStatus('ON_SCENE')} disabled={updating} style={{ width: '100%', padding: '18px', borderRadius: 10, marginBottom: 8, background: '#7c2d12', border: '2px solid #f97316', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>?? Arrived - On Scene</button></>)}
+            {assignment.status === 'ON_SCENE' && (<><div style={{ background: '#f9731622', border: '1px solid #f97316', borderRadius: 8, padding: '8px 14px', marginBottom: 10, fontSize: 13, color: '#fdba74' }}>?? On Scene</div><button onClick={() => updateStatus('RESOLVED')} disabled={updating} style={{ width: '100%', padding: '18px', borderRadius: 10, marginBottom: 8, background: '#14532d', border: '2px solid #16a34a', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>✅ Mark as Resolved</button></>)}
+            {assignment.status === 'RESOLVED' && (<div style={{ background: '#14532d33', border: '1px solid #16a34a', borderRadius: 10, padding: 16, marginBottom: 8, textAlign: 'center' }}><div style={{ fontSize: 24 }}>✅</div><div style={{ color: '#4ade80', fontWeight: 700 }}>Case Resolved</div><div style={{ color: '#8b949e', fontSize: 12 }}>Waiting for next assignment...</div></div>)}
           </div>
         )}
       </div>
