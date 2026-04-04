@@ -236,6 +236,7 @@ export default function Dashboard() {
 
       if (!['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(alert.status)) continue;
       if (!['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(alert.status)) continue;
+      if (!['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(alert.status)) continue;
       if (alert.status === 'ACTIVE' && alert.is_suspicious) {
         color = '#f97316'; size = 24; pulseClass = 'pin-suspicious';
       } else if (alert.status === 'ACTIVE') {
