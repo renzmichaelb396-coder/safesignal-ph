@@ -17,6 +17,7 @@ export default function Dashboard() {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<any>(null);
   const markersRef = useRef<Map<number, any>>(new Map());
+  const officerMarkersRef = useRef<Map<number, any>>(new Map());
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevAlertIdsRef = useRef<Set<number>>(new Set());
 
@@ -135,6 +136,61 @@ export default function Dashboard() {
     const interval = setInterval(pollAlerts, 3000);
     return () => clearInterval(interval);
   }, [officer]);
+
+  // Poll officer locations every 5 seconds and show blue dots on map
+  useEffect(() => {
+    if (!officer) return;
+    const pollOfficerLocations = async () => {
+      try {
+        const token = localStorage.getItem('dispatch_token');
+        if (!token) return;
+        const res = await fetch('/api/dispatch/officer-locations', {
+          headers: { Authorization: 'Bearer ' + token },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        updateOfficerMarkers(data.officers || []);
+      } catch {}
+    };
+    pollOfficerLocations();
+    const interval = setInterval(pollOfficerLocations, 5000);
+    return () => clearInterval(interval);
+  }, [officer]);
+
+  const updateOfficerMarkers = (officers: any[]) => {
+    if (!leafletMapRef.current) return;
+    const maplibregl = (window as any).maplibregl;
+    if (!maplibregl) return;
+
+    const currentIds = new Set(officers.map((o: any) => o.officer_id));
+
+    // Remove stale officer markers
+    for (const [id, marker] of Array.from(officerMarkersRef.current.entries())) {
+      if (!currentIds.has(id)) {
+        marker.remove();
+        officerMarkersRef.current.delete(id);
+      }
+    }
+
+    for (const ofc of officers) {
+      if (ofc.lat == null || ofc.lng == null) continue;
+      const initials = ofc.full_name ? ofc.full_name.split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase() : ofc.badge_number || '?';
+
+      if (officerMarkersRef.current.has(ofc.officer_id)) {
+        const marker = officerMarkersRef.current.get(ofc.officer_id);
+        marker.setLngLat([ofc.lng, ofc.lat]);
+      } else {
+        const el = document.createElement('div');
+        el.style.cssText = 'width:22px;height:22px;background:#3b82f6;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;box-shadow:0 2px 8px rgba(59,130,246,0.6);cursor:pointer';
+        el.textContent = initials;
+        el.title = ofc.full_name + ' (' + ofc.badge_number + ')';
+        const marker = new maplibregl.Marker({ element: el })
+          .setLngLat([ofc.lng, ofc.lat])
+          .addTo(leafletMapRef.current);
+        officerMarkersRef.current.set(ofc.officer_id, marker);
+      }
+    }
+  };
 
   const fetchAlerts = async () => {
     try {
