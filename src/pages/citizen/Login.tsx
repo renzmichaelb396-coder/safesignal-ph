@@ -5,7 +5,7 @@ import { useCitizenAuth } from '../../hooks/useCitizenAuth';
 export default function Login() {
   const [, navigate] = useLocation();
   const { login, user, loading: authLoading } = useCitizenAuth();
-  const [phone, setPhone] = useState('09171234567');
+  const [phone, setPhone] = useState('09172345678');
   const [pin, setPin] = useState('1234');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -91,7 +91,7 @@ export default function Login() {
             <label style={{ color: '#aaa', fontSize: 12, display: 'block', marginBottom: 6 }}>Phone Number</label>
             <input
               style={inputStyle}
-              placeholder="09171234567"
+              placeholder="09172345678"
               value={phone}
               maxLength={11}
               onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
@@ -138,7 +138,7 @@ export default function Login() {
       </div>
       <div className="w-full rounded-xl py-3 px-4 text-center"
         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-        <span style={{ color: '#ffd700', fontSize: 12 }}>Demo: <strong>09171234567</strong> / PIN: <strong>1234</strong></span>
+        <span style={{ color: '#ffd700', fontSize: 12 }}>Demo: <strong>09172345678</strong> / PIN: <strong>1234</strong></span>
       </div>
     </div>
   );
