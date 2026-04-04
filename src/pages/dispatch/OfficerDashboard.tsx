@@ -270,17 +270,21 @@ export default function OfficerDashboard() {
     }
   }
 
-  async function updateStatus(status: string) {
+  async function updateStatus(status: string, notes?: string) {
     if (!assignment) return;
     setUpdating(true);
     try {
-      await officerFetch('/api/officer/assignment/' + assignment.id + '/status', {
+      const res = await officerFetch('/api/officer/assignment/' + assignment.id + '/status', {
         method: 'PATCH',
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, notes: notes || undefined }),
       });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error((d as any).error || 'Update failed (' + res.status + ')');
+      }
       await fetchAssignment();
       showToast('✅ Status updated to ' + getStatusLabel(status));
-    } catch { setError('Failed to update status. Try again.'); }
+    } catch(e: any) { setError(e.message || 'Failed to update status. Try again.'); }
     setUpdating(false);
   }
 
