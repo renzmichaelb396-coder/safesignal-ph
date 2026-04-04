@@ -17,9 +17,10 @@ export function getDb(): Database.Database {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
 
-  // Migration guard: if schema is stale (missing email/full_name/is_active), delete and recreate
+  // Migration guard: delete DB if schema is stale OR seed emails are wrong
   try {
-    db.prepare('SELECT email, full_name, is_active FROM officers LIMIT 1').get();
+    const o = db.prepare("SELECT email FROM officers WHERE email = 'dispatcher@pasay.safesignal.ph'").get();
+    if (!o) throw new Error('stale seed');
   } catch {
     db.close();
     if (fs.existsSync(DB_PATH)) fs.unlinkSync(DB_PATH);
@@ -169,9 +170,9 @@ function seedData(): void {
     `INSERT INTO officers (station_id, badge_number, email, full_name, role, password_hash) VALUES (?, ?, ?, ?, ?, ?)`
   );
   const officerDefs = [
-    { badge: 'PNP-001', email: 'pnp001@safesignal.ph', name: 'Maria Lopez', role: 'DISPATCHER' },
-    { badge: 'PNP-002', email: 'pnp002@safesignal.ph', name: 'Carlos Mendoza', role: 'DISPATCHER' },
-    { badge: 'ADM-001', email: 'adm001@safesignal.ph', name: 'Chief Antonio Reyes', role: 'STATION_ADMIN' },
+    { badge: 'PNP-001', email: 'dispatcher@pasay.safesignal.ph', name: 'Maria Lopez', role: 'DISPATCHER' },
+    { badge: 'PNP-002', email: 'officer@pasay.safesignal.ph', name: 'Carlos Mendoza', role: 'DISPATCHER' },
+    { badge: 'PNP-ADM', email: 'admin@pasay.safesignal.ph', name: 'Chief Antonio Reyes', role: 'STATION_ADMIN' },
   ];
   for (const o of officerDefs) {
     officerStmt.run(stationId, o.badge, o.email, o.name, o.role, bcryptjs.hashSync('password123', 10));
