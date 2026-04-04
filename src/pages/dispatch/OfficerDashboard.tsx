@@ -259,7 +259,8 @@ export default function OfficerDashboard() {
                 <div style={{ fontSize: 11, color: '#8b949e', textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 4 }}>ELAPSED</div>
                 <div style={{ fontSize: 28, fontWeight: 700, color: '#e6edf3' }}>
                   {(() => {
-                    const ts = typeof assignment.createdAt === 'number' ? assignment.createdAt : new Date(assignment.createdAt).getTime();
+                    const raw = assignment.createdAt;
+                    const ts = Number(raw) || new Date(String(raw)).getTime();
                     const diff = Math.max(0, Math.floor((now - ts) / 1000));
                     const h = Math.floor(diff / 3600);
                     const m = Math.floor((diff % 3600) / 60);
