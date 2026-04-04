@@ -111,8 +111,9 @@ export default function SosActive() {
         setTimeout(loadMap, 100);
         return;
       }
-      const lat = sosStatus?.latitude || 14.5794;
-      const lng = sosStatus?.longitude || 120.9749;
+      // API returns lat/lng (normalized by normalizeAlert) — NOT latitude/longitude
+      const lat = sosStatus?.lat || 14.5794;
+      const lng = sosStatus?.lng || 120.9749;
       const map = window.L.map(mapRef.current).setView([lat, lng], 15);
 
       // CARTO Voyager tiles — warm, professional look matching Manus reference
@@ -206,7 +207,7 @@ export default function SosActive() {
   };
 
   return (
-    <div style={{ background: 'var(--citizen-bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ background: 'var(--citizen-bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column', paddingBottom: 88 }}>
       {/* "HELP IS ON THE WAY" Header */}
       <div style={{
         background: 'linear-gradient(180deg, #2d0a0a 0%, #1a1a2e 100%)',
@@ -297,21 +298,21 @@ export default function SosActive() {
       }} />
 
       {/* Location + Accuracy */}
-      {sosStatus?.latitude && (
+      {sosStatus?.lat && (
         <div style={{
           padding: '12px 20px', display: 'flex', justifyContent: 'space-between',
           background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}>
           <div>
-            <p style={{ color: '#888', fontSize: 10, margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>LOCATION</p>
+            <p style={{ color: '#888', fontSize: 10, margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>YOUR LOCATION</p>
             <p style={{ color: '#ccc', fontSize: 13, margin: 0, fontVariantNumeric: 'tabular-nums' }}>
-              {Number(sosStatus.latitude).toFixed(4)}, {Number(sosStatus.longitude).toFixed(4)}
+              {Number(sosStatus.lat).toFixed(4)}, {Number(sosStatus.lng).toFixed(4)}
             </p>
           </div>
-          {sosStatus.accuracy && (
+          {sosStatus.location_accuracy && (
             <div style={{ textAlign: 'right' }}>
               <p style={{ color: '#888', fontSize: 10, margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>ACCURACY</p>
-              <p style={{ color: '#ccc', fontSize: 13, margin: 0 }}>±{Math.round(sosStatus.accuracy)}m</p>
+              <p style={{ color: '#ccc', fontSize: 13, margin: 0 }}>±{Math.round(sosStatus.location_accuracy)}m</p>
             </div>
           )}
         </div>
@@ -340,22 +341,30 @@ export default function SosActive() {
         </div>
       )}
 
-      {/* I'm Safe Now Button */}
-      <div style={{ padding: '16px 20px 24px' }}>
+      {/* I'm Safe Now — fixed to bottom, always visible, never requires scrolling */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        padding: '12px 20px 28px',
+        background: 'linear-gradient(to top, rgba(13,13,20,0.98) 80%, transparent)',
+        zIndex: 40,
+      }}>
         <button
           onClick={() => setShowCancelModal(true)}
           disabled={loading || sosStatus?.status === 'CANCELLED'}
           style={{
-            width: '100%', padding: '14px', borderRadius: 12,
-            background: 'rgba(255,255,255,0.07)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            color: sosStatus?.status === 'CANCELLED' ? '#888' : '#4ade80',
-            fontSize: 15, fontWeight: 700,
+            width: '100%', padding: '16px', borderRadius: 14,
+            background: sosStatus?.status === 'CANCELLED'
+              ? 'rgba(255,255,255,0.05)'
+              : 'rgba(74,222,128,0.12)',
+            border: '1.5px solid ' + (sosStatus?.status === 'CANCELLED' ? 'rgba(255,255,255,0.1)' : 'rgba(74,222,128,0.4)'),
+            color: sosStatus?.status === 'CANCELLED' ? '#555' : '#4ade80',
+            fontSize: 16, fontWeight: 700,
             cursor: loading || sosStatus?.status === 'CANCELLED' ? 'not-allowed' : 'pointer',
             opacity: loading ? 0.5 : 1,
+            letterSpacing: 0.5,
           }}
         >
-          {sosStatus?.status === 'CANCELLED' ? 'SOS Cancelled' : '✅ I\'m Safe Now'}
+          {sosStatus?.status === 'CANCELLED' ? 'SOS Cancelled' : '✅  I\'m Safe Now'}
         </button>
       </div>
 
