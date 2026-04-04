@@ -40,7 +40,11 @@ async function request(path, options = {}, authType) {
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
-  const data = await res.json();
+  const raw = await res.text();
+  let data: any = {};
+  try { data = JSON.parse(raw); } catch {
+    throw new Error(raw.trim().slice(0, 200) || `Request failed: ${res.status}`);
+  }
   if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
   return data;
 }

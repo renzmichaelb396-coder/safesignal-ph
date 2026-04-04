@@ -786,28 +786,30 @@ app.patch('/api/officer/assignment/:id/status', requireOfficerAuth, async (req: 
       res.status(400).json({ error: 'Invalid status' });
       return;
     }
+    const alertId = parseInt(req.params.id, 10);
+    if (isNaN(alertId)) { res.status(400).json({ error: 'Invalid assignment ID' }); return; }
     const alertResult = await pool.query(
       'SELECT * FROM sos_alerts WHERE id = $1 AND assigned_officer_id = $2',
-      [req.params.id, officerPayload.id]
+      [alertId, officerPayload.id]
     );
     if (!alertResult.rows[0]) {
       res.status(404).json({ error: 'Assignment not found' });
       return;
     }
-    const now = Date.now();
+    const now = String(Date.now());
     await pool.query(
       `UPDATE sos_alerts SET status = $1,
-        resolved_at = CASE WHEN $1 = 'RESOLVED' THEN $2 ELSE resolved_at END,
-        acknowledged_at = CASE WHEN $1 = 'ACKNOWLEDGED' AND acknowledged_at IS NULL THEN $2 ELSE acknowledged_at END,
+        resolved_at = CASE WHEN $1 = 'RESOLVED' THEN $2::bigint ELSE resolved_at END,
+        acknowledged_at = CASE WHEN $1 = 'ACKNOWLEDGED' AND acknowledged_at IS NULL THEN $2::bigint ELSE acknowledged_at END,
         notes = CASE WHEN $1 = 'RESOLVED' AND $3 IS NOT NULL THEN $3 ELSE notes END
        WHERE id = $4`,
-      [status, now, notes || null, req.params.id]
+      [status, now, notes || null, alertId]
     );
-    const updated = await getAlertWithCitizen(req.params.id);
+    const updated = await getAlertWithCitizen(alertId);
     broadcastEvent('alert_updated', { alert: updated });
     res.json({ success: true });
   } catch (error) {
-    console.error(error);
+    console.error('[SafeSignal] status update error:', (error as any)?.message || error);
     res.status(500).json({ error: 'Failed to update status' });
   }
 });

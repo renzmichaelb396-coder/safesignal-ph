@@ -8,11 +8,11 @@ export default function Landing() {
       style={{ background: 'var(--citizen-bg)' }}
     >
       {/* Header */}
-      <div className="w-full flex justify-between items-center">
+      <div className="w-full flex justify-center items-center relative">
         <span style={{ color: 'var(--ph-gold)', fontSize: '12px', fontWeight: 600 }}>
           PASAY CITY POLICE STATION
         </span>
-        <span style={{ color: '#666', fontSize: '11px' }}>v1.0</span>
+        <span style={{ color: '#666', fontSize: '11px', position: 'absolute', right: 0 }}>v1.0</span>
       </div>
 
       {/* Logo and Branding */}

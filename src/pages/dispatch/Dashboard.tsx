@@ -20,6 +20,7 @@ export default function Dashboard() {
   const officerMarkersRef = useRef<Map<number, any>>(new Map());
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevAlertIdsRef = useRef<Set<number>>(new Set());
+  const hasInitialLoadRef = useRef(false);
   // Only auto-zoom when the PRIORITY alert changes (new ID). After first zoom, user can pan/zoom freely.
   const autoZoomAlertIdRef = useRef<number | null>(null);
 
@@ -119,13 +120,14 @@ export default function Dashboard() {
             // Detect new alerts by comparing IDs
             const prevIds = prevAlertIdsRef.current;
             for (const a of incoming) {
-              if (!prevIds.has(a.id) && prevIds.size > 0) {
+              if (!prevIds.has(a.id) && hasInitialLoadRef.current) {
                 playBeep();
                 break;
               }
             }
             // Update known IDs
             prevAlertIdsRef.current = new Set(incoming.map((a: any) => a.id));
+            hasInitialLoadRef.current = true;
             return incoming;
           });
         });
