@@ -26,7 +26,7 @@ export default function Login() {
       }
       ctx.putImageData(data, 0, 0);
     };
-    img.src = '/pasay-police-badge.png';
+    img.src = '/pasay-police-badge.svg';
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
