@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dispatchApi } from '../../lib/api';
 import DispatchLayout from './DispatchLayout';
+import { useDispatchAuth } from '../../contexts/DispatchAuthContext';
 
 interface Settings {
   surge_threshold: number;
@@ -10,6 +11,7 @@ interface Settings {
 }
 
 export default function Settings() {
+  const { officer } = useDispatchAuth();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [formData, setFormData] = useState<Settings>({
     surge_threshold: 0,
@@ -74,7 +76,22 @@ export default function Settings() {
     }
   };
 
-  const settingFields: Array<{
+  // DEF-05: block non-admin roles from accessing Settings
+  if (officer && officer.role !== 'STATION_ADMIN') {
+    return (
+      <DispatchLayout>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--dispatch-bg, #0d1117)', color: '#e6edf3' }}>
+          <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+            <h2 style={{ color: '#ffc107', fontWeight: 700, margin: '0 0 8px' }}>Access Restricted</h2>
+            <p style={{ color: '#8b949e', fontSize: 14 }}>System settings can only be changed by the Station Admin.</p>
+          </div>
+        </div>
+      </DispatchLayout>
+    );
+  }
+
+    const settingFields: Array<{
     key: keyof Settings;
     label: string;
     description: string;
