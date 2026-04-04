@@ -11,7 +11,36 @@ export default function DispatchLogin() {
   const [, navigate] = useLocation();
   const { login, logout, officer } = useDispatchAuth();
 
+  // Bridge ALL dispatch sessions — DispatchAuthContext only writes dispatch_* keys (BUG-007).
+  // All dispatchApi calls read from safesignal_officer_token (getToken('officer')).
+  // OfficerDashboard also reads safesignal_officer_* keys.
+  // This bridge runs for every role (DISPATCHER, OFFICER, STATION_ADMIN) so API calls work.
+  React.useEffect(() => {
+    if (officer) {
+      const token = localStorage.getItem('dispatch_token');
+      if (token) {
+        localStorage.setItem('safesignal_officer_token', token);
+        localStorage.setItem('safesignal_officer_data', JSON.stringify(officer));
+      }
+    }
+  }, [officer]);
+
+  const bridgeKeysIfNeeded = () => {
+    // Called just before any dashboard navigation — ensures safesignal_officer_token
+    // is always in sync with dispatch_token so API calls don't fail with "No token".
+    const token = localStorage.getItem('dispatch_token');
+    const userData = localStorage.getItem('dispatch_user');
+    if (token && userData) {
+      try {
+        const user = JSON.parse(userData);
+        localStorage.setItem('safesignal_officer_token', token);
+        localStorage.setItem('safesignal_officer_data', JSON.stringify(user));
+      } catch { /* ignore parse errors */ }
+    }
+  };
+
   const routeByRole = (role: string) => {
+    bridgeKeysIfNeeded(); // always sync before navigating
     if (role === 'OFFICER') {
       navigate('/officer');
     } else if (role === 'STATION_ADMIN') {
