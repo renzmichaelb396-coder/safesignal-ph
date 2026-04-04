@@ -20,6 +20,8 @@ export default function Dashboard() {
   const officerMarkersRef = useRef<Map<number, any>>(new Map());
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevAlertIdsRef = useRef<Set<number>>(new Set());
+  // Only auto-zoom when the PRIORITY alert changes (new ID). After first zoom, user can pan/zoom freely.
+  const autoZoomAlertIdRef = useRef<number | null>(null);
 
   // Live timer + PST clock
   useEffect(() => {
@@ -298,11 +300,16 @@ export default function Dashboard() {
         }
       }
     }
-    if (priorityAlert?.lat != null && priorityAlert?.lng != null) {
-      leafletMapRef.current.flyTo({ center: [priorityAlert.lng, priorityAlert.lat], zoom: 15 });
-    } else {
-      // No active emergency — return camera to Pasay Police Station
-      leafletMapRef.current.flyTo({ center: STATION_CENTER, zoom: 14 });
+    // Only auto-zoom when the priority alert changes — user can freely pan/zoom after first zoom-in
+    const priorityId = priorityAlert?.id ?? null;
+    if (priorityId !== autoZoomAlertIdRef.current) {
+      autoZoomAlertIdRef.current = priorityId;
+      if (priorityAlert?.lat != null && priorityAlert?.lng != null) {
+        leafletMapRef.current.flyTo({ center: [priorityAlert.lng, priorityAlert.lat], zoom: 15 });
+      } else {
+        // No active emergency — return camera to Pasay Police Station
+        leafletMapRef.current.flyTo({ center: STATION_CENTER, zoom: 14 });
+      }
     }
   };
 
