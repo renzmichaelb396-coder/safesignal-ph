@@ -1,4 +1,6 @@
-# SafeSignal PH — Claude Code Project Context
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 > Read this file completely before touching any code. Every rule here comes
 > from a real production bug that cost time and broke the live system.
@@ -12,9 +14,60 @@ Citizens send one-tap SOS alerts with GPS. Dispatchers assign officers. Officers
 
 - **Live URL:** https://safesignal-ph.vercel.app
 - **GitHub:** https://github.com/renzmichaelb396-coder/safesignal-ph
-- **Stack:** React + Vite + TypeScript (frontend) | Express serverless on Vercel (backend)
+- **Stack:** React 18 + Vite 5 + TypeScript (frontend) | Express serverless on Vercel (backend)
 - **Database:** PostgreSQL via `pg` pool (Neon) — production is `api/index.ts`
 - **Auth:** JWT tokens stored in localStorage — role-specific keys, never shared
+- **Routing:** wouter (lightweight client-side router)
+- **Styling:** Tailwind CSS (inline styles also used extensively)
+- **Maps:** Leaflet / MapLibre GL
+
+---
+
+## Build & Development Commands
+
+```bash
+npm run dev            # Start both frontend + backend concurrently
+npm run dev:client     # Vite dev server only (port 5173)
+npm run dev:server     # Express backend only (port 3001, via tsx watch)
+npm run build          # Production build (Vite → dist/)
+npm run preview        # Preview production build locally
+npm run start          # Production server (NODE_ENV=production)
+```
+
+**Local dev setup:** Vite proxies `/api/*` → `http://localhost:3001` and `/ws` → `ws://localhost:3001` (configured in `vite.config.ts`). No separate proxy needed.
+
+**No test runner or linter is configured.** Verify changes with `npm run build` (must complete with zero errors).
+
+---
+
+## Architecture Overview
+
+### Two Separate Backends — Only One Is Production
+
+| Path | Purpose | Used in production? |
+|------|---------|-------------------|
+| `api/index.ts` | Vercel serverless function — ALL prod routes | **YES** |
+| `server/index.ts` | Local Express dev server (uses `server/safesignal/`) | **NO — legacy** |
+
+**All backend changes go in `api/index.ts`.** The `server/` directory is only for local dev convenience and is NOT deployed.
+
+### Frontend Architecture
+
+- **Routing:** `src/App.tsx` defines all routes via wouter `<Switch>`. Citizen routes are at `/`, dispatch routes at `/dispatch/*`, officer at `/officer`.
+- **Auth contexts wrap the entire app:** `CitizenAuthProvider` → `DispatchAuthProvider` → `Router`. Each context manages only its own localStorage keys.
+- **API layer:** `src/lib/api.ts` exports `citizenApi` and `dispatchApi` objects with typed fetch helpers. All requests go through a shared `request()` function that auto-attaches JWT tokens by role type.
+- **`normalizeAlert()`** in `api.ts` handles field name differences between the two backends (legacy compat).
+
+### Path Aliases
+
+- `@/` → `./src/`
+- `@shared/` → `./shared/`
+
+Defined in both `tsconfig.json` and `vite.config.ts`. Use these in imports.
+
+### Vercel Deployment
+
+`vercel.json` rewrites all `/api/*` to `api/index.ts` (single serverless function). The `sql.js` WASM files are bundled via `includeFiles`. Frontend builds to `dist/` with SPA fallback (`/(.*) → /index.html`).
 
 ---
 
