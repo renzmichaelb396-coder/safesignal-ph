@@ -7,7 +7,7 @@ export default function Home() {
   const { user, logout, loading } = useCitizenAuth();
   const [showMenu, setShowMenu] = useState(false);
   const [trustScore, setTrustScore] = useState(85);
-  const [strikes, setStrikes] = useState(1);
+  const [strikes, setStrikes] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => { if (!loading && !user) navigate('/login'); }, [user, loading, navigate]);
@@ -25,11 +25,14 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (user) setTrustScore(Math.floor(Math.random() * 30) + 70);
+    if (user) {
+      setTrustScore(user.trust?.score ?? Math.floor(Math.random() * 30) + 70);
+      setStrikes(user.strike_count ?? 0);
+    }
   }, [user]);
 
   const handleLogout = () => { logout(); navigate('/'); };
-  const displayName = user?.name?.split(' ')[0] || 'Demo';
+  const displayName = user?.full_name?.split(' ')[0] || 'Guest';
 
   return (
     <div className="citizen-container flex flex-col min-h-screen"
