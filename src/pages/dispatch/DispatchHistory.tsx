@@ -106,7 +106,7 @@ export default function DispatchHistory() {
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: 'var(--dispatch-bg, #0d1117)',
-        color: 'var(--dispatch-border, #e6edf3)',
+        color: '#e6edf3',
       }}
     >
       {/* Header */}
@@ -119,7 +119,7 @@ export default function DispatchHistory() {
         <h1 style={{ margin: '0 0 12px 0', fontSize: '24px', fontWeight: 600, color: 'var(--ph-gold, #ffc107)' }}>
           Alert History
         </h1>
-        <p style={{ margin: 0, fontSize: '13px', color: 'var(--dispatch-border, #8b949e)' }}>
+        <p style={{ margin: 0, fontSize: '13px', color: '#8b949e' }}>
           {alerts.length} result{alerts.length !== 1 ? 's' : ''}
         </p>
       </div>
@@ -142,7 +142,7 @@ export default function DispatchHistory() {
               display: 'block',
               fontSize: '12px',
               fontWeight: 600,
-              color: 'var(--dispatch-border, #c9d1d9)',
+              color: '#c9d1d9',
               marginBottom: '6px',
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
@@ -156,10 +156,10 @@ export default function DispatchHistory() {
             style={{
               padding: '8px 12px',
               fontSize: '13px',
-              backgroundColor: 'var(--dispatch-border, #161b22)',
+              backgroundColor: '#161b22',
               border: '1px solid var(--dispatch-border, #30363d)',
               borderRadius: '6px',
-              color: 'var(--dispatch-border, #e6edf3)',
+              color: '#e6edf3',
               cursor: 'pointer',
               transition: 'border-color 0.2s',
             }}
@@ -182,7 +182,7 @@ export default function DispatchHistory() {
               display: 'block',
               fontSize: '12px',
               fontWeight: 600,
-              color: 'var(--dispatch-border, #c9d1d9)',
+              color: '#c9d1d9',
               marginBottom: '6px',
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
@@ -197,10 +197,10 @@ export default function DispatchHistory() {
             style={{
               padding: '8px 12px',
               fontSize: '13px',
-              backgroundColor: 'var(--dispatch-border, #161b22)',
+              backgroundColor: '#161b22',
               border: '1px solid var(--dispatch-border, #30363d)',
               borderRadius: '6px',
-              color: 'var(--dispatch-border, #e6edf3)',
+              color: '#e6edf3',
               cursor: 'pointer',
             }}
           />
@@ -213,7 +213,7 @@ export default function DispatchHistory() {
               display: 'block',
               fontSize: '12px',
               fontWeight: 600,
-              color: 'var(--dispatch-border, #c9d1d9)',
+              color: '#c9d1d9',
               marginBottom: '6px',
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
@@ -228,10 +228,10 @@ export default function DispatchHistory() {
             style={{
               padding: '8px 12px',
               fontSize: '13px',
-              backgroundColor: 'var(--dispatch-border, #161b22)',
+              backgroundColor: '#161b22',
               border: '1px solid var(--dispatch-border, #30363d)',
               borderRadius: '6px',
-              color: 'var(--dispatch-border, #e6edf3)',
+              color: '#e6edf3',
               cursor: 'pointer',
             }}
           />
@@ -287,7 +287,7 @@ export default function DispatchHistory() {
             style={{
               padding: '40px 24px',
               textAlign: 'center',
-              color: 'var(--dispatch-border, #8b949e)',
+              color: '#8b949e',
             }}
           >
             <p style={{ fontSize: '32px', margin: '0 0 12px 0' }}>📋</p>
@@ -301,7 +301,7 @@ export default function DispatchHistory() {
             style={{
               padding: '40px 24px',
               textAlign: 'center',
-              color: 'var(--dispatch-border, #8b949e)',
+              color: '#8b949e',
             }}
           >
             <p style={{ fontSize: '14px' }}>Loading history...</p>
@@ -320,7 +320,7 @@ export default function DispatchHistory() {
                 borderBottom: '1px solid var(--dispatch-border, #30363d)',
                 fontSize: '11px',
                 fontWeight: 700,
-                color: 'var(--dispatch-border, #8b949e)',
+                color: '#8b949e',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
                 position: 'sticky',
@@ -387,7 +387,7 @@ export default function DispatchHistory() {
                       style={{
                         margin: 0,
                         fontSize: '11px',
-                        color: 'var(--dispatch-border, #8b949e)',
+                        color: '#8b949e',
                       }}
                     >
                       Trust: <span style={{ color: trustColor, fontWeight: 700 }}>{alert.trust_score}%</span>
@@ -395,7 +395,7 @@ export default function DispatchHistory() {
                   </div>
 
                   {/* Barangay */}
-                  <div style={{ color: 'var(--dispatch-border, #8b949e)' }}>{alert.barangay}</div>
+                  <div style={{ color: '#8b949e' }}>{alert.barangay}</div>
 
                   {/* Status */}
                   <div>
@@ -416,12 +416,12 @@ export default function DispatchHistory() {
                   </div>
 
                   {/* Triggered Time */}
-                  <div style={{ fontSize: '12px', color: 'var(--dispatch-border, #8b949e)' }}>
+                  <div style={{ fontSize: '12px', color: '#8b949e' }}>
                     {formatDate(alert.triggered_at)}
                   </div>
 
                   {/* Resolution Time */}
-                  <div style={{ fontSize: '12px', color: 'var(--dispatch-border, #8b949e)' }}>
+                  <div style={{ fontSize: '12px', color: '#8b949e' }}>
                     {resolutionTime}
                   </div>
 
@@ -429,7 +429,7 @@ export default function DispatchHistory() {
                   <div
                     style={{
                       fontSize: '12px',
-                      color: 'var(--dispatch-border, #8b949e)',
+                      color: '#8b949e',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
