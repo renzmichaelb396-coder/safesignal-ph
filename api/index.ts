@@ -242,10 +242,14 @@ app.post('/api/dispatch/login', async (req: any, res: any) => {
 // GET /api/dispatch/alerts
 app.get('/api/dispatch/alerts', requireOfficerAuth, async (req: any, res: any) => {
   try {
-    const { status } = req.query;
+    const { status, all } = req.query;
     let query = `SELECT a.*, c.full_name, c.phone, c.barangay, c.address, c.photo_url, c.strike_count, c.is_suspended, t.score as trust_score, o.full_name as officer_name, o.badge_number as officer_badge FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id LEFT JOIN officers o ON a.assigned_officer_id = o.id`;
     const params: any[] = [];
-    if (status) { query += ' WHERE a.status = $1'; params.push(status); }
+    if (status) {
+      query += ' WHERE a.status = $1'; params.push(status);
+    } else if (!all) {
+      query += " WHERE a.status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE')";
+    }
     query += ' ORDER BY a.triggered_at DESC';
     const result = await pool.query(query, params);
     res.json({ alerts: result.rows.map(normalizeAlert) });

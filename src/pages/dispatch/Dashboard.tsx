@@ -234,14 +234,17 @@ export default function Dashboard() {
       let size = 20;
       let pulseClass = '';
 
+      if (!['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(alert.status)) continue;
       if (alert.status === 'ACTIVE' && alert.is_suspicious) {
         color = '#f97316'; size = 24; pulseClass = 'pin-suspicious';
       } else if (alert.status === 'ACTIVE') {
         color = '#E63946'; size = 24; pulseClass = 'pin-active';
       } else if (alert.status === 'ACKNOWLEDGED') {
         color = '#eab308'; size = 24;
-      } else if (alert.status === 'RESOLVED') {
-        color = '#22c55e'; size = 20;
+      } else if (alert.status === 'EN_ROUTE') {
+        color = '#38bdf8'; size = 22;
+      } else if (alert.status === 'ON_SCENE') {
+        color = '#f97316'; size = 22;
       }
 
       if (markersRef.current.has(alert.id)) {
@@ -301,7 +304,7 @@ export default function Dashboard() {
     } catch {}
   };
 
-  const activeAlerts = alerts.filter(a => a.status === 'ACTIVE' || a.status === 'ACKNOWLEDGED');
+  const activeAlerts = alerts.filter(a => ['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(a.status));
 
   if (loading) return null; // Wait for auth context to restore from localStorage
   if (!officer) {
