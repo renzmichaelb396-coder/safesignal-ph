@@ -38,6 +38,14 @@ async function initDb(): Promise<void> {
     await pool.query('SELECT 1');
 
     // === PRIORITY FIX: Run PNP-002/002B cleanup FIRST, in own try-catch ===
+    // DEF-08: rename officer PNP-102 "Maria Santos" to "Rosa Santos" to avoid name collision with demo citizen
+    try {
+      await pool.query(`UPDATE officers SET full_name = 'Rosa Santos' WHERE badge_number = 'PNP-102' AND full_name = 'Maria Santos'`);
+    } catch {}
+    // DEF-09: soft-delete API Test User citizen (hide from pilot-facing views)
+    try {
+      await pool.query(`UPDATE citizens SET is_suspended = true, suspension_reason = 'Test account — not a real citizen' WHERE phone = '09881234001' AND full_name = 'API Test User'`);
+    } catch {}
     try {
       const ghost = await pool.query(`SELECT id FROM officers WHERE badge_number = 'PNP-002B'`);
       if (ghost.rows.length > 0) {
@@ -454,19 +462,35 @@ app.post('/api/dispatch/officers/:id/toggle-active', requireAdminAuth, async (re
 });
 
 // GET /api/dispatch/stats
-app.get('/api/dispatch/stats', requireOfficerAuth, async (_req: any, res: any) => {
+app.get('/api/dispatch/stats', requireOfficerAuth, async (req: any, res: any) => {
   try {
-    const [total, active, acknowledged, resolved, falseAlarms, cancelled] = await Promise.all([
-      pool.query('SELECT COUNT(*) as c FROM sos_alerts'),
-      pool.query("SELECT COUNT(*) as c FROM sos_alerts WHERE status = 'ACTIVE'"),
-      pool.query("SELECT COUNT(*) as c FROM sos_alerts WHERE status = 'ACKNOWLEDGED'"),
-      pool.query("SELECT COUNT(*) as c FROM sos_alerts WHERE status = 'RESOLVED'"),
-      pool.query("SELECT COUNT(*) as c FROM sos_alerts WHERE status = 'FALSE_ALARM'"),
-      pool.query("SELECT COUNT(*) as c FROM sos_alerts WHERE status = 'CANCELLED'"),
+    const { period, start, end } = req.query;
+    let whereClause = 'WHERE 1=1';
+    const params: any[] = [];
+    if (period === 'custom' && start && end) {
+      params.push(new Date(start as string).getTime());
+      params.push(new Date((end as string) + 'T23:59:59').getTime());
+      whereClause = 'WHERE triggered_at >= $1 AND triggered_at <= $2';
+    } else if (period === '30d') {
+      params.push(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      whereClause = 'WHERE triggered_at >= $1';
+    } else if (period === '90d') {
+      params.push(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      whereClause = 'WHERE triggered_at >= $1';
+    }
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const [statusRows, avgResp, todayCount] = await Promise.all([
+      pool.query(`SELECT status, COUNT(*) as c FROM sos_alerts ${whereClause} GROUP BY status`, params),
+      pool.query(`SELECT AVG(acknowledged_at - triggered_at) as avg_ms FROM sos_alerts ${whereClause} AND acknowledged_at IS NOT NULL`, params),
+      pool.query('SELECT COUNT(*) as c FROM sos_alerts WHERE triggered_at >= $1', [todayStart.getTime()]),
     ]);
-    const t = parseInt(total.rows[0].c, 10);
-    const fa = parseInt(falseAlarms.rows[0].c, 10);
-    res.json({ stats: { total: t, active: parseInt(active.rows[0].c, 10), acknowledged: parseInt(acknowledged.rows[0].c, 10), resolved: parseInt(resolved.rows[0].c, 10), false_alarms: fa, cancelled: parseInt(cancelled.rows[0].c, 10), false_alarm_rate: t > 0 ? Math.round((fa / t) * 100) : 0, avg_response_time_ms: 0 } });
+    const statusCounts: Record<string, number> = {};
+    let total = 0;
+    for (const row of statusRows.rows) { statusCounts[row.status] = parseInt(row.c, 10); total += parseInt(row.c, 10); }
+    const fa = statusCounts['FALSE_ALARM'] || 0;
+    const avgMs = avgResp.rows[0]?.avg_ms ? parseFloat(avgResp.rows[0].avg_ms) : null;
+    const avgMinutes = avgMs != null && avgMs > 0 ? Math.round((avgMs / 60000) * 10) / 10 : null;
+    res.json({ stats: { total, active: statusCounts['ACTIVE'] || 0, acknowledged: statusCounts['ACKNOWLEDGED'] || 0, resolved: statusCounts['RESOLVED'] || 0, false_alarms: fa, cancelled: statusCounts['CANCELLED'] || 0, false_alarm_rate: total > 0 ? Math.round((fa / total) * 100) : 0, avg_response_minutes: avgMinutes, today_count: parseInt(todayCount.rows[0].c, 10) } });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch stats' }); }
 });
 
@@ -756,7 +780,7 @@ app.get('/api/officer/active-assignment', requireOfficerAuth, async (req: any, r
 app.patch('/api/officer/assignment/:id/status', requireOfficerAuth, async (req: any, res: any) => {
   try {
     const officerPayload = req.officer as OfficerPayload;
-    const { status } = req.body;
+    const { status, notes } = req.body;
     const valid = ['ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE', 'RESOLVED'];
     if (!valid.includes(status)) {
       res.status(400).json({ error: 'Invalid status' });
@@ -772,8 +796,12 @@ app.patch('/api/officer/assignment/:id/status', requireOfficerAuth, async (req: 
     }
     const now = Date.now();
     await pool.query(
-      `UPDATE sos_alerts SET status = $1, resolved_at = CASE WHEN $1 = 'RESOLVED' THEN $2 ELSE resolved_at END WHERE id = $3`,
-      [status, now, req.params.id]
+      `UPDATE sos_alerts SET status = $1,
+        resolved_at = CASE WHEN $1 = 'RESOLVED' THEN $2 ELSE resolved_at END,
+        acknowledged_at = CASE WHEN $1 = 'ACKNOWLEDGED' AND acknowledged_at IS NULL THEN $2 ELSE acknowledged_at END,
+        notes = CASE WHEN $1 = 'RESOLVED' AND $3 IS NOT NULL THEN $3 ELSE notes END
+       WHERE id = $4`,
+      [status, now, notes || null, req.params.id]
     );
     const updated = await getAlertWithCitizen(req.params.id);
     broadcastEvent('alert_updated', { alert: updated });
