@@ -180,11 +180,23 @@ export default function Dashboard() {
         const marker = officerMarkersRef.current.get(ofc.officer_id);
         marker.setLngLat([ofc.lng, ofc.lat]);
       } else {
-        const el = document.createElement('div');
-        el.style.cssText = 'width:22px;height:22px;background:#3b82f6;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;box-shadow:0 2px 8px rgba(59,130,246,0.6);cursor:pointer';
-        el.textContent = initials;
-        el.title = ofc.full_name + ' (' + ofc.badge_number + ')';
-        const marker = new maplibregl.Marker({ element: el })
+        // Wrapper: blue dot + visible name label below
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer;pointer-events:auto';
+
+        const dot = document.createElement('div');
+        dot.style.cssText = 'width:28px;height:28px;background:#3b82f6;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;box-shadow:0 0 0 3px rgba(59,130,246,0.4),0 2px 12px rgba(59,130,246,0.8)';
+        dot.textContent = initials;
+
+        const nameLabel = document.createElement('div');
+        nameLabel.style.cssText = 'background:rgba(30,64,175,0.96);color:#fff;font-size:11px;font-weight:800;padding:2px 8px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.7);margin-top:4px;max-width:140px;overflow:hidden;text-overflow:ellipsis;border:1px solid rgba(255,255,255,0.25);letter-spacing:0.02em';
+        nameLabel.textContent = ofc.full_name || ofc.badge_number;
+
+        wrapper.appendChild(dot);
+        wrapper.appendChild(nameLabel);
+        wrapper.title = ofc.full_name + ' · ' + ofc.badge_number;
+
+        const marker = new maplibregl.Marker({ element: wrapper })
           .setLngLat([ofc.lng, ofc.lat])
           .addTo(leafletMapRef.current);
         officerMarkersRef.current.set(ofc.officer_id, marker);

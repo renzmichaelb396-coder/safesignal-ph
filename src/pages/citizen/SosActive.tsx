@@ -100,7 +100,7 @@ export default function SosActive() {
       }
     };
     updateLocation();
-    const interval = setInterval(updateLocation, 30000);
+    const interval = setInterval(updateLocation, 10000);
     return () => clearInterval(interval);
   }, [sosId]);
 
@@ -122,24 +122,24 @@ export default function SosActive() {
         maxZoom: 19,
       }).addTo(map);
 
-      // Professional pulsing location pin with animated rings
+      // Pulsing RED location pin — citizen dot (matches dispatch view RED color)
       const pulseIcon = window.L.divIcon({
         className: '',
         html: `
-          <div style="position:relative;width:40px;height:40px;">
-            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:40px;height:40px;border-radius:50%;background:rgba(59,130,246,0.15);animation:sosPulse 2s ease-out infinite;"></div>
-            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;background:rgba(59,130,246,0.25);animation:sosPulse 2s ease-out infinite 0.5s;"></div>
-            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>
+          <div style="position:relative;width:44px;height:44px;">
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;background:rgba(230,57,70,0.15);animation:sosPulse 1.6s ease-out infinite;"></div>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;background:rgba(230,57,70,0.28);animation:sosPulse 1.6s ease-out infinite 0.4s;"></div>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:#E63946;border:3px solid #fff;box-shadow:0 2px 10px rgba(230,57,70,0.7);"></div>
           </div>
           <style>
             @keyframes sosPulse {
-              0% { transform: translate(-50%,-50%) scale(0.5); opacity: 1; }
-              100% { transform: translate(-50%,-50%) scale(1.8); opacity: 0; }
+              0% { transform: translate(-50%,-50%) scale(0.4); opacity: 1; }
+              100% { transform: translate(-50%,-50%) scale(2); opacity: 0; }
             }
           </style>
         `,
-        iconSize: [40, 40],
-        iconAnchor: [20, 20],
+        iconSize: [44, 44],
+        iconAnchor: [22, 22],
       });
 
       const marker = window.L.marker([lat, lng], { icon: pulseIcon }).addTo(map);

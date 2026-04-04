@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useCitizenAuth } from '../../hooks/useCitizenAuth';
 
@@ -9,25 +9,6 @@ export default function Login() {
   const [pin, setPin] = useState('1234');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const img = new Image();
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const d = data.data;
-      for (let i = 0; i < d.length; i += 4) {
-        if (d[i] > 230 && d[i + 1] > 230 && d[i + 2] > 230) d[i + 3] = 0;
-      }
-      ctx.putImageData(data, 0, 0);
-    };
-    img.src = '/pasay-police-badge.svg';
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,12 +54,10 @@ export default function Login() {
     <div className="citizen-container flex flex-col items-center justify-between min-h-screen"
       style={{ background: 'var(--citizen-bg)', padding: '48px 20px 24px' }}>
       <div className="flex flex-col items-center w-full">
-        <canvas
-          ref={canvasRef}
-          width={90}
-          height={100}
-          style={{ marginBottom: 16 }}
-          aria-label="Pasay City Police"
+        <img
+          src="/pasay-police-badge.svg"
+          alt="Pasay City Police"
+          style={{ width: 90, height: 90, objectFit: 'contain', marginBottom: 16 }}
         />
         <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 800, margin: 0, textAlign: 'center' }}>
           RespondPH
