@@ -7,7 +7,7 @@ interface Officer {
   full_name: string;
   badge_number: string;
   email: string;
-  role: 'DISPATCHER' | 'STATION_ADMIN';
+  role: 'DISPATCHER' | 'STATION_ADMIN' | 'OFFICER';
   is_active: boolean;
 }
 
@@ -86,10 +86,11 @@ export default function Officers() {
     }
   };
 
-  const getRoleColor = (role: string) => {
-    return role === 'STATION_ADMIN'
-      ? { bg: 'rgba(255, 193, 7, 0.1)', text: 'var(--ph-gold, #ffc107)' }
-      : { bg: 'rgba(33, 150, 243, 0.1)', text: '#42a5f5' };
+  const const getRoleColor = (role: string) => {
+  if (role === 'STATION_ADMIN') return { bg: 'rgba(255, 193, 7, 0.1)', text: 'var(--ph-gold, #ffc107)' };
+  if (role === 'OFFICER') return { bg: 'rgba(76, 175, 80, 0.1)', text: '#66bb6a' };
+  return { bg: 'rgba(33, 150, 243, 0.1)', text: '#42a5f5' };
+};
   };
 
   return (
@@ -365,7 +366,8 @@ export default function Officers() {
                 }}
               >
                 <option value="DISPATCHER">Dispatcher</option>
-                <option value="STATION_ADMIN">Station Admin</option>
+                <option value="OFFICER">Officer</option>
+                  <option value="STATION_ADMIN">Station Admin</option>
               </select>
             </div>
           </div>
@@ -514,7 +516,7 @@ export default function Officers() {
                           textTransform: 'uppercase',
                         }}
                       >
-                        {officer.role === 'STATION_ADMIN' ? 'Station Admin' : 'Dispatcher'}
+                        {officer.role === 'STATION_ADMIN' ? 'Station Admin' : officer.role === 'OFFICER' ? 'Officer' : 'Dispatcher'}
                       </span>
                     </div>
                   </div>
