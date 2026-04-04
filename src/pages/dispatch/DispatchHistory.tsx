@@ -314,7 +314,7 @@ export default function DispatchHistory() {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: '60px 1fr 150px 120px 120px 200px',
+                gridTemplateColumns: '50px 1fr 120px 110px 100px 100px 1fr',
                 gap: '12px',
                 padding: '12px 24px',
                 borderBottom: '1px solid var(--dispatch-border, #30363d)',
@@ -328,11 +328,12 @@ export default function DispatchHistory() {
                 backgroundColor: 'var(--dispatch-bg, #0d1117)',
               }}
             >
-              <div>Person</div>
+              <div></div>
+              <div>Citizen</div>
               <div>Barangay</div>
               <div>Status</div>
               <div>Triggered</div>
-              <div>Resolution</div>
+              <div>Duration</div>
               <div>Notes</div>
             </div>
 
@@ -347,7 +348,7 @@ export default function DispatchHistory() {
                   key={alert.id}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '60px 1fr 150px 120px 120px 200px',
+                    gridTemplateColumns: '50px 1fr 120px 110px 100px 100px 1fr',
                     gap: '12px',
                     padding: '12px 24px',
                     borderBottom: '1px solid var(--dispatch-border, #30363d)',

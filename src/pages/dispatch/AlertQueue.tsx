@@ -54,11 +54,13 @@ export default function AlertQueue() {
 
   const getStatusBadge = (status: string) => {
     const map: Record<string, { bg: string; color: string; border: string }> = {
-      ACTIVE:      { bg: 'rgba(248,81,73,0.12)',  color: '#ff7675', border: '#f85149' },
-      ACKNOWLEDGED:{ bg: 'rgba(255,193,7,0.12)',  color: '#ffc107', border: '#ffc107' },
-      RESOLVED:    { bg: 'rgba(33,150,243,0.12)', color: '#42a5f5', border: '#2196f3' },
-      FALSE_ALARM: { bg: 'rgba(156,156,156,0.12)',color: '#a0a0a0', border: '#9e9e9e' },
-      CANCELLED:   { bg: 'rgba(100,100,100,0.12)',color: '#888',    border: '#666' },
+      ACTIVE:      { bg: 'rgba(248,81,73,0.12)',   color: '#ff7675', border: '#f85149' },
+      ACKNOWLEDGED:{ bg: 'rgba(255,193,7,0.12)',   color: '#ffc107', border: '#ffc107' },
+      EN_ROUTE:    { bg: 'rgba(14,165,233,0.12)',  color: '#38bdf8', border: '#0ea5e9' },
+      ON_SCENE:    { bg: 'rgba(249,115,22,0.12)',  color: '#fb923c', border: '#f97316' },
+      RESOLVED:    { bg: 'rgba(33,150,243,0.12)',  color: '#42a5f5', border: '#2196f3' },
+      FALSE_ALARM: { bg: 'rgba(156,156,156,0.12)', color: '#a0a0a0', border: '#9e9e9e' },
+      CANCELLED:   { bg: 'rgba(100,100,100,0.12)', color: '#888',    border: '#666' },
     };
     return map[status] || map['CANCELLED'];
   };
@@ -140,6 +142,8 @@ export default function AlertQueue() {
               <option value="ALL">All Status</option>
               <option value="ACTIVE">Active</option>
               <option value="ACKNOWLEDGED">Acknowledged</option>
+              <option value="EN_ROUTE">En Route</option>
+              <option value="ON_SCENE">On Scene</option>
               <option value="RESOLVED">Resolved</option>
               <option value="FALSE_ALARM">False Alarm</option>
             </select>

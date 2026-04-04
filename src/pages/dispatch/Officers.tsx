@@ -427,7 +427,7 @@ export default function Officers() {
               color: 'var(--dispatch-border, #8b949e)',
             }}
           >
-            <p style={{ fontSize: '32px', margin: '0 0 12px 0' }}>ð®</p>
+            <p style={{ fontSize: '32px', margin: '0 0 12px 0' }}>👮</p>
             <p style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0' }}>No officers found</p>
             <p style={{ fontSize: '12px', margin: 0 }}>Add your first dispatcher to get started</p>
           </div>

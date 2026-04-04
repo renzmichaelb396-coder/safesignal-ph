@@ -151,11 +151,14 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'ACTIVE': return { bg: 'rgba(248, 81, 73, 0.15)', border: '#f85149', text: '#ff7675' };
-      case 'ACKNOWLEDGED': return { bg: 'rgba(255, 193, 7, 0.15)', border: '#ffc107', text: '#ffc107' };
-      case 'RESOLVED': return { bg: 'rgba(33, 150, 243, 0.15)', border: '#2196f3', text: '#42a5f5' };
-      case 'FALSE_ALARM': return { bg: 'rgba(156, 156, 156, 0.15)', border: '#9e9e9e', text: '#a0a0a0' };
-      default: return { bg: 'rgba(200, 200, 200, 0.1)', border: '#c0c0c0', text: '#c0c0c0' };
+      case 'ACTIVE':       return { bg: 'rgba(248, 81, 73, 0.15)',  border: '#f85149', text: '#ff7675' };
+      case 'ACKNOWLEDGED': return { bg: 'rgba(255, 193, 7, 0.15)',  border: '#ffc107', text: '#ffc107' };
+      case 'EN_ROUTE':     return { bg: 'rgba(14, 165, 233, 0.15)', border: '#0ea5e9', text: '#38bdf8' };
+      case 'ON_SCENE':     return { bg: 'rgba(249, 115, 22, 0.15)', border: '#f97316', text: '#fb923c' };
+      case 'RESOLVED':     return { bg: 'rgba(33, 150, 243, 0.15)', border: '#2196f3', text: '#42a5f5' };
+      case 'FALSE_ALARM':  return { bg: 'rgba(156, 156, 156, 0.15)',border: '#9e9e9e', text: '#a0a0a0' };
+      case 'CANCELLED':    return { bg: 'rgba(100, 100, 100, 0.12)',border: '#666',    text: '#888' };
+      default:             return { bg: 'rgba(200, 200, 200, 0.1)', border: '#c0c0c0', text: '#c0c0c0' };
     }
   };
 
@@ -246,6 +249,25 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
               <p style={{ margin: 0, fontSize: '10px', fontWeight: 600, color: trustColor, textTransform: 'uppercase' }}>Trust</p>
             </div>
           </div>
+
+          {/* Assigned Officer Card — shown whenever an officer is linked to this alert */}
+          {(alert as any).officer_name && (
+            <div style={{ padding: '14px 16px', backgroundColor: 'rgba(14,165,233,0.08)', borderRadius: '8px', border: '1px solid rgba(14,165,233,0.3)', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#0ea5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                {getInitials((alert as any).officer_name)}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#38bdf8' }}>🚔 Assigned Officer</p>
+                <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 600, color: '#e6edf3' }}>{(alert as any).officer_name}</p>
+                {(alert as any).officer_badge && (
+                  <p style={{ margin: '1px 0 0', fontSize: 11, color: '#8b949e' }}>Badge: {(alert as any).officer_badge}</p>
+                )}
+              </div>
+              <span style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(14,165,233,0.15)', color: '#38bdf8', border: '1px solid rgba(14,165,233,0.3)', whiteSpace: 'nowrap' }}>
+                {alert.status}
+              </span>
+            </div>
+          )}
 
           {/* Error Message */}
           {actionError && (

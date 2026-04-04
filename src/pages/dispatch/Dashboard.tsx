@@ -249,7 +249,7 @@ export default function Dashboard() {
       let size = 20;
       let pulseClass = '';
 
-      if (!["ACTIVE","ACKNOWLEDGED","EN_ROUTE","ON_SCENE"].includes(alert.status)) continue;
+      if (!['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(alert.status)) continue;
       if (alert.status === 'ACTIVE' && alert.is_suspicious) {
         color = '#f97316'; size = 24; pulseClass = 'pin-suspicious';
       } else if (alert.status === 'ACTIVE') {
@@ -293,7 +293,7 @@ export default function Dashboard() {
     if (!priorityAlert) {
       // No ACTIVE alert — find the most recent in-progress alert (EN_ROUTE, ON_SCENE, etc.)
       for (const alert of alertList) {
-        if (["ACKNOWLEDGED","EN_ROUTE","ON_SCENE"].includes(alert.status)) {
+        if (['ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(alert.status)) {
           if (!priorityAlert || alert.triggered_at > priorityAlert.triggered_at) priorityAlert = alert;
         }
       }
@@ -345,7 +345,7 @@ export default function Dashboard() {
     } catch {}
   };
 
-  const activeAlerts = alerts.filter(a => ["ACTIVE","ACKNOWLEDGED","EN_ROUTE","ON_SCENE"].includes(a.status));
+  const activeAlerts = alerts.filter(a => ['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(a.status));
 
   if (loading) return null; // Wait for auth context to restore from localStorage
   if (!officer) {
@@ -454,7 +454,7 @@ export default function Dashboard() {
                     <div className="flex items-start gap-3">
                       <div className="flex items-center justify-center rounded-full flex-shrink-0"
                         style={{ width: 36, height: 36,
-                          background: alert.status === 'ACTIVE' ? 'var(--sos-red)' : '#eab308',
+                          background: alert.status === 'ACTIVE' ? 'var(--sos-red)' : alert.status === 'ACKNOWLEDGED' ? '#eab308' : alert.status === 'EN_ROUTE' ? '#0ea5e9' : alert.status === 'ON_SCENE' ? '#f97316' : '#6b7280',
                           fontSize: 12, fontWeight: 700, color: '#fff' }}>
                         {getInitials(alert.full_name)}
                       </div>
@@ -491,6 +491,12 @@ export default function Dashboard() {
                             </span>
                           </div>
                         </div>
+                        {(alert as any).officer_name && (
+                          <div style={{ marginTop: 4, fontSize: 10, color: '#38bdf8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span>🚔</span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(alert as any).officer_name}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -501,8 +507,8 @@ export default function Dashboard() {
             {/* Stats bar */}
             <div className="p-3 grid grid-cols-3 gap-2" style={{ borderTop: '1px solid var(--dispatch-border)' }}>
               {[
-                { label: 'Active', value: alerts.filter(a => ["ACTIVE","ACKNOWLEDGED"].includes(a.status)).length, color: '#dc2626', bg: 'rgba(220,38,38,0.1)', icon: '🚨' },
-                { label: "En Route", value: alerts.filter(a => ["EN_ROUTE","ON_SCENE"].includes(a.status)).length, color: '#0ea5e9', bg: 'rgba(14,165,233,0.1)', icon: '🚔' },
+                { label: 'Active', value: alerts.filter(a => ['ACTIVE','ACKNOWLEDGED'].includes(a.status)).length, color: '#dc2626', bg: 'rgba(220,38,38,0.1)', icon: '🚨' },
+                { label: "En Route", value: alerts.filter(a => ['EN_ROUTE','ON_SCENE'].includes(a.status)).length, color: '#0ea5e9', bg: 'rgba(14,165,233,0.1)', icon: '🚔' },
                 { label: 'Today', value: alerts.filter(a => a.triggered_at > Date.now() - 86400000).length, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', icon: '📅' },
               ].map((s, i) => (
                 <div key={i} className="text-center p-2 rounded-lg"

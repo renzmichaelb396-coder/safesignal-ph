@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useLocation } from 'wouter';
 
 function officerFetch(path: string, options: RequestInit = {}) {
@@ -43,6 +43,8 @@ export default function OfficerDashboard() {
   const officerMarkerRef = useRef<any>(null);
   const officerLatLngRef = useRef<{lat: number; lng: number} | null>(null);
   const pendingCitizenRef = useRef<{lat: number; lng: number} | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const prevAssignmentIdRef = useRef<number | null>(null);
   const [toastMsg, setToastMsg] = useState('');
 
   useEffect(() => {
@@ -82,6 +84,33 @@ export default function OfficerDashboard() {
   }, []);
 
   function showToast(msg: string) { setToastMsg(msg); setTimeout(() => setToastMsg(''), 2500); }
+
+  // Urgent siren alert played when officer receives a new assignment
+  function playAssignmentAlert() {
+    try {
+      if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+      const ctx = audioCtxRef.current;
+      const playTone = (startTime: number, freqHigh: number, freqLow: number, dur: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freqHigh, startTime);
+        osc.frequency.linearRampToValueAtTime(freqLow, startTime + dur);
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.7, startTime + 0.02);
+        gain.gain.setValueAtTime(0.7, startTime + dur - 0.05);
+        gain.gain.linearRampToValueAtTime(0, startTime + dur);
+        osc.start(startTime); osc.stop(startTime + dur);
+      };
+      const t = ctx.currentTime;
+      // 4 cycles — louder and more urgent than dispatch beep
+      playTone(t,        1100, 700, 0.3);
+      playTone(t + 0.38, 1100, 700, 0.3);
+      playTone(t + 0.76, 1100, 700, 0.3);
+      playTone(t + 1.14, 1100, 700, 0.3);
+    } catch {}
+  }
 
   // Report officer's GPS location to dispatch + update own marker on map
   async function reportLocation() {
@@ -193,9 +222,21 @@ export default function OfficerDashboard() {
       if (res.status === 401) { setLocation('/dispatch/login'); return; }
       if (!res.ok) { setAssignment(null); setLoading(false); return; }
       const data = await res.json();
-      setAssignment(data.assignment || null);
+      const incoming = data.assignment || null;
+      // New assignment arrived — play urgent alert sound
+      if (incoming && prevAssignmentIdRef.current !== incoming.id) {
+        if (prevAssignmentIdRef.current !== null || !loading) {
+          // Only play if this isn't the very first load (avoid sound on page open)
+          playAssignmentAlert();
+          showToast('🚨 New Assignment Received!');
+        }
+        prevAssignmentIdRef.current = incoming.id;
+      } else if (!incoming) {
+        prevAssignmentIdRef.current = null;
+      }
+      setAssignment(incoming);
       setLoading(false);
-      if (data.assignment) updateMap(data.assignment.lat, data.assignment.lng);
+      if (incoming) updateMap(incoming.lat, incoming.lng);
     } catch {
       setAssignment(null);
       setLoading(false);
@@ -207,10 +248,24 @@ export default function OfficerDashboard() {
     const maplibregl = (window as any).maplibregl;
     mapInstanceRef.current.flyTo({ center: [lng, lat], zoom: 16 });
     if (markerRef.current) { markerRef.current.setLngLat([lng, lat]); } else {
-      const popup = new maplibregl.Popup({ offset: 28, closeOnClick: false }).setHTML(
+      const popup = new maplibregl.Popup({ offset: 36, closeOnClick: false, className: 'sos-popup' }).setHTML(
         '<div style="background:#7f0000;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.6);">🚨 SOS — Citizen Location</div>'
       );
-      markerRef.current = new maplibregl.Marker({ color: '#e63946' }).setLngLat([lng, lat]).setPopup(popup).addTo(mapInstanceRef.current);
+      // Pulsing red circle — matches dispatch dashboard citizen dot style
+      const sosEl = document.createElement('div');
+      sosEl.style.cssText = 'position:relative;width:44px;height:44px;';
+      sosEl.innerHTML = `
+        <style>
+          @keyframes sosPulseOfficer {
+            0%   { transform:translate(-50%,-50%) scale(0.4); opacity:1; }
+            100% { transform:translate(-50%,-50%) scale(2.2); opacity:0; }
+          }
+        </style>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;background:rgba(230,57,70,0.15);animation:sosPulseOfficer 1.6s ease-out infinite;"></div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;background:rgba(230,57,70,0.28);animation:sosPulseOfficer 1.6s ease-out infinite 0.4s;"></div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:#E63946;border:3px solid #fff;box-shadow:0 2px 10px rgba(230,57,70,0.8);"></div>
+      `;
+      markerRef.current = new maplibregl.Marker({ element: sosEl }).setLngLat([lng, lat]).setPopup(popup).addTo(mapInstanceRef.current);
       markerRef.current.togglePopup();
     }
   }
