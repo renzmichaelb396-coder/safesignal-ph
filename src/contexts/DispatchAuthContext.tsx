@@ -41,18 +41,15 @@ export function DispatchAuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY)
-      || localStorage.getItem('safesignal_officer_token');
-    const storedUser = localStorage.getItem(USER_KEY)
-      || localStorage.getItem('safesignal_officer_data');
+    // Only read from dispatch-specific keys — never fall back to officer keys.
+    // Officer sessions (safesignal_officer_token) must not bleed into dispatch auth.
+    const token = localStorage.getItem(TOKEN_KEY);
+    const storedUser = localStorage.getItem(USER_KEY);
 
     if (token && storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser) as OfficerUser;
         setOfficer(parsedUser);
-        localStorage.setItem(TOKEN_KEY, token);
-        localStorage.setItem(USER_KEY, storedUser);
-        localStorage.setItem('safesignal_officer_token', token);
       } catch {
         clearSession();
       }

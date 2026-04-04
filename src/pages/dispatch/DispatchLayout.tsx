@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useDispatchAuth } from '../../contexts/DispatchAuthContext';
 import { getInitials } from '../../lib/api';
@@ -23,7 +23,16 @@ const navLinks: NavLink[] = [
 
 export default function DispatchLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { officer, logout } = useDispatchAuth();
+  const { officer, loading, logout } = useDispatchAuth();
+
+  // Auth guard: redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !officer) {
+      window.location.href = '/dispatch/login';
+    }
+  }, [officer, loading]);
+
+  if (loading || !officer) return null;
 
   const officerRole = officer?.role || '';
   const officerName = officer?.full_name || (officer as any)?.name || 'User';
