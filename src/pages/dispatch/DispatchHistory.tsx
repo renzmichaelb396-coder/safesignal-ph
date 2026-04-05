@@ -21,7 +21,7 @@ export default function DispatchHistory() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'RESOLVED' | 'FALSE_ALARM'>('RESOLVED');
+  const [statusFilter, setStatusFilter] = useState<'RESOLVED' | 'FALSE_ALARM' | 'CANCELLED'>('RESOLVED');
   const [dateFilter, setDateFilter] = useState({
     start: getDefaultStartDate(),
     end: new Date().toISOString().split('T')[0],
@@ -36,6 +36,29 @@ export default function DispatchHistory() {
     date.setDate(date.getDate() - 30);
     return date.toISOString().split('T')[0];
   }
+
+  const handleExportCSV = async () => {
+    try {
+      const token = localStorage.getItem('dispatch_token');
+      const res = await fetch('/api/dispatch/alerts/export', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `safesignal-history-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('CSV export error:', err);
+    }
+  };
+
+  const handlePrint = () => window.print();
 
   const fetchHistory = async () => {
     try {
@@ -101,7 +124,21 @@ export default function DispatchHistory() {
 
   return (
     <DispatchLayout>
+    <style>{`
+      @media print {
+        body * { visibility: hidden; }
+        #history-print-area, #history-print-area * { visibility: visible; }
+        #history-print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 24px; background: #fff; color: #111; }
+        #history-print-area .print-hide { display: none !important; }
+        #history-print-area .print-show { display: block !important; }
+        #history-print-area table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        #history-print-area th, #history-print-area td { border: 1px solid #ccc; padding: 5px 8px; text-align: left; color: #111 !important; background: #fff !important; }
+        #history-print-area th { background: #f0f0f0 !important; font-weight: 700; }
+      }
+      .print-show { display: none; }
+    `}</style>
     <div
+      id="history-print-area"
       style={{
         flex: 1,
         display: 'flex',
@@ -110,23 +147,51 @@ export default function DispatchHistory() {
         color: '#e6edf3',
       }}
     >
+      {/* Print-only header */}
+      <div className="print-show" style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 18, fontWeight: 700 }}>SafeSignal PH — Alert History Report</div>
+        <div style={{ fontSize: 12, color: '#555', marginTop: 4 }}>
+          Pasay City Police Station &nbsp;|&nbsp; Generated: {new Date().toLocaleString('en-PH')} &nbsp;|&nbsp; Filter: {statusFilter}
+        </div>
+      </div>
+
       {/* Header */}
       <div
+        className="print-hide"
         style={{
           padding: '24px',
           borderBottom: '1px solid var(--dispatch-border, #30363d)',
         }}
       >
-        <h1 style={{ margin: '0 0 12px 0', fontSize: '24px', fontWeight: 600, color: 'var(--ph-gold, #ffc107)' }}>
-          Alert History
-        </h1>
-        <p style={{ margin: 0, fontSize: '13px', color: '#8b949e' }}>
-          {alerts.length} result{alerts.length !== 1 ? 's' : ''}
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h1 style={{ margin: '0 0 4px 0', fontSize: '24px', fontWeight: 600, color: 'var(--ph-gold, #ffc107)' }}>
+              Alert History
+            </h1>
+            <p style={{ margin: 0, fontSize: '13px', color: '#8b949e' }}>
+              {alerts.length} result{alerts.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleExportCSV}
+              style={{ padding: '8px 14px', fontSize: 12, fontWeight: 600, color: '#e6edf3', backgroundColor: '#161b22', border: '1px solid #30363d', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              ⬇ Export CSV
+            </button>
+            <button
+              onClick={handlePrint}
+              style={{ padding: '8px 14px', fontSize: 12, fontWeight: 600, color: '#0d1117', backgroundColor: 'var(--ph-gold, #ffc107)', border: 'none', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              🖨 Print / PDF
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Filters */}
       <div
+        className="print-hide"
         style={{
           padding: '16px 24px',
           borderBottom: '1px solid var(--dispatch-border, #30363d)',
@@ -153,7 +218,7 @@ export default function DispatchHistory() {
           </label>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as 'RESOLVED' | 'FALSE_ALARM')}
+            onChange={(e) => setStatusFilter(e.target.value as 'RESOLVED' | 'FALSE_ALARM' | 'CANCELLED')}
             style={{
               padding: '8px 12px',
               fontSize: '13px',
@@ -173,6 +238,7 @@ export default function DispatchHistory() {
           >
             <option value="RESOLVED">Resolved</option>
             <option value="FALSE_ALARM">False Alarm</option>
+            <option value="CANCELLED">Cancelled</option>
           </select>
         </div>
 

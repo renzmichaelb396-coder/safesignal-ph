@@ -46,6 +46,7 @@ export default function OfficerDashboard() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevAssignmentIdRef = useRef<number | null>(null);
   const [toastMsg, setToastMsg] = useState('');
+  const [soundArmed, setSoundArmed] = useState(false);
 
   useEffect(() => {
     if (assignment?.lat != null && assignment?.lng != null) {
@@ -90,6 +91,7 @@ export default function OfficerDashboard() {
     try {
       if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
       const ctx = audioCtxRef.current;
+      ctx.resume().catch(() => {}); // unblock browser autoplay policy
       const playTone = (startTime: number, freqHigh: number, freqLow: number, dur: number) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -318,7 +320,20 @@ export default function OfficerDashboard() {
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#ffc107' }}>{officerName}</div>
-            <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#8b949e', fontSize: 12, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Logout</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+              <button
+                onClick={() => {
+                  if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+                  audioCtxRef.current.resume().catch(() => {});
+                  setSoundArmed(true);
+                }}
+                title={soundArmed ? 'Alert sounds armed' : 'Tap to enable alert sounds'}
+                style={{ background: soundArmed ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', border: `1px solid ${soundArmed ? 'rgba(34,197,94,0.35)' : '#30363d'}`, borderRadius: 6, color: soundArmed ? '#22c55e' : '#6b7280', fontSize: 14, padding: '2px 8px', cursor: 'pointer', lineHeight: '1.6' }}
+              >
+                {soundArmed ? '🔔' : '🔕'}
+              </button>
+              <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#8b949e', fontSize: 12, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Logout</button>
+            </div>
           </div>
         </div>
       </div>

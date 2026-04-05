@@ -208,7 +208,15 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
         {/* Header with Avatar */}
         <div style={{ padding: '24px 24px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#ffc107', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 700, color: '#0d1117', flexShrink: 0 }}>
+            {(alert as any).photo_url ? (
+              <img
+                src={(alert as any).photo_url}
+                alt={alert.full_name}
+                onError={(e) => { const t = e.target as HTMLImageElement; t.style.display = 'none'; t.nextElementSibling && ((t.nextElementSibling as HTMLElement).style.display = 'flex'); }}
+                style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid #ffc107' }}
+              />
+            ) : null}
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#ffc107', display: (alert as any).photo_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 700, color: '#0d1117', flexShrink: 0 }}>
               {getInitials(alert.full_name)}
             </div>
             <div>

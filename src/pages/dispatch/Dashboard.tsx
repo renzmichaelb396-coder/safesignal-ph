@@ -23,6 +23,7 @@ export default function Dashboard() {
   const hasInitialLoadRef = useRef(false);
   // Only auto-zoom when the PRIORITY alert changes (new ID). After first zoom, user can pan/zoom freely.
   const autoZoomAlertIdRef = useRef<number | null>(null);
+  const [soundArmed, setSoundArmed] = useState(false);
 
   // Live timer + PST clock
   useEffect(() => {
@@ -315,10 +316,17 @@ export default function Dashboard() {
     }
   };
 
+  const armSound = () => {
+    if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+    audioCtxRef.current.resume().catch(() => {});
+    setSoundArmed(true);
+  };
+
   const playBeep = () => {
     try {
       if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
       const ctx = audioCtxRef.current;
+      ctx.resume().catch(() => {}); // ensure AudioContext not suspended by browser autoplay policy
       // Siren pattern: 3 urgent beeps — high-low sweep, then repeat twice more
       const playTone = (startTime: number, freqHigh: number, freqLow: number, duration: number) => {
         const osc = ctx.createOscillator();
@@ -406,10 +414,19 @@ export default function Dashboard() {
                     {activeAlerts.length}
                   </span>
                 </div>
-                <span className="px-2 py-0.5 rounded text-xs font-bold tracking-widest"
-                  style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.4)' }}>
-                  LIVE
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button
+                    onClick={armSound}
+                    title={soundArmed ? 'Alert sounds armed — click to re-arm' : 'Click to enable alert sounds'}
+                    style={{ background: soundArmed ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', border: `1px solid ${soundArmed ? 'rgba(34,197,94,0.35)' : '#30363d'}`, borderRadius: 6, color: soundArmed ? '#22c55e' : '#6b7280', fontSize: 14, padding: '2px 7px', cursor: 'pointer', lineHeight: '1.6' }}
+                  >
+                    {soundArmed ? '🔔' : '🔕'}
+                  </button>
+                  <span className="px-2 py-0.5 rounded text-xs font-bold tracking-widest"
+                    style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.4)' }}>
+                    LIVE
+                  </span>
+                </div>
               </div>
               {clock && (
                 <p style={{ color: '#6b7280', fontSize: 10, margin: '6px 0 0', fontFamily: 'monospace', letterSpacing: '0.03em' }}>
