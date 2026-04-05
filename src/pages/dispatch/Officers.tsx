@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dispatchApi, getInitials } from '../../lib/api';
 import DispatchLayout from './DispatchLayout';
+import { useDispatchAuth } from '../../contexts/DispatchAuthContext';
 
 interface Officer {
   id: string;
@@ -12,6 +13,8 @@ interface Officer {
 }
 
 export default function Officers() {
+  const { officer: currentOfficer } = useDispatchAuth();
+  const isAdmin = currentOfficer?.role === 'STATION_ADMIN';
   const [officers, setOfficers] = useState<Officer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -121,34 +124,32 @@ export default function Officers() {
             {officers.length} officer{officers.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          style={{
-            padding: '10px 16px',
-            fontSize: '13px',
-            fontWeight: 600,
-            color: '#0d1117',
-            backgroundColor: 'var(--ph-gold, #ffc107)',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            textTransform: 'uppercase',
-            whiteSpace: 'nowrap',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffb300';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--ph-gold, #ffc107)';
-          }}
-        >
-          {showAddForm ? 'Cancel' : 'Add Officer'}
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            style={{
+              padding: '10px 16px',
+              fontSize: '13px',
+              fontWeight: 600,
+              color: '#0d1117',
+              backgroundColor: 'var(--ph-gold, #ffc107)',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ffb300'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--ph-gold, #ffc107)'; }}
+          >
+            {showAddForm ? 'Cancel' : 'Add Officer'}
+          </button>
+        )}
       </div>
 
-      {/* Add Form */}
-      {showAddForm && (
+      {/* Add Form — STATION_ADMIN only */}
+      {showAddForm && isAdmin && (
         <form
           onSubmit={handleAddOfficer}
           style={{
@@ -540,36 +541,36 @@ export default function Officers() {
                       {!!officer.is_active ? 'Active' : 'Inactive'}
                     </div>
 
-                    <button
-                      onClick={() => handleToggleActive(officer.id, officer.is_active)}
-                      disabled={actionLoading === officer.id}
-                      style={{
-                        padding: '6px 12px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        color: '#e6edf3',
-                        backgroundColor: 'var(--dispatch-border, #30363d)',
-                        border: '1px solid var(--dispatch-border, #30363d)',
-                        borderRadius: '4px',
-                        cursor: actionLoading === officer.id ? 'not-allowed' : 'pointer',
-                        opacity: actionLoading === officer.id ? 0.6 : 1,
-                        transition: 'all 0.2s',
-                        textTransform: 'uppercase',
-                        whiteSpace: 'nowrap',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (actionLoading !== officer.id) {
-                          e.currentTarget.style.backgroundColor = 'var(--dispatch-border, #30363d)';
-                          e.currentTarget.style.borderColor = 'var(--ph-gold, #ffc107)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--dispatch-border, #30363d)';
-                        e.currentTarget.style.borderColor = 'var(--dispatch-border, #30363d)';
-                      }}
-                    >
-                      {actionLoading === officer.id ? '...' : !!officer.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleToggleActive(officer.id, officer.is_active)}
+                        disabled={actionLoading === officer.id}
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          color: '#e6edf3',
+                          backgroundColor: 'var(--dispatch-border, #30363d)',
+                          border: '1px solid var(--dispatch-border, #30363d)',
+                          borderRadius: '4px',
+                          cursor: actionLoading === officer.id ? 'not-allowed' : 'pointer',
+                          opacity: actionLoading === officer.id ? 0.6 : 1,
+                          transition: 'all 0.2s',
+                          textTransform: 'uppercase',
+                          whiteSpace: 'nowrap',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (actionLoading !== officer.id) {
+                            e.currentTarget.style.borderColor = 'var(--ph-gold, #ffc107)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--dispatch-border, #30363d)';
+                        }}
+                      >
+                        {actionLoading === officer.id ? '...' : !!officer.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    )}
                   </div>
                 </div>
               );

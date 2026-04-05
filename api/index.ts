@@ -428,7 +428,7 @@ app.post('/api/dispatch/citizens/:id/reset-strikes', requireOfficerAuth, async (
 // GET /api/dispatch/officers
 app.get('/api/dispatch/officers', requireOfficerAuth, async (_req: any, res: any) => {
   try {
-    const result = await pool.query(`SELECT o.*, s.name as station_name FROM officers o LEFT JOIN stations s ON o.station_id = s.id WHERE o.is_active = 1 ORDER BY o.created_at DESC`);
+    const result = await pool.query(`SELECT o.*, s.name as station_name FROM officers o LEFT JOIN stations s ON o.station_id = s.id ORDER BY o.created_at DESC`);
     res.json({ officers: result.rows.map((o: any) => { const r = { ...o }; delete r.password_hash; return r; }) });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch officers' }); }
 });
@@ -440,7 +440,7 @@ app.post('/api/dispatch/officers', requireAdminAuth, async (req: any, res: any) 
     if (!full_name || !email || !badge_number || !password || !role) { res.status(400).json({ error: 'All fields are required' }); return; }
     const stationResult = await pool.query('SELECT id FROM stations LIMIT 1');
     const passwordHash = await bcrypt.hash(password, 10);
-    const result = await pool.query(`INSERT INTO officers (full_name, email, badge_number, station_id, role, password_hash, is_active) VALUES ($1, $2, $3, $4, $5, $6, 1) RETURNING id`, [full_name, email, badge_number, stationResult.rows[0].id, role, passwordHash]);
+    const result = await pool.query(`INSERT INTO officers (full_name, email, badge_number, station_id, role, password_hash, is_active) VALUES ($1, $2, $3, $4, $5, $6, true) RETURNING id`, [full_name, email, badge_number, stationResult.rows[0].id, role, passwordHash]);
     res.status(201).json({ officer: { id: result.rows[0].id, full_name, email, badge_number, role } });
   } catch (err: any) {
     if (err.code === '23505') { res.status(409).json({ error: 'Email or badge number already exists' }); }
@@ -456,7 +456,7 @@ app.post('/api/dispatch/officers/:id/toggle-active', requireAdminAuth, async (re
     const officer = officerResult.rows[0];
     if (!officer) { res.status(404).json({ error: 'Officer not found' }); return; }
     if (officer.id === officerPayload.id) { res.status(400).json({ error: 'Cannot deactivate yourself' }); return; }
-    await pool.query('UPDATE officers SET is_active = $1 WHERE id = $2', [officer.is_active ? 0 : 1, officer.id]);
+    await pool.query('UPDATE officers SET is_active = $1 WHERE id = $2', [!officer.is_active, officer.id]);
     res.json({ success: true, is_active: !officer.is_active });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to toggle officer status' }); }
 });
