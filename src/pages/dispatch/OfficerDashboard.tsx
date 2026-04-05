@@ -45,6 +45,7 @@ export default function OfficerDashboard() {
   const pendingCitizenRef = useRef<{lat: number; lng: number} | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevAssignmentIdRef = useRef<number | null>(null);
+  const hasInitialLoadRef = useRef(false);
   const [toastMsg, setToastMsg] = useState('');
   const [soundArmed, setSoundArmed] = useState(false);
 
@@ -227,8 +228,8 @@ export default function OfficerDashboard() {
       const incoming = data.assignment || null;
       // New assignment arrived — play urgent alert sound
       if (incoming && prevAssignmentIdRef.current !== incoming.id) {
-        if (prevAssignmentIdRef.current !== null || !loading) {
-          // Only play if this isn't the very first load (avoid sound on page open)
+        if (hasInitialLoadRef.current) {
+          // Only play after first poll completes — avoids sound on page open
           playAssignmentAlert();
           showToast('🚨 New Assignment Received!');
         }
@@ -236,6 +237,7 @@ export default function OfficerDashboard() {
       } else if (!incoming) {
         prevAssignmentIdRef.current = null;
       }
+      hasInitialLoadRef.current = true;
       setAssignment(incoming);
       setLoading(false);
       if (incoming) updateMap(incoming.lat, incoming.lng);
