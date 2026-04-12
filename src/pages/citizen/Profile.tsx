@@ -56,8 +56,18 @@ export default function Profile() {
             background: '#1e4c8f',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 26, fontWeight: 700, color: '#fff', flexShrink: 0,
+            overflow: 'hidden',
           }}>
-            {getInitials(citizen.full_name)}
+            {citizen.photo_url ? (
+              <img
+                src={citizen.photo_url}
+                alt="Profile"
+                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : (
+              getInitials(citizen.full_name)
+            )}
           </div>
           <div>
             <h2 style={{ margin: '0 0 4px 0', fontSize: 18, fontWeight: 700 }}>{citizen.full_name}</h2>
