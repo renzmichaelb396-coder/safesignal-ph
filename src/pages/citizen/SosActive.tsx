@@ -81,9 +81,11 @@ export default function SosActive() {
                   position.coords.latitude,
                   position.coords.longitude,
                 );
-                if (mapInstance.current && markerRef.current) {
-                  markerRef.current.setLatLng([position.coords.latitude, position.coords.longitude]);
-                  mapInstance.current.setView([position.coords.latitude, position.coords.longitude], 15);
+                const newLat = position.coords.latitude;
+                const newLng = position.coords.longitude;
+                if (mapInstance.current && markerRef.current && newLat != null && newLng != null && !isNaN(newLat) && !isNaN(newLng)) {
+                  markerRef.current.setLatLng([newLat, newLng]);
+                  mapInstance.current.setView([newLat, newLng], 15);
                 }
               } catch (err) {
                 console.error('Failed to update location', err);

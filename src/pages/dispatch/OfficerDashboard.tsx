@@ -352,7 +352,7 @@ export default function OfficerDashboard() {
       }
       setAssignment(incoming);
       setLoading(false);
-      if (incoming) {
+      if (incoming && incoming.lat != null && incoming.lng != null) {
         // Only fly to SOS location the FIRST time this assignment ID appears (or on new assignment).
         // After that, user can freely zoom/pan — marker updates silently without re-zooming.
         const shouldFly = incoming.id !== hasZoomedToAssignmentRef.current;
@@ -366,6 +366,8 @@ export default function OfficerDashboard() {
   }
 
   function updateMap(lat: number, lng: number, flyTo: boolean = true) {
+    // Guard: skip if coordinates are null/undefined/NaN — avoids corrupting marker position
+    if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) return;
     if (!mapInstanceRef.current) { pendingCitizenRef.current = { lat, lng }; return; }
     const maplibregl = (window as any).maplibregl;
     // Only fly when explicitly requested (new assignment ID) — lets user zoom/pan freely after initial fly-in
