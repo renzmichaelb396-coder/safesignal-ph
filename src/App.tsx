@@ -14,6 +14,7 @@ import SosConfirm from "./pages/citizen/SosConfirm";
 import SosActive from "./pages/citizen/SosActive";
 import AlertHistory from "./pages/citizen/History";
 import Profile from "./pages/citizen/Profile";
+import ForgotPin from "./pages/citizen/ForgotPin";
 
 // Dispatch Pages
 import DispatchLogin from "./pages/dispatch/DispatchLogin";
@@ -52,6 +53,7 @@ function Router() {
       <Route path="/sos/active" component={SosActive} />
       <Route path="/history" component={AlertHistory} />
       <Route path="/profile" component={Profile} />
+      <Route path="/forgot-pin" component={ForgotPin} />
 
       {/* Dispatch Routes */}
       <Route path="/dispatch/login" component={DispatchLogin} />
