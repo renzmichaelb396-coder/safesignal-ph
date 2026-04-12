@@ -83,7 +83,7 @@ export default function Login() {
             <input
               type="password"
               style={inputStyle}
-              placeholder="\u2022\u2022\u2022\u2022"
+              placeholder="••••"
               value={pin}
               maxLength={4}
               onChange={e => setPin(e.target.value.replace(/\D/g, ''))}
