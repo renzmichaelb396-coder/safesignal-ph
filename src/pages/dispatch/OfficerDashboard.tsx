@@ -46,6 +46,8 @@ export default function OfficerDashboard() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevAssignmentIdRef = useRef<number | null>(null);
   const hasInitialLoadRef = useRef(false);
+  const alarmIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const soundArmedRef = useRef(false);
   const [toastMsg, setToastMsg] = useState('');
   const [soundArmed, setSoundArmed] = useState(false);
   const [dispositionNotes, setDispositionNotes] = useState('');
@@ -114,6 +116,16 @@ export default function OfficerDashboard() {
       playTone(t + 0.76, 1100, 700, 0.3);
       playTone(t + 1.14, 1100, 700, 0.3);
     } catch {}
+  }
+
+  function stopAlarmLoop() {
+    if (alarmIntervalRef.current !== null) { clearInterval(alarmIntervalRef.current); alarmIntervalRef.current = null; }
+  }
+
+  function startAlarmLoop() {
+    if (!soundArmedRef.current || alarmIntervalRef.current !== null) return;
+    playAssignmentAlert();
+    alarmIntervalRef.current = setInterval(() => { if (soundArmedRef.current) playAssignmentAlert(); }, 5500);
   }
 
   // Report officer's GPS location to dispatch + update own marker on map
@@ -227,16 +239,17 @@ export default function OfficerDashboard() {
       if (!res.ok) { setAssignment(null); setLoading(false); return; }
       const data = await res.json();
       const incoming = data.assignment || null;
-      // New assignment arrived — play urgent alert sound
       if (incoming && prevAssignmentIdRef.current !== incoming.id) {
-        if (hasInitialLoadRef.current) {
-          // Only play after first poll completes — avoids sound on page open
-          playAssignmentAlert();
-          showToast('🚨 New Assignment Received!');
-        }
+        if (hasInitialLoadRef.current) showToast('🚨 New Assignment Received!');
         prevAssignmentIdRef.current = incoming.id;
       } else if (!incoming) {
         prevAssignmentIdRef.current = null;
+      }
+      // Alarm loops while assignment is unacknowledged: ACTIVE = no dispatch ack, ACKNOWLEDGED = no officer ack
+      // Stops the moment officer taps EN_ROUTE (both sides have acknowledged)
+      if (hasInitialLoadRef.current) {
+        const needsAlarm = incoming && ['ACTIVE', 'ACKNOWLEDGED'].includes(incoming.status);
+        if (needsAlarm) startAlarmLoop(); else stopAlarmLoop();
       }
       hasInitialLoadRef.current = true;
       setAssignment(incoming);
@@ -329,6 +342,11 @@ export default function OfficerDashboard() {
                   if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
                   audioCtxRef.current.resume().catch(() => {});
                   setSoundArmed(true);
+                  soundArmedRef.current = true;
+                  // Start alarm immediately if there's already an unacknowledged assignment
+                  if (assignment && ['ACTIVE', 'ACKNOWLEDGED'].includes(assignment.status)) {
+                    setTimeout(startAlarmLoop, 100);
+                  }
                 }}
                 title={soundArmed ? 'Alert sounds armed' : 'Tap to enable alert sounds'}
                 style={{ background: soundArmed ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', border: `1px solid ${soundArmed ? 'rgba(34,197,94,0.35)' : '#30363d'}`, borderRadius: 6, color: soundArmed ? '#22c55e' : '#6b7280', fontSize: 14, padding: '2px 8px', cursor: 'pointer', lineHeight: '1.6' }}
