@@ -240,9 +240,27 @@ export default function Dashboard() {
         wrapper.appendChild(nameLabel);
         wrapper.title = ofc.full_name + ' · ' + ofc.badge_number;
 
+        // Click popup — shows full contact card for dispatcher to call
+        const phoneDisplay = ofc.phone ? `<a href="tel:${ofc.phone}" style="color:#93c5fd;font-weight:700;text-decoration:none;">${ofc.phone}</a>` : '<span style="color:#6b7280;font-style:italic">No phone on file</span>';
+        const dutyColor = ofc.duty_status === 'OFF_DUTY' ? '#f87171' : '#4ade80';
+        const dutyLabel = ofc.duty_status === 'OFF_DUTY' ? '🔴 Off Duty' : '🟢 On Duty';
+        const popup = new maplibregl.Popup({ offset: 52, closeButton: true, className: 'officer-popup' })
+          .setHTML(`
+            <div style="background:#0f172a;color:#f1f5f9;padding:12px 14px;border-radius:8px;min-width:180px;font-family:sans-serif;border:1px solid rgba(59,130,246,0.4);box-shadow:0 4px 20px rgba(0,0,0,0.8);">
+              <div style="font-size:13px;font-weight:800;margin-bottom:4px;">${ofc.full_name || 'Unknown'}</div>
+              <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">Badge: <b style="color:#e2e8f0">${ofc.badge_number}</b></div>
+              <div style="font-size:11px;margin-bottom:6px;">📞 ${phoneDisplay}</div>
+              <div style="font-size:11px;color:${dutyColor};font-weight:700;">${dutyLabel}</div>
+            </div>
+          `);
+
         const marker = new maplibregl.Marker({ element: wrapper })
           .setLngLat([ofc.lng, ofc.lat])
+          .setPopup(popup)
           .addTo(leafletMapRef.current);
+
+        // Open popup on click
+        wrapper.addEventListener('click', () => marker.togglePopup());
         officerMarkersRef.current.set(ofc.officer_id, marker);
       }
     }

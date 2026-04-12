@@ -1136,7 +1136,7 @@ app.get('/api/dispatch/officer-locations', requireOfficerAuth, async (_req: any,
     const fiveMinAgo = Date.now() - 5 * 60 * 1000;
     const result = await pool.query(
       `SELECT ol.officer_id, ol.lat, ol.lng, ol.heading, ol.status, ol.updated_at,
-              o.full_name, o.badge_number, o.role
+              o.full_name, o.badge_number, o.role, o.phone, o.duty_status
        FROM officer_locations ol
        JOIN officers o ON ol.officer_id = o.id
        WHERE ol.updated_at > $1
