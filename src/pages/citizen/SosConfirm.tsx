@@ -3,6 +3,26 @@ import { useLocation } from 'wouter';
 import { useCitizenAuth } from '../../hooks/useCitizenAuth';
 import { citizenApi } from '../../lib/api';
 
+function compressImage(file: File, maxPx: number, quality: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('Canvas error')); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 export default function SosConfirm() {
   const [, navigate] = useLocation();
   const { user, loading: authLoading } = useCitizenAuth();
@@ -12,6 +32,8 @@ export default function SosConfirm() {
   const [countdown, setCountdown] = useState(5);
   const [showCountdown, setShowCountdown] = useState(false);
   const [geoError, setGeoError] = useState('');
+  const [incidentPhoto, setIncidentPhoto] = useState<string | null>(null);
+  const [photoCompressing, setPhotoCompressing] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -50,6 +72,20 @@ export default function SosConfirm() {
     });
   };
 
+  const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoCompressing(true);
+    try {
+      const compressed = await compressImage(file, 800, 0.7);
+      setIncidentPhoto(compressed);
+    } catch {
+      setIncidentPhoto(null);
+    } finally {
+      setPhotoCompressing(false);
+    }
+  };
+
   const handleNumpadClick = (digit: string) => {
     if (pin.length < 4) setPin(pin + digit);
   };
@@ -68,7 +104,9 @@ export default function SosConfirm() {
     setGeoError('');
 
     const sendSos = async (lat: number, lng: number, accuracy: number) => {
-      const data = await citizenApi.sendSos({ pin, lat, lng, accuracy });
+      const body: any = { pin, lat, lng, accuracy };
+      if (incidentPhoto) body.incident_photo = incidentPhoto;
+      const data = await citizenApi.sendSos(body);
       localStorage.setItem('active_sos_id', String((data as any).alert?.id || (data as any).sos_id || ''));
       setShowCountdown(true);
     };
@@ -156,6 +194,40 @@ export default function SosConfirm() {
             {error}
           </div>
         )}
+
+        {/* Optional Incident Photo */}
+        <div className="w-full mt-3">
+          <label htmlFor="incident-photo" style={{ display: 'block', cursor: 'pointer' }}>
+            {incidentPhoto ? (
+              <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '2px solid rgba(255,193,7,0.5)' }}>
+                <img src={incidentPhoto} alt="Incident" style={{ width: '100%', maxHeight: 120, objectFit: 'cover', display: 'block' }} />
+                <div style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.6)', borderRadius: 20, padding: '2px 8px', fontSize: 11, color: '#ffc107' }}>📷 Photo added</div>
+              </div>
+            ) : (
+              <div style={{ padding: '10px 14px', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>
+                <span style={{ fontSize: 20 }}>📷</span>
+                <span>{photoCompressing ? 'Compressing photo...' : 'Optional: Add incident photo'}</span>
+              </div>
+            )}
+          </label>
+          <input
+            id="incident-photo"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handlePhotoCapture}
+            disabled={loading || photoCompressing}
+            style={{ display: 'none' }}
+          />
+          {incidentPhoto && (
+            <button
+              onClick={() => setIncidentPhoto(null)}
+              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 11, cursor: 'pointer', marginTop: 4 }}
+            >
+              Remove photo
+            </button>
+          )}
+        </div>
 
         {/* PIN Dots */}
         <div className="flex gap-4 justify-center mt-4">

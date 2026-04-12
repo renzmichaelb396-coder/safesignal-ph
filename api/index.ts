@@ -77,6 +77,7 @@ async function initDb(): Promise<void> {
     await pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS heading FLOAT`);
     await pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ON_DUTY'`);
     await pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS updated_at BIGINT`);
+    await pool.query(`ALTER TABLE sos_alerts ADD COLUMN IF NOT EXISTS incident_photo TEXT`);
     const stationResult = await pool.query(`
       INSERT INTO stations (name, barangay, latitude, longitude, contact_number)
       VALUES ($1, $2, $3, $4, $5)
@@ -428,7 +429,7 @@ app.post('/api/dispatch/citizens/:id/reset-strikes', requireOfficerAuth, async (
 // GET /api/dispatch/officers
 app.get('/api/dispatch/officers', requireOfficerAuth, async (_req: any, res: any) => {
   try {
-    const result = await pool.query(`SELECT o.*, s.name as station_name FROM officers o LEFT JOIN stations s ON o.station_id = s.id ORDER BY o.created_at DESC`);
+    const result = await pool.query(`SELECT o.*, s.name as station_name, ol.lat as officer_lat, ol.lng as officer_lng, ol.status as duty_status, ol.updated_at as location_updated_at FROM officers o LEFT JOIN stations s ON o.station_id = s.id LEFT JOIN officer_locations ol ON ol.officer_id = o.id ORDER BY o.created_at DESC`);
     res.json({ officers: result.rows.map((o: any) => { const r = { ...o }; delete r.password_hash; return r; }) });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch officers' }); }
 });
@@ -492,6 +493,44 @@ app.get('/api/dispatch/stats', requireOfficerAuth, async (req: any, res: any) =>
     const avgMinutes = avgMs != null && avgMs > 0 ? Math.round((avgMs / 60000) * 10) / 10 : null;
     res.json({ stats: { total, active: statusCounts['ACTIVE'] || 0, acknowledged: statusCounts['ACKNOWLEDGED'] || 0, resolved: statusCounts['RESOLVED'] || 0, false_alarms: fa, cancelled: statusCounts['CANCELLED'] || 0, false_alarm_rate: total > 0 ? Math.round((fa / total) * 100) : 0, avg_response_minutes: avgMinutes, today_count: parseInt(todayCount.rows[0].c, 10) } });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch stats' }); }
+});
+
+// GET /api/dispatch/reports — real weekly/monthly grouping from DB
+app.get('/api/dispatch/reports', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const groupBy = (req.query.groupBy as string) === 'month' ? 'month' : 'week';
+    const periodParam = req.query.period as string;
+    const cutoff = periodParam === '30d' ? Date.now() - 30 * 24 * 60 * 60 * 1000
+      : periodParam === 'all' ? 0
+      : Date.now() - 90 * 24 * 60 * 60 * 1000;
+    const result = await pool.query(`
+      SELECT
+        DATE_TRUNC($1, to_timestamp(triggered_at / 1000.0) AT TIME ZONE 'Asia/Manila') AS period_start,
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE status = 'RESOLVED')::int AS resolved,
+        COUNT(*) FILTER (WHERE status = 'FALSE_ALARM')::int AS false_alarms,
+        COUNT(*) FILTER (WHERE status = 'CANCELLED')::int AS cancelled,
+        AVG(CASE WHEN acknowledged_at IS NOT NULL AND triggered_at IS NOT NULL
+            THEN (acknowledged_at - triggered_at) / 60000.0 END) AS avg_response_min
+      FROM sos_alerts
+      WHERE triggered_at >= $2
+      GROUP BY period_start
+      ORDER BY period_start DESC
+      LIMIT 12
+    `, [groupBy, cutoff]);
+    const reports = result.rows.map((r: any) => ({
+      period_start: r.period_start,
+      label: groupBy === 'month'
+        ? new Date(r.period_start).toLocaleDateString('en-PH', { month: 'short', year: 'numeric', timeZone: 'Asia/Manila' })
+        : 'Wk ' + new Date(r.period_start).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' }),
+      total: r.total,
+      resolved: r.resolved,
+      false_alarms: r.false_alarms,
+      cancelled: r.cancelled,
+      avg_response_min: r.avg_response_min != null ? Math.round(parseFloat(r.avg_response_min) * 10) / 10 : null,
+    }));
+    res.json({ reports });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch reports' }); }
 });
 
 // GET /api/dispatch/settings
@@ -602,7 +641,7 @@ app.post('/api/citizen/verify-pin', requireCitizenAuth, async (req: any, res: an
 app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
   try {
     const cp = req.citizen as CitizenPayload;
-    const { lat, lng, accuracy, pin } = req.body;
+    const { lat, lng, accuracy, pin, incident_photo } = req.body;
     if (!lat || !lng || !pin) { res.status(400).json({ error: 'lat, lng, and pin are required' }); return; }
     const citizenResult = await pool.query('SELECT * FROM citizens WHERE id = $1', [cp.id]);
     const citizen = citizenResult.rows[0];
@@ -620,7 +659,7 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
     const activeAlert = await pool.query(`SELECT id FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE')`, [cp.id]);
     if (activeAlert.rows.length > 0) { res.status(409).json({ error: 'You already have an active alert', alert_id: activeAlert.rows[0].id }); return; }
     const now = Date.now();
-    const result = await pool.query(`INSERT INTO sos_alerts (citizen_id, lat, lng, status, triggered_at, location_accuracy) VALUES ($1, $2, $3, 'ACTIVE', $4, $5) RETURNING id`, [cp.id, lat, lng, now, accuracy || null]);
+    const result = await pool.query(`INSERT INTO sos_alerts (citizen_id, lat, lng, status, triggered_at, location_accuracy, incident_photo) VALUES ($1, $2, $3, 'ACTIVE', $4, $5, $6) RETURNING id`, [cp.id, lat, lng, now, accuracy || null, incident_photo || null]);
     const alertId = result.rows[0].id;
     await pool.query(`INSERT INTO alert_location_history (alert_id, lat, lng, recorded_at) VALUES ($1, $2, $3, $4)`, [alertId, lat, lng, now]);
     await pool.query(`UPDATE citizen_trust_scores SET total_alerts = total_alerts + 1, last_updated = $1 WHERE citizen_id = $2`, [now, cp.id]);

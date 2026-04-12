@@ -94,6 +94,7 @@ export const dispatchApi = {
   addOfficer: (body) => request('/api/dispatch/officers', { method: 'POST', body: JSON.stringify(body) }, 'officer'),
   toggleOfficerActive: (id) => request(`/api/dispatch/officers/${id}/toggle-active`, { method: 'POST' }, 'officer'),
   getStats: (query = '') => request('/api/dispatch/stats' + query, {}, 'officer'),
+  getReports: (query = '') => request('/api/dispatch/reports' + query, {}, 'officer'),
   getSettings: () => request('/api/dispatch/settings', {}, 'officer'),
   updateSettings: (body) => request('/api/dispatch/settings', { method: 'PUT', body: JSON.stringify(body) }, 'officer'),
 };

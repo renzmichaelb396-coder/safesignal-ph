@@ -54,7 +54,19 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
 
   useEffect(() => {
     dispatchApi.getOfficers().then((data: any) => {
-      setOfficers(data.officers || []);
+      const list = data.officers || [];
+      // Sort by distance from alert location — nearest duty officer first
+      if (alert.location) {
+        list.sort((a: any, b: any) => {
+          const aDist = a.officer_lat != null ? haversineKm(alert.location!.lat, alert.location!.lng, a.officer_lat, a.officer_lng) : Infinity;
+          const bDist = b.officer_lat != null ? haversineKm(alert.location!.lat, alert.location!.lng, b.officer_lat, b.officer_lng) : Infinity;
+          return aDist - bDist;
+        });
+        // Auto-select the nearest officer who has GPS
+        const nearest = list.find((o: any) => o.officer_lat != null && o.is_active && o.role === 'OFFICER');
+        if (nearest && !selectedOfficerId) setSelectedOfficerId(String(nearest.id));
+      }
+      setOfficers(list);
     }).catch(() => {});
   }, []);
 
@@ -335,6 +347,27 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
             )}
           </div>
 
+          {/* Incident Photo from Citizen */}
+          {(alert as any).incident_photo && (
+            <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid #30363d' }}>
+              <p style={{ margin: 0, padding: '8px 12px', fontSize: '10px', fontWeight: 600, color: '#8b949e', textTransform: 'uppercase', background: '#0d1117', letterSpacing: '0.5px' }}>📷 Incident Photo</p>
+              <img
+                src={(alert as any).incident_photo}
+                alt="Incident"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                style={{ width: '100%', maxHeight: '240px', objectFit: 'cover', display: 'block' }}
+              />
+            </div>
+          )}
+
+          {/* Responder Disposition Notes */}
+          {(alert as any).notes && (
+            <div style={{ padding: '14px 16px', backgroundColor: 'rgba(63,185,80,0.06)', borderRadius: '8px', border: '1px solid rgba(63,185,80,0.3)' }}>
+              <p style={{ margin: '0 0 6px', fontSize: '10px', fontWeight: 600, color: '#3fb950', textTransform: 'uppercase', letterSpacing: '0.5px' }}>✅ Responder Disposition / Action Taken</p>
+              <p style={{ margin: 0, fontSize: '13px', color: '#e6edf3', lineHeight: 1.6 }}>{(alert as any).notes}</p>
+            </div>
+          )}
+
           {/* Embedded Map */}
           {alert.location && (
             <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid #30363d', height: '180px' }}>
@@ -353,13 +386,37 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
           {/* ASSIGN OFFICER */}
           {(alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED') && (
             <div style={{ padding: '16px', backgroundColor: '#0d1117', borderRadius: '8px', border: '1px solid #30363d' }}>
+              {/* Nearest Officer Recommendation */}
+              {(() => {
+                const nearest = officers.find((o: any) => o.officer_lat != null && o.is_active && o.role === 'OFFICER');
+                if (!nearest || !alert.location) return null;
+                const dist = haversineKm(alert.location.lat, alert.location.lng, nearest.officer_lat, nearest.officer_lng);
+                return (
+                  <div style={{ padding: '10px 12px', marginBottom: 12, backgroundColor: 'rgba(59,130,246,0.08)', borderRadius: '6px', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>📍</span>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#58a6ff' }}>NEAREST ON-DUTY OFFICER</p>
+                      <p style={{ margin: '2px 0 0', fontSize: 13, color: '#e6edf3', fontWeight: 600 }}>{nearest.full_name} · {nearest.badge_number}</p>
+                      <p style={{ margin: '1px 0 0', fontSize: 11, color: '#8b949e' }}>{dist.toFixed(2)} km from SOS location</p>
+                    </div>
+                  </div>
+                );
+              })()}
               <p style={{ margin: '0 0 12px', fontSize: '11px', fontWeight: 700, color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assign Officer</p>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <select value={selectedOfficerId} onChange={(e) => setSelectedOfficerId(e.target.value)} style={{ flex: 1, padding: '10px 12px', fontSize: '13px', backgroundColor: '#161b22', border: '1px solid #30363d', borderRadius: '6px', color: '#e6edf3', cursor: 'pointer' }}>
                   <option value="">{'\u2014'} Select officer {'\u2014'}</option>
-                  {officers.map((o: any) => (
-                    <option key={o.id} value={o.id}>{o.full_name} ({o.badge_number})</option>
-                  ))}
+                  {officers.map((o: any, i: number) => {
+                    const dist = alert.location && o.officer_lat != null
+                      ? haversineKm(alert.location.lat, alert.location.lng, o.officer_lat, o.officer_lng)
+                      : null;
+                    const isNearest = i === 0 && dist != null;
+                    return (
+                      <option key={o.id} value={o.id}>
+                        {isNearest ? '\uD83D\uDCCD ' : ''}{o.full_name} ({o.badge_number}){dist != null ? ` — ${dist.toFixed(2)}km` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
                 <button onClick={handleAssignOfficer} disabled={!selectedOfficerId || actionLoading} style={{ padding: '10px 20px', fontSize: '12px', fontWeight: 600, color: '#161b22', backgroundColor: '#ffc107', border: 'none', borderRadius: '6px', cursor: !selectedOfficerId || actionLoading ? 'not-allowed' : 'pointer', opacity: !selectedOfficerId || actionLoading ? 0.5 : 1, whiteSpace: 'nowrap' }}>Assign</button>
               </div>

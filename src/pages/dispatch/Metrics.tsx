@@ -15,6 +15,8 @@ export default function Metrics() {
   const [customEnd, setCustomEnd] = useState(new Date().toISOString().split('T')[0]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [reports, setReports] = useState<any[]>([]);
+  const [groupBy, setGroupBy] = useState<'week' | 'month'>('week');
 
   useEffect(() => {
     if (authLoading) return;
@@ -23,11 +25,18 @@ export default function Metrics() {
     const query = period === 'custom'
       ? `?period=custom&start=${customStart}&end=${customEnd}`
       : `?period=${period}`;
-    dispatchApi.getStats(query)
-      .then(data => setStats(data.stats || data))
+    const reportPeriod = period === '30d' ? '30d' : period === 'pilot' ? 'all' : '90d';
+    Promise.all([
+      dispatchApi.getStats(query),
+      dispatchApi.getReports(`?groupBy=${groupBy}&period=${reportPeriod}`),
+    ])
+      .then(([statsData, reportsData]: any[]) => {
+        setStats(statsData.stats || statsData);
+        setReports((reportsData.reports || []).reverse());
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [officer, authLoading, period, customStart, customEnd]);
+  }, [officer, authLoading, period, customStart, customEnd, groupBy]);
 
   if (authLoading) return null;
 
@@ -39,20 +48,24 @@ export default function Metrics() {
   const resolutionRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
   const avgResponseMin = stats?.avg_response_minutes ?? null;
 
-  // Build fake weekly volume data from stats if not provided
-  const weeklyData: { week: string; count: number }[] = stats?.weekly_volume || [
-    { week: 'Wk 1', count: Math.max(1, Math.floor(total * 0.18)) },
-    { week: 'Wk 2', count: Math.max(1, Math.floor(total * 0.22)) },
-    { week: 'Wk 3', count: Math.max(1, Math.floor(total * 0.31)) },
-    { week: 'Wk 4', count: Math.max(1, Math.floor(total * 0.29)) },
-  ];
+  // Real data from /api/dispatch/reports (weekly or monthly from DB)
+  const weeklyData: { week: string; count: number }[] = reports.length > 0
+    ? reports.map(r => ({ week: r.label, count: r.total }))
+    : [
+      { week: 'Wk 1', count: Math.max(1, Math.floor(total * 0.18)) },
+      { week: 'Wk 2', count: Math.max(1, Math.floor(total * 0.22)) },
+      { week: 'Wk 3', count: Math.max(1, Math.floor(total * 0.31)) },
+      { week: 'Wk 4', count: Math.max(1, Math.floor(total * 0.29)) },
+    ];
 
-  const responseTrend: { label: string; minutes: number }[] = stats?.response_trend || [
-    { label: 'Wk 1', minutes: 8.4 },
-    { label: 'Wk 2', minutes: 7.1 },
-    { label: 'Wk 3', minutes: 6.2 },
-    { label: 'Wk 4', minutes: avgResponseMin ?? 5.5 },
-  ];
+  const responseTrend: { label: string; minutes: number }[] = reports.length > 0
+    ? reports.filter(r => r.avg_response_min != null).map(r => ({ label: r.label, minutes: r.avg_response_min }))
+    : [
+      { label: 'Wk 1', minutes: 8.4 },
+      { label: 'Wk 2', minutes: 7.1 },
+      { label: 'Wk 3', minutes: 6.2 },
+      { label: 'Wk 4', minutes: avgResponseMin ?? 5.5 },
+    ];
 
   const maxWeekly = Math.max(...weeklyData.map(w => w.count), 1);
   const maxResponse = Math.max(...responseTrend.map(r => r.minutes), 1);
@@ -85,7 +98,30 @@ export default function Metrics() {
         </div>
 
         <div style={{ padding: '20px 24px' }}>
-          {/* Period Selector */}
+          {/* Period + GroupBy selectors */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            {(['week', 'month'] as const).map(g => (
+              <button
+                key={g}
+                onClick={() => setGroupBy(g)}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 20,
+                  border: '1px solid transparent',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background: groupBy === g ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.05)',
+                  color: groupBy === g ? '#58a6ff' : '#8b949e',
+                  transition: 'all 0.15s',
+                  textTransform: 'uppercase' as const,
+                  letterSpacing: 0.5,
+                }}
+              >
+                {g === 'week' ? 'Weekly' : 'Monthly'}
+              </button>
+            ))}
+          </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
             {periods.map(({ val, label }) => (
               <button
@@ -290,7 +326,7 @@ export default function Metrics() {
                   }}
                 >
                   <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 600, color: '#e6edf3' }}>
-                    Alert Volume by Week
+                    Alert Volume by {groupBy === 'month' ? 'Month' : 'Week'}
                   </h3>
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, height: 80 }}>
                     {weeklyData.map((w, i) => (
@@ -311,10 +347,46 @@ export default function Metrics() {
                     ))}
                   </div>
                   <div style={{ marginTop: 10, fontSize: 10, color: '#8b949e' }}>
-                    📅 Weekly SOS alert distribution
+                    📅 {groupBy === 'month' ? 'Monthly' : 'Weekly'} SOS alert distribution {reports.length > 0 ? '(live DB data)' : '(estimated)'}
                   </div>
                 </div>
               </div>
+              {/* Consolidated Report Table */}
+              {reports.length > 0 && (
+                <div style={{ marginTop: 20, background: '#161b22', border: '1px solid #30363d', borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ padding: '14px 20px', borderBottom: '1px solid #30363d', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#e6edf3' }}>
+                      📋 Consolidated Report — {groupBy === 'month' ? 'Monthly' : 'Weekly'} Breakdown
+                    </h3>
+                    <span style={{ fontSize: 10, color: '#8b949e', fontStyle: 'italic' }}>Live database data</span>
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ background: '#0d1117' }}>
+                          {['Period', 'Total SOS', 'Resolved', 'False Alarms', 'Cancelled', 'Avg Response'].map(h => (
+                            <th key={h} style={{ padding: '10px 14px', textAlign: 'left', color: '#8b949e', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: '1px solid #30363d' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...reports].reverse().map((r, i) => (
+                          <tr key={i} style={{ borderBottom: '1px solid #21262d' }}>
+                            <td style={{ padding: '10px 14px', color: '#e6edf3', fontWeight: 600 }}>{r.label}</td>
+                            <td style={{ padding: '10px 14px', color: '#e6edf3' }}>{r.total}</td>
+                            <td style={{ padding: '10px 14px', color: '#3fb950' }}>{r.resolved}</td>
+                            <td style={{ padding: '10px 14px', color: '#8b949e' }}>{r.false_alarms}</td>
+                            <td style={{ padding: '10px 14px', color: '#8b949e' }}>{r.cancelled}</td>
+                            <td style={{ padding: '10px 14px', color: r.avg_response_min != null && r.avg_response_min < 8 ? '#3fb950' : '#ffc107' }}>
+                              {r.avg_response_min != null ? `${r.avg_response_min}m` : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
