@@ -7,14 +7,6 @@ export default function Landing() {
       className="citizen-container flex flex-col items-center justify-between min-h-screen px-6 py-10"
       style={{ background: 'var(--citizen-bg)' }}
     >
-      {/* Header */}
-      <div className="w-full flex justify-center items-center relative">
-        <span style={{ color: 'var(--ph-gold)', fontSize: '12px', fontWeight: 600 }}>
-          PASAY CITY POLICE STATION
-        </span>
-        <span style={{ color: '#666', fontSize: '11px', position: 'absolute', right: 0 }}>v1.0</span>
-      </div>
-
       {/* Logo and Branding */}
       <div className="flex flex-col items-center text-center gap-6">
         {/* Pasay Police Badge */}
