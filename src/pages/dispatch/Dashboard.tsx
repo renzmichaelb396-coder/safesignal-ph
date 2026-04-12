@@ -80,9 +80,16 @@ export default function Dashboard() {
 
       leafletMapRef.current = new maplibregl.Map({
         container: mapRef.current!,
-        style: `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${import.meta.env.VITE_MAPTILER_KEY || 'demo'}`,
+        style: 'https://tiles.openfreemap.org/styles/liberty',
         center: [120.9932, 14.5378],
         zoom: 14,
+      });
+
+      // Dark mode: invert canvas only — markers in overlay div stay normal
+      leafletMapRef.current.on('load', () => {
+        const canvas = leafletMapRef.current!.getCanvas();
+        canvas.style.filter = 'invert(1) hue-rotate(180deg)';
+        canvas.style.borderRadius = 'inherit';
       });
 
       // Station marker

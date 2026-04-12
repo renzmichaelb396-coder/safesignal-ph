@@ -138,14 +138,17 @@ export default function SosActive() {
       const lng = sosStatus?.lng || 120.9749;
       const map = window.L.map(mapRef.current).setView([lat, lng], 15);
 
-      // MapTiler Streets Dark @2x — Waze-style dark map with landmarks and readable labels
-      const mtKey = (window as any).__MAPTILER_KEY__ || 'demo';
-      window.L.tileLayer(`https://api.maptiler.com/maps/streets-v2-dark/{z}/{x}/{y}@2x.png?key=${mtKey}`, {
-        attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      // OpenFreeMap Voyager @2x + dark mode via tile pane CSS inversion — no API key needed
+      window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
         maxZoom: 19,
         tileSize: 512,
         zoomOffset: -1,
       }).addTo(map);
+      // Dark mode: invert tile layer only, markers stay normal
+      const tilePaneEl = map.getPanes().tilePane as HTMLElement;
+      if (tilePaneEl) tilePaneEl.style.filter = 'invert(1) hue-rotate(180deg)';
 
       // Pulsing RED location pin — citizen dot (matches dispatch view RED color)
       const pulseIcon = window.L.divIcon({

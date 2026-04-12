@@ -300,12 +300,16 @@ export default function OfficerDashboard() {
         const PASAY_CENTER: [number, number] = [120.9982, 14.5378];
         mapInstanceRef.current = new maplibregl.Map({
           container: mapRef.current,
-          style: `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${import.meta.env.VITE_MAPTILER_KEY || 'demo'}`,
+          style: 'https://tiles.openfreemap.org/styles/liberty',
           center: PASAY_CENTER,
           zoom: 14,
         });
         // Place the blue dot immediately once the map is ready
         mapInstanceRef.current.on('load', () => {
+          // Dark mode: invert canvas only — markers in overlay stay normal
+          const canvas = mapInstanceRef.current!.getCanvas();
+          canvas.style.filter = 'invert(1) hue-rotate(180deg)';
+          canvas.style.borderRadius = 'inherit';
           reportLocation();
           if (pendingCitizenRef.current) { const { lat, lng } = pendingCitizenRef.current; pendingCitizenRef.current = null; updateMap(lat, lng); }
         });
