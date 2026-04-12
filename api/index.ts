@@ -81,6 +81,9 @@ async function initDb(): Promise<void> {
     await pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_number TEXT`);
     await pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_photo TEXT`);
     await pool.query(`ALTER TABLE sos_alerts ADD COLUMN IF NOT EXISTS incident_photo TEXT`);
+    // Migrate is_suspended / verified from INTEGER to BOOLEAN if needed (idempotent)
+    await pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='citizens' AND column_name='is_suspended' AND data_type='integer') THEN ALTER TABLE citizens ALTER COLUMN is_suspended TYPE BOOLEAN USING (is_suspended::integer != 0); END IF; END $$`);
+    await pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='citizens' AND column_name='verified' AND data_type='integer') THEN ALTER TABLE citizens ALTER COLUMN verified TYPE BOOLEAN USING (verified::integer != 0); END IF; END $$`);
     // Performance indexes — make every query on sos_alerts fast even at scale
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_status ON sos_alerts(status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_triggered ON sos_alerts(triggered_at)`);
@@ -503,7 +506,7 @@ app.get('/api/dispatch/stats', requireOfficerAuth, async (req: any, res: any) =>
       pool.query(`SELECT status, COUNT(*) as c FROM sos_alerts ${whereClause} GROUP BY status`, params),
       pool.query(`SELECT AVG(acknowledged_at - triggered_at) as avg_ms FROM sos_alerts ${whereClause} AND acknowledged_at IS NOT NULL`, params),
       pool.query('SELECT COUNT(*) as c FROM sos_alerts WHERE triggered_at >= $1', [todayStart.getTime()]),
-      pool.query('SELECT COUNT(*) as c FROM citizens WHERE is_suspended = false'),
+      pool.query('SELECT COUNT(*) as c FROM citizens WHERE COALESCE(is_suspended::boolean, false) = false'),
     ]);
     const statusCounts: Record<string, number> = {};
     let total = 0;
