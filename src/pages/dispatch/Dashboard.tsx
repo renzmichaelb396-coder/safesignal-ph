@@ -21,6 +21,8 @@ export default function Dashboard() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevAlertIdsRef = useRef<Set<number>>(new Set());
   const hasInitialLoadRef = useRef(false);
+  const alarmIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const soundArmedRef = useRef(false);
   // Only auto-zoom when the PRIORITY alert changes (new ID). After first zoom, user can pan/zoom freely.
   const autoZoomAlertIdRef = useRef<number | null>(null);
   const [soundArmed, setSoundArmed] = useState(false);
@@ -116,22 +118,16 @@ export default function Dashboard() {
       try {
         const data: any = await dispatchApi.getAlerts();
         const incoming = data.alerts || [];
-        React.startTransition(() => {
-          setAlerts(prev => {
-            // Detect new alerts by comparing IDs
-            const prevIds = prevAlertIdsRef.current;
-            for (const a of incoming) {
-              if (!prevIds.has(a.id) && hasInitialLoadRef.current) {
-                playBeep();
-                break;
-              }
-            }
-            // Update known IDs
-            prevAlertIdsRef.current = new Set(incoming.map((a: any) => a.id));
-            hasInitialLoadRef.current = true;
-            return incoming;
-          });
-        });
+        const wasInitialized = hasInitialLoadRef.current;
+        prevAlertIdsRef.current = new Set(incoming.map((a: any) => a.id));
+        hasInitialLoadRef.current = true;
+        // Alarm loops while any alert needs attention: ACTIVE (no dispatch ack) or ACKNOWLEDGED (no officer ack)
+        // Stops only when all active alerts are EN_ROUTE or beyond (both sides have acknowledged)
+        if (wasInitialized) {
+          const needsAlarm = incoming.some((a: any) => ['ACTIVE', 'ACKNOWLEDGED'].includes(a.status));
+          if (needsAlarm) startAlarmLoop(); else stopAlarmLoop();
+        }
+        React.startTransition(() => { setAlerts(() => incoming); });
       } catch {}
     };
 
@@ -139,7 +135,7 @@ export default function Dashboard() {
     pollAlerts();
     // Poll every 3 seconds
     const interval = setInterval(pollAlerts, 3000);
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); stopAlarmLoop(); };
   }, [officer]);
 
   // Poll officer locations every 5 seconds and show blue dots on map
@@ -316,10 +312,25 @@ export default function Dashboard() {
     }
   };
 
+  const stopAlarmLoop = () => {
+    if (alarmIntervalRef.current !== null) { clearInterval(alarmIntervalRef.current); alarmIntervalRef.current = null; }
+  };
+
+  const startAlarmLoop = () => {
+    if (!soundArmedRef.current || alarmIntervalRef.current !== null) return;
+    playBeep();
+    // Repeat every 5.5s — 3 wail tones take ~1.5s, then 4s silence before next cycle
+    alarmIntervalRef.current = setInterval(() => { if (soundArmedRef.current) playBeep(); }, 5500);
+  };
+
   const armSound = () => {
     if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
     audioCtxRef.current.resume().catch(() => {});
     setSoundArmed(true);
+    soundArmedRef.current = true;
+    // If there are already unacknowledged alerts, start alarm immediately on arm
+    const needsAlarm = alerts.some(a => ['ACTIVE', 'ACKNOWLEDGED'].includes(a.status));
+    if (needsAlarm) setTimeout(startAlarmLoop, 100);
   };
 
   const playBeep = () => {
