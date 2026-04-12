@@ -25,6 +25,7 @@ export default function Dashboard() {
   const soundArmedRef = useRef(false);
   // Only auto-zoom when the PRIORITY alert changes (new ID). After first zoom, user can pan/zoom freely.
   const autoZoomAlertIdRef = useRef<number | null>(null);
+  const repushCounterRef = useRef(0);
   const [soundArmed, setSoundArmed] = useState(false);
   // Nearby officers per alert id (fetched once per ACTIVE alert)
   const [nearbyOfficers, setNearbyOfficers] = useState<Record<number, any[]>>({});
@@ -138,6 +139,21 @@ export default function Dashboard() {
           if (needsAlarm) startAlarmLoop(); else stopAlarmLoop();
         }
         React.startTransition(() => { setAlerts(() => incoming); });
+        // Repush to nearby/assigned officers every 30s while ACTIVE or ACKNOWLEDGED
+        repushCounterRef.current++;
+        if (repushCounterRef.current % 10 === 0) {
+          const repushToken = localStorage.getItem('dispatch_token');
+          if (repushToken) {
+            for (const a of incoming) {
+              if (['ACTIVE', 'ACKNOWLEDGED'].includes(a.status)) {
+                fetch(`/api/dispatch/alerts/${a.id}/repush`, {
+                  method: 'POST',
+                  headers: { Authorization: 'Bearer ' + repushToken },
+                }).catch(() => {});
+              }
+            }
+          }
+        }
         // Fetch nearby officers once per new ACTIVE alert (fire-and-forget)
         const token = localStorage.getItem('dispatch_token');
         if (token) {

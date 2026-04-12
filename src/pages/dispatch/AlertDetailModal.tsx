@@ -221,16 +221,23 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
         <div style={{ padding: '24px 24px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
             {(alert as any).photo_url ? (
-              <img
-                src={(alert as any).photo_url}
-                alt={alert.full_name}
-                onError={(e) => { const t = e.target as HTMLImageElement; t.style.display = 'none'; t.nextElementSibling && ((t.nextElementSibling as HTMLElement).style.display = 'flex'); }}
-                style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid #ffc107' }}
-              />
-            ) : null}
-            <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#ffc107', display: (alert as any).photo_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 700, color: '#0d1117', flexShrink: 0 }}>
-              {getInitials(alert.full_name)}
-            </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <img
+                  src={(alert as any).photo_url}
+                  alt={alert.full_name}
+                  onError={(e) => { const t = e.target as HTMLImageElement; t.parentElement!.style.display = 'none'; }}
+                  style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '3px solid #ffc107', boxShadow: '0 0 12px rgba(255,193,7,0.5)' }}
+                />
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#ffc107', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CITIZEN</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{ width: '72px', height: '72px', borderRadius: '50%', backgroundColor: '#ffc107', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 700, color: '#0d1117', flexShrink: 0, border: '3px solid #ffc107' }}>
+                  {getInitials(alert.full_name)}
+                </div>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#ffc107', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CITIZEN</span>
+              </div>
+            )}
             <div>
               <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#e6edf3' }}>{alert.full_name}</h2>
               <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#8b949e' }}>{alert.phone && alert.phone !== '0' ? alert.phone : ''}</p>
@@ -273,14 +280,22 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
           {/* Assigned Officer Card — shown whenever an officer is linked to this alert */}
           {(alert as any).officer_name && (
             <div style={{ padding: '14px 16px', backgroundColor: 'rgba(14,165,233,0.08)', borderRadius: '8px', border: '1px solid rgba(14,165,233,0.3)', display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#0ea5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-                {getInitials((alert as any).officer_name)}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#0ea5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, color: '#fff', border: '3px solid #38bdf8', boxShadow: '0 0 10px rgba(14,165,233,0.5)' }}>
+                  {getInitials((alert as any).officer_name)}
+                </div>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>OFFICER</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#38bdf8' }}>🚔 Assigned Officer</p>
-                <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 600, color: '#e6edf3' }}>{(alert as any).officer_name}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 15, fontWeight: 700, color: '#e6edf3' }}>{(alert as any).officer_name}</p>
                 {(alert as any).officer_badge && (
                   <p style={{ margin: '1px 0 0', fontSize: 11, color: '#8b949e' }}>Badge: {(alert as any).officer_badge}</p>
+                )}
+                {(alert as any).officer_phone && (
+                  <a href={`tel:${(alert as any).officer_phone}`} style={{ display: 'inline-block', marginTop: 4, fontSize: 13, fontWeight: 700, color: '#4ade80', textDecoration: 'none' }}>
+                    📞 {(alert as any).officer_phone}
+                  </a>
                 )}
               </div>
               <span style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(14,165,233,0.15)', color: '#38bdf8', border: '1px solid rgba(14,165,233,0.3)', whiteSpace: 'nowrap' }}>

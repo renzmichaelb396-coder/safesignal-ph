@@ -331,25 +331,19 @@ export default function OfficerDashboard() {
       } else if (!incoming) {
         prevAssignmentIdRef.current = null;
       }
-      // Alarm loops while assignment is unacknowledged: ACTIVE = no dispatch ack, ACKNOWLEDGED = no officer ack
-      // Stops the moment officer taps EN_ROUTE (both sides have acknowledged)
+      // Auto-arm alarm the moment an ACTIVE/ACKNOWLEDGED assignment arrives — no manual bell tap needed
+      if (incoming && ['ACTIVE', 'ACKNOWLEDGED'].includes(incoming.status) && !soundArmedRef.current) {
+        if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+        audioCtxRef.current.resume().catch(() => {});
+        soundArmedRef.current = true;
+        setSoundArmed(true);
+      }
+      // Alarm loops while ACTIVE or ACKNOWLEDGED — stops the moment officer taps EN_ROUTE
       if (hasInitialLoadRef.current) {
         const needsAlarm = incoming && ['ACTIVE', 'ACKNOWLEDGED'].includes(incoming.status);
         if (needsAlarm) startAlarmLoop(); else stopAlarmLoop();
       }
       hasInitialLoadRef.current = true;
-      // Continuous alarm: loop while assignment is ACTIVE (unacknowledged), stop on acknowledge
-      if (incoming?.status === 'ACTIVE' && soundArmedRef.current) {
-        if (!alarmIntervalRef.current) {
-          playAssignmentAlert();
-          alarmIntervalRef.current = setInterval(() => playAssignmentAlert(), 2000);
-        }
-      } else {
-        if (alarmIntervalRef.current) {
-          clearInterval(alarmIntervalRef.current);
-          alarmIntervalRef.current = null;
-        }
-      }
       setAssignment(incoming);
       setLoading(false);
       if (incoming && incoming.lat != null && incoming.lng != null) {

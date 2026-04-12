@@ -263,7 +263,7 @@ function recordFailedAttempt(key: string): void {
 function normalizeAlert(a: any): any { const r = { ...a }; delete r.password_hash; return r; }
 function normalizeCitizen(c: any): any { const r = { ...c }; delete r.pin_hash; return r; }
 async function getFullAlert(alertId: any): Promise<any> {
-  const r = await pool.query(`SELECT a.*, c.full_name, c.phone, c.barangay, c.address, c.photo_url, c.strike_count, c.is_suspended, t.score as trust_score, t.total_alerts, t.false_alarms, t.resolved_emergencies, o.full_name as officer_name, o.badge_number as officer_badge FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id LEFT JOIN officers o ON a.assigned_officer_id = o.id WHERE a.id = $1`, [alertId]);
+  const r = await pool.query(`SELECT a.*, c.full_name, c.phone, c.barangay, c.address, c.photo_url, c.strike_count, c.is_suspended, t.score as trust_score, t.total_alerts, t.false_alarms, t.resolved_emergencies, o.full_name as officer_name, o.badge_number as officer_badge, o.phone as officer_phone FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id LEFT JOIN officers o ON a.assigned_officer_id = o.id WHERE a.id = $1`, [alertId]);
   return r.rows[0] ? normalizeAlert(r.rows[0]) : null;
 }
 async function getAlertWithCitizen(alertId: any): Promise<any> {
@@ -572,6 +572,41 @@ app.post('/api/dispatch/alerts/:id/assign', requireOfficerAuth, async (req: any,
     await sendPushToOfficers([Number(officer_id)], pushPayload);
     res.json({ alert: updated });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to assign officer' }); }
+});
+
+// POST /api/dispatch/alerts/:id/repush — resend push every 30s while ACTIVE/ACKNOWLEDGED
+app.post('/api/dispatch/alerts/:id/repush', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const alertResult = await pool.query(`SELECT a.*, c.full_name, c.barangay FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id WHERE a.id = $1`, [req.params.id]);
+    const alert = alertResult.rows[0];
+    if (!alert || !['ACTIVE', 'ACKNOWLEDGED'].includes(alert.status)) { res.json({ pushed: 0 }); return; }
+    let targetIds: number[];
+    if (alert.status === 'ACKNOWLEDGED' && alert.assigned_officer_id) {
+      targetIds = [Number(alert.assigned_officer_id)];
+    } else {
+      const fifteenMinAgo = Date.now() - 15 * 60 * 1000;
+      const nearbyResult = await pool.query(
+        `SELECT o.id FROM officers o JOIN officer_locations ol ON ol.officer_id = o.id
+         WHERE o.role = 'OFFICER' AND o.is_active = true AND ol.updated_at > $3
+           AND (6371 * acos(LEAST(1, cos(radians($1)) * cos(radians(ol.lat)) * cos(radians(ol.lng) - radians($2)) + sin(radians($1)) * sin(radians(ol.lat))))) < 5`,
+        [alert.lat, alert.lng, fifteenMinAgo]
+      );
+      targetIds = nearbyResult.rows.map((r: any) => Number(r.id));
+      if (targetIds.length === 0) {
+        const allResult = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = true`);
+        targetIds = allResult.rows.map((r: any) => Number(r.id));
+      }
+    }
+    if (targetIds.length > 0) {
+      const statusLabel = alert.status === 'ACKNOWLEDGED' ? '⚠️ ASSIGNED — Tap to respond' : '🚨 UNRESPONDED SOS';
+      await sendPushToOfficers(targetIds, {
+        title: `${statusLabel} — SafeSignal`,
+        body: `Citizen: ${alert.full_name} | Barangay: ${alert.barangay || 'Unknown'} | Still waiting for response!`,
+        url: '/dispatch/login',
+      });
+    }
+    res.json({ pushed: targetIds.length });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to repush' }); }
 });
 
 // POST /api/dispatch/alerts/:id/resolve
@@ -1000,13 +1035,23 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
     await pool.query('UPDATE citizens SET last_active = $1 WHERE id = $2', [now, cp.id]);
     const alertWithCitizen = await getAlertWithCitizen(alertId);
     broadcastEvent('new_alert', { alert: alertWithCitizen });
-    // Push alarm to ALL active officers — fires even on locked screen
-    const allOfficers = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = true`);
-    const officerIds = allOfficers.rows.map((o: any) => Number(o.id));
-    if (officerIds.length > 0) {
-      sendPushToOfficers(officerIds, {
+    // Push to NEARBY officers first (within 5km, GPS active in last 15min) — fallback to ALL if none nearby
+    const fifteenMinAgo = Date.now() - 15 * 60 * 1000;
+    const nearbyPushResult = await pool.query(
+      `SELECT o.id FROM officers o JOIN officer_locations ol ON ol.officer_id = o.id
+       WHERE o.role = 'OFFICER' AND o.is_active = true AND ol.updated_at > $3
+         AND (6371 * acos(LEAST(1, cos(radians($1)) * cos(radians(ol.lat)) * cos(radians(ol.lng) - radians($2)) + sin(radians($1)) * sin(radians(ol.lat))))) < 5`,
+      [lat, lng, fifteenMinAgo]
+    );
+    let pushTargetIds = nearbyPushResult.rows.map((o: any) => Number(o.id));
+    if (pushTargetIds.length === 0) {
+      const allResult = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = true`);
+      pushTargetIds = allResult.rows.map((o: any) => Number(o.id));
+    }
+    if (pushTargetIds.length > 0) {
+      sendPushToOfficers(pushTargetIds, {
         title: '🚨 NEW SOS — Immediate Response Required',
-        body: `Citizen: ${citizen.full_name} | Barangay: ${citizen.barangay || 'Unknown'} | Open dashboard now.`,
+        body: `Citizen: ${citizen.full_name} | Barangay: ${citizen.barangay || 'Unknown'} | Tap to respond NOW.`,
         url: '/dispatch/login',
       });
     }
