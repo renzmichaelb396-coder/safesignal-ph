@@ -131,20 +131,18 @@ async function initDb(): Promise<void> {
       ON CONFLICT (station_id) DO NOTHING
     `, [stationId]);
     const officers = [
-      { badge: 'PNP-001', email: 'dispatcher@pasay.safesignal.ph', full_name: 'Maria Lopez', role: 'DISPATCHER' },
-      { badge: 'PNP-002', email: 'officer@pasay.safesignal.ph', full_name: 'Carlos Mendoza', role: 'OFFICER' },
-      { badge: 'PNP-ADM', email: 'admin@pasay.safesignal.ph', full_name: 'Chief Antonio Reyes', role: 'STATION_ADMIN' },
+      { badge: 'PNP-001', email: 'dispatcher@pasay.safesignal.ph', full_name: 'Maria Lopez', role: 'DISPATCHER', phone: '09171110001' },
+      { badge: 'PNP-002', email: 'officer@pasay.safesignal.ph', full_name: 'Carlos Mendoza', role: 'OFFICER', phone: '09171110002' },
+      { badge: 'PNP-ADM', email: 'admin@pasay.safesignal.ph', full_name: 'Chief Antonio Reyes', role: 'STATION_ADMIN', phone: '09171110000' },
     ];
     for (const officer of officers) {
-      const existing = await pool.query('SELECT id FROM officers WHERE badge_number = $1', [officer.badge]);
-      if (existing.rows.length === 0) {
-        const passwordHash = await bcrypt.hash('password123', 10);
-        await pool.query(`
-          INSERT INTO officers (station_id, badge_number, email, full_name, role, password_hash, is_active)
-          VALUES ($1, $2, $3, $4, $5, $6, 1)
-        `, [stationId, officer.badge, officer.email, officer.full_name, officer.role, passwordHash]);
-        console.log('[SafeSignal] Seeded officer:', officer.badge);
-      }
+      const passwordHash = await bcrypt.hash('password123', 10);
+      await pool.query(`
+        INSERT INTO officers (station_id, badge_number, email, full_name, role, password_hash, is_active, phone)
+        VALUES ($1, $2, $3, $4, $5, $6, 1, $7)
+        ON CONFLICT (badge_number) DO UPDATE SET phone = EXCLUDED.phone, full_name = EXCLUDED.full_name
+      `, [stationId, officer.badge, officer.email, officer.full_name, officer.role, passwordHash, officer.phone]);
+      console.log('[SafeSignal] Upserted officer:', officer.badge);
     }
     // Seed demo citizen account — always reset to verified/active on cold start
     // Try BOOLEAN literals (post-migration columns), fall back to INTEGER (pre-migration)
