@@ -80,7 +80,7 @@ export default function Dashboard() {
 
       leafletMapRef.current = new maplibregl.Map({
         container: mapRef.current!,
-        style: 'https://tiles.openfreemap.org/styles/bright',
+        style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
         center: [120.9932, 14.5378],
         zoom: 14,
       });

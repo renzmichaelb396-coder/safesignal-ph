@@ -300,7 +300,7 @@ export default function OfficerDashboard() {
         const PASAY_CENTER: [number, number] = [120.9982, 14.5378];
         mapInstanceRef.current = new maplibregl.Map({
           container: mapRef.current,
-          style: 'https://tiles.openfreemap.org/styles/bright',
+          style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
           center: PASAY_CENTER,
           zoom: 14,
         });
