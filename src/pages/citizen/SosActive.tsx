@@ -138,11 +138,13 @@ export default function SosActive() {
       const lng = sosStatus?.lng || 120.9749;
       const map = window.L.map(mapRef.current).setView([lat, lng], 15);
 
-      // CARTO Voyager tiles — warm, professional look matching Manus reference
-      window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      // CartoDB Voyager @2x — forced retina quality, sharper road labels on all screens
+      window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 19,
+        tileSize: 512,
+        zoomOffset: -1,
       }).addTo(map);
 
       // Pulsing RED location pin — citizen dot (matches dispatch view RED color)
