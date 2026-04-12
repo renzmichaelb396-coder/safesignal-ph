@@ -109,19 +109,15 @@ export default function VerifyOtp() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-r from-blue-900 to-blue-800 p-4 rounded-xl mb-6" style={{ background: 'rgba(0,56,168,0.2)', border: '1px solid rgba(0,56,168,0.4)' }}>
-          <p style={{ color: '#4da6ff', fontSize: 12, margin: 0, fontWeight: 600 }}>
-            Demo Mode: Your OTP is <strong style={{ color: 'var(--ph-gold)' }}>123456</strong>
-          </p>
-        </div>
-
         <div className="flex flex-col gap-6">
           <div className="flex gap-2 justify-center">
             {otp.map((digit, i) => (
               <input
                 key={i}
                 ref={el => { inputRefs.current[i] = el; }}
-                type="text"
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 maxLength={1}
                 value={digit}
                 onChange={e => handleOtpChange(i, e.target.value)}
