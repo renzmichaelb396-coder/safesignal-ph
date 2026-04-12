@@ -77,7 +77,6 @@ async function initDb(): Promise<void> {
     await pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS heading FLOAT`);
     await pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ON_DUTY'`);
     await pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS updated_at BIGINT`);
-    await pool.query(`ALTER TABLE sos_alerts ADD COLUMN IF NOT EXISTS incident_photo TEXT`);
     const stationResult = await pool.query(`
       INSERT INTO stations (name, barangay, latitude, longitude, contact_number)
       VALUES ($1, $2, $3, $4, $5)
@@ -246,51 +245,6 @@ app.post('/api/dispatch/login', async (req: any, res: any) => {
     const stationResult = await pool.query('SELECT * FROM stations WHERE id = $1', [officer.station_id]);
     res.json({ token, officer: { id: officer.id, full_name: officer.full_name, badge_number: officer.badge_number, role: officer.role, email: officer.email, station: stationResult.rows[0] } });
   } catch (error) { console.error('Login error:', error); res.status(500).json({ error: 'Failed to process login' }); }
-});
-
-// POST /api/dispatch/register
-app.post('/api/dispatch/register', async (req: any, res: any) => {
-  try {
-    const { full_name, email, badge_number, password, role } = req.body;
-    if (!full_name || !email || !badge_number || !password) {
-      res.status(400).json({ error: 'full_name, email, badge_number, and password are required' }); return;
-    }
-    const allowedRoles = ['OFFICER', 'DISPATCHER'];
-    const assignedRole = allowedRoles.includes(role) ? role : 'OFFICER';
-
-    // Check for duplicate email or badge_number
-    const existing = await pool.query(
-      'SELECT id FROM officers WHERE email = $1 OR badge_number = $2',
-      [email, badge_number]
-    );
-    if (existing.rows.length > 0) {
-      res.status(409).json({ error: 'An account with this email or badge number already exists.' }); return;
-    }
-
-    // Get station
-    const stationResult = await pool.query('SELECT id FROM stations LIMIT 1');
-    let stationId: number;
-    if (stationResult.rows.length > 0) {
-      stationId = stationResult.rows[0].id;
-    } else {
-      const newStation = await pool.query(
-        `INSERT INTO stations (name, barangay, contact_number) VALUES ($1, $2, $3) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id`,
-        ['Pasay City Police Station', 'Pasay City', '(02) 833-0000']
-      );
-      stationId = newStation.rows[0].id;
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const result = await pool.query(
-      `INSERT INTO officers (full_name, email, badge_number, station_id, role, password_hash)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, full_name, email, badge_number, role`,
-      [full_name, email, badge_number, stationId, assignedRole, passwordHash]
-    );
-    res.status(201).json({ message: 'Account created successfully.', officer: result.rows[0] });
-  } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ error: 'Registration failed. Please try again.' });
-  }
 });
 
 // GET /api/dispatch/alerts
@@ -474,7 +428,7 @@ app.post('/api/dispatch/citizens/:id/reset-strikes', requireOfficerAuth, async (
 // GET /api/dispatch/officers
 app.get('/api/dispatch/officers', requireOfficerAuth, async (_req: any, res: any) => {
   try {
-    const result = await pool.query(`SELECT o.*, s.name as station_name, ol.lat as officer_lat, ol.lng as officer_lng, ol.status as duty_status, ol.updated_at as location_updated_at FROM officers o LEFT JOIN stations s ON o.station_id = s.id LEFT JOIN officer_locations ol ON ol.officer_id = o.id ORDER BY o.created_at DESC`);
+    const result = await pool.query(`SELECT o.*, s.name as station_name FROM officers o LEFT JOIN stations s ON o.station_id = s.id WHERE o.is_active = 1 ORDER BY o.created_at DESC`);
     res.json({ officers: result.rows.map((o: any) => { const r = { ...o }; delete r.password_hash; return r; }) });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch officers' }); }
 });
@@ -486,7 +440,7 @@ app.post('/api/dispatch/officers', requireAdminAuth, async (req: any, res: any) 
     if (!full_name || !email || !badge_number || !password || !role) { res.status(400).json({ error: 'All fields are required' }); return; }
     const stationResult = await pool.query('SELECT id FROM stations LIMIT 1');
     const passwordHash = await bcrypt.hash(password, 10);
-    const result = await pool.query(`INSERT INTO officers (full_name, email, badge_number, station_id, role, password_hash, is_active) VALUES ($1, $2, $3, $4, $5, $6, true) RETURNING id`, [full_name, email, badge_number, stationResult.rows[0].id, role, passwordHash]);
+    const result = await pool.query(`INSERT INTO officers (full_name, email, badge_number, station_id, role, password_hash, is_active) VALUES ($1, $2, $3, $4, $5, $6, 1) RETURNING id`, [full_name, email, badge_number, stationResult.rows[0].id, role, passwordHash]);
     res.status(201).json({ officer: { id: result.rows[0].id, full_name, email, badge_number, role } });
   } catch (err: any) {
     if (err.code === '23505') { res.status(409).json({ error: 'Email or badge number already exists' }); }
@@ -502,7 +456,7 @@ app.post('/api/dispatch/officers/:id/toggle-active', requireAdminAuth, async (re
     const officer = officerResult.rows[0];
     if (!officer) { res.status(404).json({ error: 'Officer not found' }); return; }
     if (officer.id === officerPayload.id) { res.status(400).json({ error: 'Cannot deactivate yourself' }); return; }
-    await pool.query('UPDATE officers SET is_active = $1 WHERE id = $2', [!officer.is_active, officer.id]);
+    await pool.query('UPDATE officers SET is_active = $1 WHERE id = $2', [officer.is_active ? 0 : 1, officer.id]);
     res.json({ success: true, is_active: !officer.is_active });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to toggle officer status' }); }
 });
@@ -540,44 +494,6 @@ app.get('/api/dispatch/stats', requireOfficerAuth, async (req: any, res: any) =>
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch stats' }); }
 });
 
-// GET /api/dispatch/reports — real weekly/monthly grouping from DB
-app.get('/api/dispatch/reports', requireOfficerAuth, async (req: any, res: any) => {
-  try {
-    const groupBy = (req.query.groupBy as string) === 'month' ? 'month' : 'week';
-    const periodParam = req.query.period as string;
-    const cutoff = periodParam === '30d' ? Date.now() - 30 * 24 * 60 * 60 * 1000
-      : periodParam === 'all' ? 0
-      : Date.now() - 90 * 24 * 60 * 60 * 1000;
-    const result = await pool.query(`
-      SELECT
-        DATE_TRUNC($1, to_timestamp(triggered_at / 1000.0) AT TIME ZONE 'Asia/Manila') AS period_start,
-        COUNT(*)::int AS total,
-        COUNT(*) FILTER (WHERE status = 'RESOLVED')::int AS resolved,
-        COUNT(*) FILTER (WHERE status = 'FALSE_ALARM')::int AS false_alarms,
-        COUNT(*) FILTER (WHERE status = 'CANCELLED')::int AS cancelled,
-        AVG(CASE WHEN acknowledged_at IS NOT NULL AND triggered_at IS NOT NULL
-            THEN (acknowledged_at - triggered_at) / 60000.0 END) AS avg_response_min
-      FROM sos_alerts
-      WHERE triggered_at >= $2
-      GROUP BY period_start
-      ORDER BY period_start DESC
-      LIMIT 12
-    `, [groupBy, cutoff]);
-    const reports = result.rows.map((r: any) => ({
-      period_start: r.period_start,
-      label: groupBy === 'month'
-        ? new Date(r.period_start).toLocaleDateString('en-PH', { month: 'short', year: 'numeric', timeZone: 'Asia/Manila' })
-        : 'Wk ' + new Date(r.period_start).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' }),
-      total: r.total,
-      resolved: r.resolved,
-      false_alarms: r.false_alarms,
-      cancelled: r.cancelled,
-      avg_response_min: r.avg_response_min != null ? Math.round(parseFloat(r.avg_response_min) * 10) / 10 : null,
-    }));
-    res.json({ reports });
-  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch reports' }); }
-});
-
 // GET /api/dispatch/settings
 app.get('/api/dispatch/settings', requireOfficerAuth, async (_req: any, res: any) => {
   try {
@@ -601,6 +517,7 @@ app.put('/api/dispatch/settings', requireAdminAuth, async (req: any, res: any) =
 async function sendSmsOtp(phone: string, code: string): Promise<void> {
   const apiKey = process.env.SEMAPHORE_API_KEY;
   if (!apiKey) { console.warn('SEMAPHORE_API_KEY not set — OTP not sent via SMS'); return; }
+  // Convert 09XXXXXXXXX → 639XXXXXXXXX (Semaphore international format)
   const intlPhone = '63' + phone.substring(1);
   const body = new URLSearchParams({
     apikey: apiKey,
@@ -637,7 +554,10 @@ app.post('/api/citizen/verify-otp', async (req: any, res: any) => {
   try {
     const { citizen_id, otp } = req.body;
     if (!citizen_id || !otp) { res.status(400).json({ error: 'citizen_id and otp are required' }); return; }
-    const otpResult = await pool.query(`SELECT code, expires_at FROM otp_codes WHERE citizen_id = $1 ORDER BY id DESC LIMIT 1`, [citizen_id]);
+    const otpResult = await pool.query(
+      `SELECT code, expires_at FROM otp_codes WHERE citizen_id = $1 ORDER BY id DESC LIMIT 1`,
+      [citizen_id]
+    );
     const otpRow = otpResult.rows[0];
     if (!otpRow) { res.status(400).json({ error: 'No OTP found. Please register again.' }); return; }
     if (Date.now() > Number(otpRow.expires_at)) { res.status(400).json({ error: 'OTP has expired. Please request a new one.' }); return; }
@@ -650,6 +570,39 @@ app.post('/api/citizen/verify-otp', async (req: any, res: any) => {
     const token = signCitizenToken({ id: citizen.id, phone: citizen.phone });
     res.json({ token, citizen: { id: citizen.id, full_name: citizen.full_name, phone: citizen.phone } });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to verify OTP' }); }
+});
+
+// POST /api/citizen/forgot-pin — sends OTP to phone for PIN reset
+app.post('/api/citizen/forgot-pin', async (req: any, res: any) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) { res.status(400).json({ error: 'phone is required' }); return; }
+    const citizenResult = await pool.query('SELECT id, phone FROM citizens WHERE phone = $1 AND verified = true', [phone]);
+    if (!citizenResult.rows[0]) { res.status(404).json({ error: 'No verified account found for this number' }); return; }
+    const citizen = citizenResult.rows[0];
+    const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+    await pool.query(`INSERT INTO otp_codes (citizen_id, code, expires_at) VALUES ($1, $2, $3)`, [citizen.id, otpCode, Date.now() + 10 * 60 * 1000]);
+    await sendSmsOtp(phone, otpCode);
+    res.json({ citizen_id: citizen.id, message: 'OTP sent to your phone' });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to send OTP' }); }
+});
+
+// POST /api/citizen/reset-pin — verifies OTP and sets new PIN
+app.post('/api/citizen/reset-pin', async (req: any, res: any) => {
+  try {
+    const { citizen_id, otp, new_pin } = req.body;
+    if (!citizen_id || !otp || !new_pin) { res.status(400).json({ error: 'citizen_id, otp, and new_pin are required' }); return; }
+    if (!/^\d{4}$/.test(new_pin)) { res.status(400).json({ error: 'PIN must be exactly 4 digits' }); return; }
+    const otpResult = await pool.query(`SELECT code, expires_at FROM otp_codes WHERE citizen_id = $1 ORDER BY id DESC LIMIT 1`, [citizen_id]);
+    const otpRow = otpResult.rows[0];
+    if (!otpRow) { res.status(400).json({ error: 'No OTP found. Please request a new one.' }); return; }
+    if (Date.now() > Number(otpRow.expires_at)) { res.status(400).json({ error: 'OTP has expired. Please request a new one.' }); return; }
+    if (otp !== otpRow.code) { res.status(400).json({ error: 'Invalid OTP code' }); return; }
+    const pinHash = hashPin(new_pin);
+    await pool.query('UPDATE citizens SET pin_hash = $1 WHERE id = $2', [pinHash, citizen_id]);
+    await pool.query('DELETE FROM otp_codes WHERE citizen_id = $1', [citizen_id]);
+    res.json({ message: 'PIN reset successful. You can now log in.' });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to reset PIN' }); }
 });
 
 // POST /api/citizen/login
@@ -708,7 +661,7 @@ app.post('/api/citizen/verify-pin', requireCitizenAuth, async (req: any, res: an
 app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
   try {
     const cp = req.citizen as CitizenPayload;
-    const { lat, lng, accuracy, pin, incident_photo } = req.body;
+    const { lat, lng, accuracy, pin } = req.body;
     if (!lat || !lng || !pin) { res.status(400).json({ error: 'lat, lng, and pin are required' }); return; }
     const citizenResult = await pool.query('SELECT * FROM citizens WHERE id = $1', [cp.id]);
     const citizen = citizenResult.rows[0];
@@ -726,7 +679,7 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
     const activeAlert = await pool.query(`SELECT id FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE')`, [cp.id]);
     if (activeAlert.rows.length > 0) { res.status(409).json({ error: 'You already have an active alert', alert_id: activeAlert.rows[0].id }); return; }
     const now = Date.now();
-    const result = await pool.query(`INSERT INTO sos_alerts (citizen_id, lat, lng, status, triggered_at, location_accuracy, incident_photo) VALUES ($1, $2, $3, 'ACTIVE', $4, $5, $6) RETURNING id`, [cp.id, lat, lng, now, accuracy || null, incident_photo || null]);
+    const result = await pool.query(`INSERT INTO sos_alerts (citizen_id, lat, lng, status, triggered_at, location_accuracy) VALUES ($1, $2, $3, 'ACTIVE', $4, $5) RETURNING id`, [cp.id, lat, lng, now, accuracy || null]);
     const alertId = result.rows[0].id;
     await pool.query(`INSERT INTO alert_location_history (alert_id, lat, lng, recorded_at) VALUES ($1, $2, $3, $4)`, [alertId, lat, lng, now]);
     await pool.query(`UPDATE citizen_trust_scores SET total_alerts = total_alerts + 1, last_updated = $1 WHERE citizen_id = $2`, [now, cp.id]);
@@ -913,7 +866,7 @@ app.patch('/api/officer/assignment/:id/status', requireOfficerAuth, async (req: 
       `UPDATE sos_alerts SET status = $1,
         resolved_at = CASE WHEN $1 = 'RESOLVED' THEN $2::bigint ELSE resolved_at END,
         acknowledged_at = CASE WHEN $1 = 'ACKNOWLEDGED' AND acknowledged_at IS NULL THEN $2::bigint ELSE acknowledged_at END,
-        notes = CASE WHEN $1 = 'RESOLVED' THEN COALESCE($3::text, notes) ELSE notes END
+        notes = CASE WHEN $1 = 'RESOLVED' AND $3 IS NOT NULL THEN $3::text ELSE notes END
        WHERE id = $4`,
       [status, now, notes || null, alertId]
     );
