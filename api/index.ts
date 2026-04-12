@@ -597,6 +597,21 @@ app.put('/api/dispatch/settings', requireAdminAuth, async (req: any, res: any) =
 
 // ─────────────────────────── CITIZEN ROUTES ──────────────────────────────────
 
+// SMS helper — sends OTP via Semaphore (Philippine SMS gateway)
+async function sendSmsOtp(phone: string, code: string): Promise<void> {
+  const apiKey = process.env.SEMAPHORE_API_KEY;
+  if (!apiKey) { console.warn('SEMAPHORE_API_KEY not set — OTP not sent via SMS'); return; }
+  const intlPhone = '63' + phone.substring(1);
+  const body = new URLSearchParams({
+    apikey: apiKey,
+    number: intlPhone,
+    message: `Your Pasay City Emergency Response OTP is: ${code}. Valid for 10 minutes. Do not share this code.`,
+    sendername: 'PASAY911',
+  });
+  const resp = await fetch('https://api.semaphore.co/api/v4/messages', { method: 'POST', body });
+  if (!resp.ok) { console.error('Semaphore SMS failed:', await resp.text()); }
+}
+
 // POST /api/citizen/register
 app.post('/api/citizen/register', async (req: any, res: any) => {
   try {
@@ -607,10 +622,12 @@ app.post('/api/citizen/register', async (req: any, res: any) => {
     const existing = await pool.query('SELECT id FROM citizens WHERE phone = $1', [phone]);
     if (existing.rows.length > 0) { res.status(409).json({ error: 'Phone number already registered' }); return; }
     const pinHash = hashPin(pin);
-    const result = await pool.query(`INSERT INTO citizens (full_name, phone, address, barangay, pin_hash, photo_url, verified) VALUES ($1, $2, $3, $4, $5, $6, 0) RETURNING id`, [full_name, phone, address || null, barangay || null, pinHash, photo_url || null]);
+    const result = await pool.query(`INSERT INTO citizens (full_name, phone, address, barangay, pin_hash, photo_url, verified) VALUES ($1, $2, $3, $4, $5, $6, false) RETURNING id`, [full_name, phone, address || null, barangay || null, pinHash, photo_url || null]);
     const citizenId = result.rows[0].id;
     await pool.query(`INSERT INTO citizen_trust_scores (citizen_id, score, total_alerts, false_alarms, resolved_emergencies) VALUES ($1, 100, 0, 0, 0)`, [citizenId]);
-    await pool.query(`INSERT INTO otp_codes (citizen_id, code, expires_at) VALUES ($1, '123456', $2)`, [citizenId, Date.now() + 10 * 60 * 1000]);
+    const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+    await pool.query(`INSERT INTO otp_codes (citizen_id, code, expires_at) VALUES ($1, $2, $3)`, [citizenId, otpCode, Date.now() + 10 * 60 * 1000]);
+    await sendSmsOtp(phone, otpCode);
     res.status(201).json({ citizen_id: citizenId, message: 'OTP sent to your phone' });
   } catch (error) { console.error('Register error:', error); res.status(500).json({ error: 'Failed to process registration' }); }
 });
@@ -620,11 +637,16 @@ app.post('/api/citizen/verify-otp', async (req: any, res: any) => {
   try {
     const { citizen_id, otp } = req.body;
     if (!citizen_id || !otp) { res.status(400).json({ error: 'citizen_id and otp are required' }); return; }
-    if (otp !== '123456') { res.status(400).json({ error: 'Invalid OTP code' }); return; }
+    const otpResult = await pool.query(`SELECT code, expires_at FROM otp_codes WHERE citizen_id = $1 ORDER BY id DESC LIMIT 1`, [citizen_id]);
+    const otpRow = otpResult.rows[0];
+    if (!otpRow) { res.status(400).json({ error: 'No OTP found. Please register again.' }); return; }
+    if (Date.now() > Number(otpRow.expires_at)) { res.status(400).json({ error: 'OTP has expired. Please request a new one.' }); return; }
+    if (otp !== otpRow.code) { res.status(400).json({ error: 'Invalid OTP code' }); return; }
     const citizenResult = await pool.query('SELECT * FROM citizens WHERE id = $1', [citizen_id]);
     const citizen = citizenResult.rows[0];
     if (!citizen) { res.status(404).json({ error: 'Citizen not found' }); return; }
-    await pool.query('UPDATE citizens SET verified = 1 WHERE id = $1', [citizen_id]);
+    await pool.query('UPDATE citizens SET verified = true WHERE id = $1', [citizen_id]);
+    await pool.query('DELETE FROM otp_codes WHERE citizen_id = $1', [citizen_id]);
     const token = signCitizenToken({ id: citizen.id, phone: citizen.phone });
     res.json({ token, citizen: { id: citizen.id, full_name: citizen.full_name, phone: citizen.phone } });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to verify OTP' }); }
@@ -788,8 +810,14 @@ app.post('/api/citizen/resend-otp', async (req: any, res: any) => {
   try {
     const { citizen_id } = req.body;
     if (!citizen_id) { res.status(400).json({ error: 'citizen_id is required' }); return; }
-    await pool.query(`INSERT INTO otp_codes (citizen_id, code, expires_at) VALUES ($1, '123456', $2)`, [citizen_id, Date.now() + 10 * 60 * 1000]);
-    res.json({ message: 'OTP resent' });  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to resend OTP' }); }
+    const citizenResult = await pool.query('SELECT phone FROM citizens WHERE id = $1', [citizen_id]);
+    if (!citizenResult.rows[0]) { res.status(404).json({ error: 'Citizen not found' }); return; }
+    const phone = citizenResult.rows[0].phone;
+    const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+    await pool.query(`INSERT INTO otp_codes (citizen_id, code, expires_at) VALUES ($1, $2, $3)`, [citizen_id, otpCode, Date.now() + 10 * 60 * 1000]);
+    await sendSmsOtp(phone, otpCode);
+    res.json({ message: 'OTP resent' });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to resend OTP' }); }
 });
 
 // GET /api/dispatch/officer-locations
