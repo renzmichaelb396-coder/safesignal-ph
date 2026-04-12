@@ -15,6 +15,8 @@ interface Alert {
   resolution_notes?: string; // legacy alias
   resolved_by?: string;
   phone?: string;
+  officer_name?: string;
+  officer_badge?: string;
 }
 
 export default function DispatchHistory() {
@@ -147,11 +149,54 @@ export default function DispatchHistory() {
         color: '#e6edf3',
       }}
     >
-      {/* Print-only header */}
+      {/* Print-only official section — hidden on screen, visible only when printing */}
       <div className="print-show" style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 18, fontWeight: 700 }}>SafeSignal PH — Alert History Report</div>
-        <div style={{ fontSize: 12, color: '#555', marginTop: 4 }}>
-          Pasay City Police Station &nbsp;|&nbsp; Generated: {new Date().toLocaleString('en-PH')} &nbsp;|&nbsp; Filter: {statusFilter}
+        {/* Official letterhead */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, borderBottom: '2px solid #1a237e', paddingBottom: 10, marginBottom: 10 }}>
+          <img src="/pasay-police-badge.svg" alt="Pasay City Police" style={{ width: 60, height: 60 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#1a237e' }}>Republic of the Philippines · National Police Commission</div>
+            <div style={{ fontSize: 15, fontWeight: 700, textTransform: 'uppercase', color: '#1a237e' }}>Pasay City Police Station</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#333' }}>SafeSignal PH — Emergency Response System</div>
+          </div>
+          <div style={{ textAlign: 'right', fontSize: 10, color: '#555' }}>
+            <div><strong>INCIDENT HISTORY REPORT</strong></div>
+            <div>Generated: {new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</div>
+            <div>Status: <strong>{statusFilter.replace('_', ' ')}</strong></div>
+            <div>Period: {dateFilter.start} — {dateFilter.end}</div>
+            <div>Total Records: <strong>{alerts.length}</strong></div>
+          </div>
+        </div>
+        {/* Print table */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 9 }}>
+          <thead>
+            <tr style={{ backgroundColor: '#c5cae9' }}>
+              {['Alert #','Citizen Name','Phone','Barangay','Status','Date/Time Triggered','Date/Time Resolved','Duration','Officer Assigned','Trust %','Notes / Disposition'].map(h => (
+                <th key={h} style={{ border: '1px solid #7986cb', padding: '4px 5px', textAlign: 'left', fontSize: 9, fontWeight: 700, color: '#1a237e' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {alerts.map((alert, i) => (
+              <tr key={alert.id} style={{ backgroundColor: i % 2 === 0 ? '#fff' : '#f3f4ff' }}>
+                <td style={{ border: '1px solid #bdbdbd', padding: '3px 5px', fontSize: 9 }}>{alert.id}</td>
+                <td style={{ border: '1px solid #bdbdbd', padding: '3px 5px', fontSize: 9, fontWeight: 600 }}>{alert.full_name}</td>
+                <td style={{ border: '1px solid #bdbdbd', padding: '3px 5px', fontSize: 9 }}>{alert.phone || '—'}</td>
+                <td style={{ border: '1px solid #bdbdbd', padding: '3px 5px', fontSize: 9 }}>{alert.barangay || '—'}</td>
+                <td style={{ border: '1px solid #bdbdbd', padding: '3px 5px', fontSize: 9, fontWeight: 700 }}>{alert.status.replace('_', ' ')}</td>
+                <td style={{ border: '1px solid #bdbdbd', padding: '3px 5px', fontSize: 9 }}>{formatDate(alert.triggered_at)}</td>
+                <td style={{ border: '1px solid #bdbdbd', padding: '3px 5px', fontSize: 9 }}>{alert.resolved_at ? formatDate(alert.resolved_at) : '—'}</td>
+                <td style={{ border: '1px solid #bdbdbd', padding: '3px 5px', fontSize: 9 }}>{calculateResolutionTime(alert.triggered_at, alert.resolved_at)}</td>
+                <td style={{ border: '1px solid #bdbdbd', padding: '3px 5px', fontSize: 9 }}>{alert.officer_name ? `${alert.officer_name} (${alert.officer_badge})` : '—'}</td>
+                <td style={{ border: '1px solid #bdbdbd', padding: '3px 5px', fontSize: 9, textAlign: 'center' }}>{alert.trust_score ?? '—'}</td>
+                <td style={{ border: '1px solid #bdbdbd', padding: '3px 5px', fontSize: 9 }}>{alert.notes || alert.resolution_notes || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{ marginTop: 10, fontSize: 9, color: '#555', borderTop: '1px solid #9e9e9e', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+          <span>FOR OFFICIAL USE ONLY · Computer-generated from SafeSignal PH v1.0</span>
+          <span>Pasay City Police Station · Pasay City, Metro Manila</span>
         </div>
       </div>
 
