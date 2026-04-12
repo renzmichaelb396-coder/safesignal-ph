@@ -80,6 +80,7 @@ async function initDb(): Promise<void> {
     await pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_type TEXT`);
     await pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_number TEXT`);
     await pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_photo TEXT`);
+    await pool.query(`ALTER TABLE sos_alerts ADD COLUMN IF NOT EXISTS incident_photo TEXT`);
     const stationResult = await pool.query(`
       INSERT INTO stations (name, barangay, latitude, longitude, contact_number)
       VALUES ($1, $2, $3, $4, $5)
@@ -507,6 +508,51 @@ app.get('/api/dispatch/stats', requireOfficerAuth, async (req: any, res: any) =>
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch stats' }); }
 });
 
+// GET /api/dispatch/reports — weekly or monthly grouping for Metrics page
+app.get('/api/dispatch/reports', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const { groupBy, period } = req.query;
+    let sinceMs = 0;
+    if (period === '30d') sinceMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    else if (period === '90d') sinceMs = Date.now() - 90 * 24 * 60 * 60 * 1000;
+    // else 'all' — no lower bound
+
+    // Group by ISO week (Mon–Sun) or calendar month using epoch ms column
+    let labelExpr: string;
+    if (groupBy === 'month') {
+      // e.g. "2026-04"
+      labelExpr = `TO_CHAR(TO_TIMESTAMP(triggered_at / 1000), 'YYYY-MM')`;
+    } else {
+      // default: week — e.g. "2026-W14"
+      labelExpr = `TO_CHAR(DATE_TRUNC('week', TO_TIMESTAMP(triggered_at / 1000)), 'YYYY-"W"IW')`;
+    }
+
+    const result = await pool.query(
+      `SELECT
+         ${labelExpr} AS label,
+         COUNT(*) AS total,
+         SUM(CASE WHEN status = 'RESOLVED' THEN 1 ELSE 0 END) AS resolved,
+         SUM(CASE WHEN status = 'FALSE_ALARM' THEN 1 ELSE 0 END) AS false_alarms,
+         SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled,
+         ROUND(AVG(CASE WHEN acknowledged_at IS NOT NULL THEN (acknowledged_at - triggered_at) / 60000.0 ELSE NULL END)::numeric, 1) AS avg_response_min
+       FROM sos_alerts
+       WHERE triggered_at >= $1
+       GROUP BY label
+       ORDER BY label ASC`,
+      [sinceMs]
+    );
+
+    res.json({ reports: result.rows.map(r => ({
+      label: r.label,
+      total: parseInt(r.total, 10),
+      resolved: parseInt(r.resolved, 10),
+      false_alarms: parseInt(r.false_alarms, 10),
+      cancelled: parseInt(r.cancelled, 10),
+      avg_response_min: r.avg_response_min != null ? parseFloat(r.avg_response_min) : null,
+    })) });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch reports' }); }
+});
+
 // GET /api/dispatch/settings
 app.get('/api/dispatch/settings', requireOfficerAuth, async (_req: any, res: any) => {
   try {
@@ -676,7 +722,7 @@ app.post('/api/citizen/verify-pin', requireCitizenAuth, async (req: any, res: an
 app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
   try {
     const cp = req.citizen as CitizenPayload;
-    const { lat, lng, accuracy, pin } = req.body;
+    const { lat, lng, accuracy, pin, incident_photo } = req.body;
     if (!lat || !lng || !pin) { res.status(400).json({ error: 'lat, lng, and pin are required' }); return; }
     const citizenResult = await pool.query('SELECT * FROM citizens WHERE id = $1', [cp.id]);
     const citizen = citizenResult.rows[0];
@@ -694,7 +740,7 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
     const activeAlert = await pool.query(`SELECT id FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE')`, [cp.id]);
     if (activeAlert.rows.length > 0) { res.status(409).json({ error: 'You already have an active alert', alert_id: activeAlert.rows[0].id }); return; }
     const now = Date.now();
-    const result = await pool.query(`INSERT INTO sos_alerts (citizen_id, lat, lng, status, triggered_at, location_accuracy) VALUES ($1, $2, $3, 'ACTIVE', $4, $5) RETURNING id`, [cp.id, lat, lng, now, accuracy || null]);
+    const result = await pool.query(`INSERT INTO sos_alerts (citizen_id, lat, lng, status, triggered_at, location_accuracy, incident_photo) VALUES ($1, $2, $3, 'ACTIVE', $4, $5, $6) RETURNING id`, [cp.id, lat, lng, now, accuracy || null, incident_photo || null]);
     const alertId = result.rows[0].id;
     await pool.query(`INSERT INTO alert_location_history (alert_id, lat, lng, recorded_at) VALUES ($1, $2, $3, $4)`, [alertId, lat, lng, now]);
     await pool.query(`UPDATE citizen_trust_scores SET total_alerts = total_alerts + 1, last_updated = $1 WHERE citizen_id = $2`, [now, cp.id]);
