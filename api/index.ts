@@ -282,8 +282,8 @@ app.post('/api/dispatch/register', async (req: any, res: any) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      `INSERT INTO officers (full_name, email, badge_number, station_id, role, password_hash, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, true) RETURNING id, full_name, email, badge_number, role`,
+      `INSERT INTO officers (full_name, email, badge_number, station_id, role, password_hash)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, full_name, email, badge_number, role`,
       [full_name, email, badge_number, stationId, assignedRole, passwordHash]
     );
     res.status(201).json({ message: 'Account created successfully.', officer: result.rows[0] });
