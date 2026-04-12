@@ -113,6 +113,10 @@ export default function Login() {
             No account?{' '}
             <Link href="/register"><span style={{ color: 'var(--ph-gold)', fontWeight: 600 }}>Register here</span></Link>
           </p>
+          <p className="text-center text-sm" style={{ color: '#888' }}>
+            Forgot your PIN?{' '}
+            <Link href="/forgot-pin"><span style={{ color: 'var(--ph-gold)', fontWeight: 600 }}>Reset PIN</span></Link>
+          </p>
         </form>
       </div>
       <p style={{ color: '#555', fontSize: 11, textAlign: 'center', margin: 0 }}>
