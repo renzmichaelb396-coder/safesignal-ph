@@ -1055,7 +1055,7 @@ app.patch('/api/officer/assignment/:id/status', requireOfficerAuth, async (req: 
       `UPDATE sos_alerts SET status = $1,
         resolved_at = CASE WHEN $1 = 'RESOLVED' THEN $2::bigint ELSE resolved_at END,
         acknowledged_at = CASE WHEN $1 = 'ACKNOWLEDGED' AND acknowledged_at IS NULL THEN $2::bigint ELSE acknowledged_at END,
-        notes = CASE WHEN $1 = 'RESOLVED' AND $3 IS NOT NULL THEN $3::text ELSE notes END
+        notes = CASE WHEN $1 = 'RESOLVED' AND $3::text IS NOT NULL THEN $3::text ELSE notes END
        WHERE id = $4`,
       [status, now, notes || null, alertId]
     );
