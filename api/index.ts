@@ -4,6 +4,12 @@ import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import webpush from 'web-push';
+
+// VAPID keys for Web Push (set in Vercel env vars)
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BODUL6wNT8YyVp5WL0Q-uLqPZVd8q2lnR9d1v1XLW3ykrWHx0MCqhlOIFgAImAgaBx6rU2KYWmBlgX71dlgCl1o';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'bpPPRubMXNCQSiW7K_edavPdZ8cIT-yVhnPbIHOXtoo';
+webpush.setVapidDetails('mailto:admin@pasay.safesignal.ph', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
 const app = express();
 
@@ -80,6 +86,7 @@ async function initDb(): Promise<void> {
     await Promise.all([
       pool.query(`CREATE TABLE IF NOT EXISTS sos_alerts (id SERIAL PRIMARY KEY, citizen_id INT REFERENCES citizens(id), lat FLOAT NOT NULL, lng FLOAT NOT NULL, status TEXT NOT NULL DEFAULT 'ACTIVE', triggered_at BIGINT, acknowledged_at BIGINT, resolved_at BIGINT, cancelled_at BIGINT, location_accuracy FLOAT, assigned_officer_id INT REFERENCES officers(id), is_suspicious BOOL DEFAULT false, suspicious_reason TEXT, notes TEXT, cancellation_reason TEXT)`),
       pool.query(`CREATE TABLE IF NOT EXISTS officer_locations (officer_id INT UNIQUE REFERENCES officers(id), lat FLOAT, lng FLOAT, heading FLOAT, status TEXT DEFAULT 'ON_DUTY', updated_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`),
+      pool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (id SERIAL PRIMARY KEY, officer_id INT REFERENCES officers(id), endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`),
     ]);
     // ── Phase 4: tables that depend on sos_alerts ─────────────────────────────
     await pool.query(`CREATE TABLE IF NOT EXISTS alert_location_history (id SERIAL PRIMARY KEY, alert_id INT REFERENCES sos_alerts(id), lat FLOAT NOT NULL, lng FLOAT NOT NULL, recorded_at BIGINT)`);
@@ -263,11 +270,63 @@ async function getAlertWithCitizen(alertId: any): Promise<any> {
   return r.rows[0] || null;
 }
 
+// ── Web Push helper ───────────────────────────────────────────────────────────
+async function sendPushToOfficers(officerIds: number[], payload: object): Promise<void> {
+  try {
+    const subs = await pool.query(
+      'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE officer_id = ANY($1)',
+      [officerIds]
+    );
+    await Promise.allSettled(
+      subs.rows.map(sub =>
+        webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          JSON.stringify(payload)
+        )
+      )
+    );
+  } catch (err) { console.error('[SafeSignal] sendPush error:', err); }
+}
+
 // Cold-start init
 initDb().catch(err => console.error('[SafeSignal] Cold-start initDb error:', err));
 
 // ── Health ────────────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: Date.now() }));
+
+// ── Web Push routes ───────────────────────────────────────────────────────────
+// GET /api/push/vapid-public-key
+app.get('/api/push/vapid-public-key', (_req, res) => {
+  res.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
+// POST /api/officer/push-subscribe
+app.post('/api/officer/push-subscribe', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const { endpoint, keys } = req.body;
+    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+      return res.status(400).json({ error: 'endpoint and keys (p256dh, auth) are required' });
+    }
+    const officerId = (req.officer as OfficerPayload).id;
+    await pool.query(
+      `INSERT INTO push_subscriptions (officer_id, endpoint, p256dh, auth)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (endpoint) DO UPDATE SET officer_id = $1, p256dh = $3, auth = $4`,
+      [officerId, endpoint, keys.p256dh, keys.auth]
+    );
+    res.json({ ok: true });
+  } catch (err) { console.error('[SafeSignal] push-subscribe error:', err); res.status(500).json({ error: 'Failed to save subscription' }); }
+});
+
+// DELETE /api/officer/push-unsubscribe
+app.delete('/api/officer/push-unsubscribe', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const { endpoint } = req.body;
+    if (!endpoint) return res.status(400).json({ error: 'endpoint required' });
+    await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [endpoint]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Failed to remove subscription' }); }
+});
 
 // ── SSE endpoint ──────────────────────────────────────────────────────────────
 app.get('/api/dispatch/events', requireOfficerAuth, (req, res) => addSSEClient(req, res));
@@ -297,7 +356,9 @@ app.post('/api/dispatch/login', async (req: any, res: any) => {
     if (!valid) { recordFailedAttempt(attemptKey); res.status(401).json({ error: 'Invalid credentials' }); return; }
     loginAttempts.delete(attemptKey);
     await pool.query('UPDATE officers SET last_login = $1 WHERE id = $2', [Date.now(), officer.id]);
-    const token = signOfficerToken({ id: officer.id, email: officer.email, role: officer.role, badge_number: officer.badge_number });
+    const rememberMe = req.body.remember === true;
+    const tokenExpiry = rememberMe ? '30d' : '24h';
+    const token = jwt.sign({ type: 'officer', id: officer.id, email: officer.email, role: officer.role, badge_number: officer.badge_number }, process.env.JWT_SECRET || 'safesignal-secret-2025', { expiresIn: tokenExpiry });
     const stationResult = await pool.query('SELECT * FROM stations WHERE id = $1', [officer.station_id]);
     res.json({ token, officer: { id: officer.id, full_name: officer.full_name, badge_number: officer.badge_number, role: officer.role, email: officer.email, station: stationResult.rows[0] } });
   } catch (error) { console.error('Login error:', error); res.status(500).json({ error: 'Failed to process login' }); }
@@ -456,6 +517,13 @@ app.post('/api/dispatch/alerts/:id/assign', requireOfficerAuth, async (req: any,
     await pool.query('UPDATE sos_alerts SET assigned_officer_id = $1 WHERE id = $2', [officer_id, req.params.id]);
     const updated = await getFullAlert(alert.id);
     broadcastEvent('alert_updated', { alert: updated });
+    // Fire Web Push to assigned officer (works even when screen is off)
+    const pushPayload = {
+      title: '\uD83D\uDEA8 EMERGENCY \u2014 You have been assigned!',
+      body: `Citizen: ${updated?.full_name || 'Unknown'} | Barangay: ${updated?.barangay || ''}`,
+      url: '/dispatch/login',
+    };
+    await sendPushToOfficers([Number(officer_id)], pushPayload);
     res.json({ alert: updated });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to assign officer' }); }
 });
