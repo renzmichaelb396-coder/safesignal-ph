@@ -148,9 +148,8 @@ export default function SosActive() {
         tileSize: 512,
         zoomOffset: -1,
       }).addTo(map);
-      // Dark mode: invert tile pane only — contrast(1.1) makes labels pop, no hue-rotate keeps text crisp
       const tilePaneEl = map.getPanes().tilePane as HTMLElement;
-      if (tilePaneEl) tilePaneEl.style.filter = 'invert(1) contrast(1.1)';
+      if (tilePaneEl) tilePaneEl.style.filter = 'invert(1) hue-rotate(180deg)';
 
       // Pulsing RED location pin — citizen dot (matches dispatch view RED color)
       const pulseIcon = window.L.divIcon({
