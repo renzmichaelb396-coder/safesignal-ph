@@ -81,6 +81,12 @@ async function initDb(): Promise<void> {
     await pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_number TEXT`);
     await pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_photo TEXT`);
     await pool.query(`ALTER TABLE sos_alerts ADD COLUMN IF NOT EXISTS incident_photo TEXT`);
+    // Performance indexes — make every query on sos_alerts fast even at scale
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_status ON sos_alerts(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_triggered ON sos_alerts(triggered_at)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_citizen ON sos_alerts(citizen_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_officer ON sos_alerts(assigned_officer_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_citizens_phone ON citizens(phone)`);
     const stationResult = await pool.query(`
       INSERT INTO stations (name, barangay, latitude, longitude, contact_number)
       VALUES ($1, $2, $3, $4, $5)
@@ -493,18 +499,23 @@ app.get('/api/dispatch/stats', requireOfficerAuth, async (req: any, res: any) =>
       whereClause = 'WHERE triggered_at >= $1';
     }
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const [statusRows, avgResp, todayCount] = await Promise.all([
+    const [statusRows, avgResp, todayCount, activeCitizens] = await Promise.all([
       pool.query(`SELECT status, COUNT(*) as c FROM sos_alerts ${whereClause} GROUP BY status`, params),
       pool.query(`SELECT AVG(acknowledged_at - triggered_at) as avg_ms FROM sos_alerts ${whereClause} AND acknowledged_at IS NOT NULL`, params),
       pool.query('SELECT COUNT(*) as c FROM sos_alerts WHERE triggered_at >= $1', [todayStart.getTime()]),
+      pool.query('SELECT COUNT(*) as c FROM citizens WHERE is_suspended = false'),
     ]);
     const statusCounts: Record<string, number> = {};
     let total = 0;
     for (const row of statusRows.rows) { statusCounts[row.status] = parseInt(row.c, 10); total += parseInt(row.c, 10); }
     const fa = statusCounts['FALSE_ALARM'] || 0;
+    const resolvedCount = statusCounts['RESOLVED'] || 0;
+    const cancelledCount = statusCounts['CANCELLED'] || 0;
+    const terminalTotal = resolvedCount + fa + cancelledCount;
+    const resolutionRate = terminalTotal > 0 ? Math.round((resolvedCount / terminalTotal) * 100) : 0;
     const avgMs = avgResp.rows[0]?.avg_ms ? parseFloat(avgResp.rows[0].avg_ms) : null;
     const avgMinutes = avgMs != null && avgMs > 0 ? Math.round((avgMs / 60000) * 10) / 10 : null;
-    res.json({ stats: { total, active: statusCounts['ACTIVE'] || 0, acknowledged: statusCounts['ACKNOWLEDGED'] || 0, resolved: statusCounts['RESOLVED'] || 0, false_alarms: fa, cancelled: statusCounts['CANCELLED'] || 0, false_alarm_rate: total > 0 ? Math.round((fa / total) * 100) : 0, avg_response_minutes: avgMinutes, today_count: parseInt(todayCount.rows[0].c, 10) } });
+    res.json({ stats: { total, active: statusCounts['ACTIVE'] || 0, acknowledged: statusCounts['ACKNOWLEDGED'] || 0, en_route: statusCounts['EN_ROUTE'] || 0, on_scene: statusCounts['ON_SCENE'] || 0, resolved: resolvedCount, false_alarms: fa, cancelled: cancelledCount, false_alarm_rate: total > 0 ? Math.round((fa / total) * 100) : 0, resolution_rate: resolutionRate, avg_response_minutes: avgMinutes, today_count: parseInt(todayCount.rows[0].c, 10), active_citizens: parseInt(activeCitizens.rows[0].c, 10) } });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch stats' }); }
 });
 
