@@ -151,7 +151,7 @@ export default function DispatchLogin() {
                 style={{ width: '96px', height: 'auto', filter: 'drop-shadow(0 4px 12px rgba(245,158,11,0.4))' }}
               />
             </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 600, color: '#ffc107', margin: '0 0 8px 0' }}>RespondPH</h1>
+            <h1 style={{ fontSize: '18px', fontWeight: 700, color: '#ffc107', margin: '0 0 8px 0', textAlign: 'center', lineHeight: 1.2 }}>Pasay City Emergency Response</h1>
             <p style={{ fontSize: '14px', color: '#8b949e', margin: 0 }}>Police Dispatch Console</p>
           </div>
 
@@ -247,12 +247,18 @@ export default function DispatchLogin() {
           </div>
 
           <p style={{ marginTop: '24px', textAlign: 'center', fontSize: '11px', color: '#8b949e' }}>
-            RespondPH v1.0 — Authorized Personnel Only
+            Pasay City Emergency Response v1.0 — Authorized Personnel Only
           </p>
         </div>
 
+        {/* Register link */}
+        <p style={{ marginTop: '12px', textAlign: 'center', fontSize: '12px', color: '#8b949e' }}>
+          New personnel?{' '}
+          <a href="/dispatch/register" style={{ color: '#ffc107', textDecoration: 'none', fontWeight: 600 }}>Register here</a>
+        </p>
+
         {/* Back to citizen app */}
-        <p style={{ marginTop: '16px', textAlign: 'center', fontSize: '12px', color: '#8b949e' }}>
+        <p style={{ marginTop: '8px', textAlign: 'center', fontSize: '12px', color: '#8b949e' }}>
           <a href="/" style={{ color: '#8b949e', textDecoration: 'none' }}>← Back to Citizen App</a>
         </p>
       </div>

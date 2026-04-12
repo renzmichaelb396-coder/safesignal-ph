@@ -28,13 +28,15 @@ export default function Landing() {
           <h1
             style={{
               color: '#ffffff',
-              fontSize: '28px',
+              fontSize: '22px',
               fontWeight: 800,
               margin: 0,
               letterSpacing: '-0.5px',
+              textAlign: 'center',
+              lineHeight: 1.2,
             }}
           >
-            RespondPH
+            Pasay City Emergency Response
           </h1>
           <p style={{ color: 'var(--ph-gold)', fontSize: '14px', marginTop: 8, fontStyle: 'italic' }}>
             Emergency help, one tap away

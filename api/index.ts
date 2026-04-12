@@ -248,6 +248,51 @@ app.post('/api/dispatch/login', async (req: any, res: any) => {
   } catch (error) { console.error('Login error:', error); res.status(500).json({ error: 'Failed to process login' }); }
 });
 
+// POST /api/dispatch/register
+app.post('/api/dispatch/register', async (req: any, res: any) => {
+  try {
+    const { full_name, email, badge_number, password, role } = req.body;
+    if (!full_name || !email || !badge_number || !password) {
+      res.status(400).json({ error: 'full_name, email, badge_number, and password are required' }); return;
+    }
+    const allowedRoles = ['OFFICER', 'DISPATCHER'];
+    const assignedRole = allowedRoles.includes(role) ? role : 'OFFICER';
+
+    // Check for duplicate email or badge_number
+    const existing = await pool.query(
+      'SELECT id FROM officers WHERE email = $1 OR badge_number = $2',
+      [email, badge_number]
+    );
+    if (existing.rows.length > 0) {
+      res.status(409).json({ error: 'An account with this email or badge number already exists.' }); return;
+    }
+
+    // Get station
+    const stationResult = await pool.query('SELECT id FROM stations LIMIT 1');
+    let stationId: number;
+    if (stationResult.rows.length > 0) {
+      stationId = stationResult.rows[0].id;
+    } else {
+      const newStation = await pool.query(
+        `INSERT INTO stations (name, address, city, phone) VALUES ($1, $2, $3, $4) RETURNING id`,
+        ['Pasay City Police Station', 'Leveriza St, Pasay City', 'Pasay City', '(02) 833-0000']
+      );
+      stationId = newStation.rows[0].id;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      `INSERT INTO officers (full_name, email, badge_number, station_id, role, password_hash, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, true) RETURNING id, full_name, email, badge_number, role`,
+      [full_name, email, badge_number, stationId, assignedRole, passwordHash]
+    );
+    res.status(201).json({ message: 'Account created successfully.', officer: result.rows[0] });
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ error: 'Registration failed. Please try again.' });
+  }
+});
+
 // GET /api/dispatch/alerts
 app.get('/api/dispatch/alerts', requireOfficerAuth, async (req: any, res: any) => {
   try {

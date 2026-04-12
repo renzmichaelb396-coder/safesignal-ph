@@ -41,7 +41,7 @@ export default function Home() {
       <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <p style={{ color: '#888', fontSize: 10, margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>PASAY CITY POLICE</p>
-          <h1 style={{ color: '#fff', fontSize: 17, fontWeight: 800, margin: 0 }}>RespondPH</h1>
+          <h1 style={{ color: '#fff', fontSize: 13, fontWeight: 800, margin: 0 }}>Pasay City Emergency Response</h1>
         </div>
         <button onClick={() => setShowMenu(!showMenu)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: 4 }}>☰</button>
       </div>

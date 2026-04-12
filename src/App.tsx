@@ -17,6 +17,7 @@ import Profile from "./pages/citizen/Profile";
 
 // Dispatch Pages
 import DispatchLogin from "./pages/dispatch/DispatchLogin";
+import DispatchRegister from "./pages/dispatch/DispatchRegister";
 import Dashboard from "./pages/dispatch/Dashboard";
 import AlertQueue from "./pages/dispatch/AlertQueue";
 import DispatchHistory from "./pages/dispatch/DispatchHistory";
@@ -54,6 +55,7 @@ function Router() {
 
       {/* Dispatch Routes */}
       <Route path="/dispatch/login" component={DispatchLogin} />
+      <Route path="/dispatch/register" component={DispatchRegister} />
       <Route path="/dispatch" component={Dashboard} />
       <Route path="/dispatch/queue" component={AlertQueue} />
       <Route path="/dispatch/history" component={DispatchHistory} />

@@ -93,7 +93,7 @@ export default function DispatchLayout({ children }: { children: React.ReactNode
                 letterSpacing: '0.02em',
               }}
             >
-              RespondPH
+              Pasay City Emergency Response
             </span>
           </div>
           <p
