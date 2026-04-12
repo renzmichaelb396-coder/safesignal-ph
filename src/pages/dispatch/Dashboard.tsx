@@ -80,7 +80,7 @@ export default function Dashboard() {
 
       leafletMapRef.current = new maplibregl.Map({
         container: mapRef.current!,
-        style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+        style: `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${import.meta.env.VITE_MAPTILER_KEY || 'demo'}`,
         center: [120.9932, 14.5378],
         zoom: 14,
       });

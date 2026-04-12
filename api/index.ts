@@ -991,11 +991,7 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
     // }
     const settingsResult = await pool.query('SELECT * FROM station_settings LIMIT 1');
     const settings = settingsResult.rows[0];
-    const cooldownMs = (settings?.cooldown_minutes || 10) * 60 * 1000;
-    // Cooldown and duplicate checks must cover ALL in-progress statuses.
-    // If an officer is already EN_ROUTE or ON_SCENE, the citizen must not trigger a second SOS.
-    const recentAlert = await pool.query(`SELECT id FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE') AND triggered_at > $2`, [cp.id, Date.now() - cooldownMs]);
-    if (recentAlert.rows.length > 0) { res.status(429).json({ error: 'Cooldown active. Please wait before sending another alert.' }); return; }
+    // Cooldown removed — duplicate check only (prevent double-tap SOS while one is already active)
     const activeAlert = await pool.query(`SELECT id FROM sos_alerts WHERE citizen_id = $1 AND status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE')`, [cp.id]);
     if (activeAlert.rows.length > 0) { res.status(409).json({ error: 'You already have an active alert', alert_id: activeAlert.rows[0].id }); return; }
     const now = Date.now();
@@ -1006,6 +1002,16 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
     await pool.query('UPDATE citizens SET last_active = $1 WHERE id = $2', [now, cp.id]);
     const alertWithCitizen = await getAlertWithCitizen(alertId);
     broadcastEvent('new_alert', { alert: alertWithCitizen });
+    // Push alarm to ALL active officers — fires even on locked screen
+    const allOfficers = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = true`);
+    const officerIds = allOfficers.rows.map((o: any) => Number(o.id));
+    if (officerIds.length > 0) {
+      sendPushToOfficers(officerIds, {
+        title: '🚨 NEW SOS — Immediate Response Required',
+        body: `Citizen: ${citizen.full_name} | Barangay: ${citizen.barangay || 'Unknown'} | Open dashboard now.`,
+        url: '/dispatch/login',
+      });
+    }
     if (citizen.barangay) {
       const windowMs = (settings?.surge_window_minutes || 2) * 60 * 1000;
       // Surge count includes all in-progress statuses — an EN_ROUTE/ON_SCENE alert is still an active emergency.

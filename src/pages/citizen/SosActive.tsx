@@ -138,10 +138,10 @@ export default function SosActive() {
       const lng = sosStatus?.lng || 120.9749;
       const map = window.L.map(mapRef.current).setView([lat, lng], 15);
 
-      // CartoDB Dark Matter @2x — dark Waze-style map, forced retina quality
-      window.L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
+      // MapTiler Streets Dark @2x — Waze-style dark map with landmarks and readable labels
+      const mtKey = (window as any).__MAPTILER_KEY__ || 'demo';
+      window.L.tileLayer(`https://api.maptiler.com/maps/streets-v2-dark/{z}/{x}/{y}@2x.png?key=${mtKey}`, {
+        attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
         tileSize: 512,
         zoomOffset: -1,
