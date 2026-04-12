@@ -274,8 +274,8 @@ app.post('/api/dispatch/register', async (req: any, res: any) => {
       stationId = stationResult.rows[0].id;
     } else {
       const newStation = await pool.query(
-        `INSERT INTO stations (name, address, city, phone) VALUES ($1, $2, $3, $4) RETURNING id`,
-        ['Pasay City Police Station', 'Leveriza St, Pasay City', 'Pasay City', '(02) 833-0000']
+        `INSERT INTO stations (name, barangay, contact_number) VALUES ($1, $2, $3) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id`,
+        ['Pasay City Police Station', 'Pasay City', '(02) 833-0000']
       );
       stationId = newStation.rows[0].id;
     }
