@@ -51,6 +51,8 @@ export default function OfficerDashboard() {
   const [toastMsg, setToastMsg] = useState('');
   const [soundArmed, setSoundArmed] = useState(false);
   const [dispositionNotes, setDispositionNotes] = useState('');
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
 
   useEffect(() => {
     if (assignment?.lat != null && assignment?.lng != null) {
@@ -59,6 +61,49 @@ export default function OfficerDashboard() {
         .then(r => r.json()).then(data => { if (data.display_name) { setCitizenAddress(data.display_name.split(',').slice(0,4).map((s: string) => s.trim()).join(', ')); } }).catch(() => {});
     }
   }, [assignment?.lat, assignment?.lng]);
+
+  // ── Service Worker registration + SW_ALARM listener ─────────────────────────
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+      reg.pushManager.getSubscription().then(sub => { if (sub) setPushEnabled(true); });
+    }).catch(() => {});
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'SW_ALARM') {
+        if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+        soundArmedRef.current = true;
+        setSoundArmed(true);
+        startAlarmLoop();
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handler);
+    return () => navigator.serviceWorker.removeEventListener('message', handler);
+  }, []);
+
+  async function togglePushSubscription() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      showToast('Push notifications not supported on this device'); return;
+    }
+    setPushLoading(true);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) {
+        await existing.unsubscribe();
+        await officerFetch('/api/officer/push-unsubscribe', { method: 'DELETE', body: JSON.stringify({ endpoint: existing.endpoint }) });
+        setPushEnabled(false); showToast('Push alerts disabled');
+      } else {
+        const vr = await officerFetch('/api/push/vapid-public-key');
+        const { publicKey } = await vr.json();
+        const convert = (b64: string) => { const p = '='.repeat((4-(b64.length%4))%4); const s = (b64+p).replace(/-/g,'+').replace(/_/g,'/'); const r = window.atob(s); return new Uint8Array([...r].map(c=>c.charCodeAt(0))); };
+        const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: convert(publicKey) });
+        const sj = sub.toJSON();
+        await officerFetch('/api/officer/push-subscribe', { method: 'POST', body: JSON.stringify({ endpoint: sj.endpoint, keys: sj.keys }) });
+        setPushEnabled(true); showToast('\uD83D\uDD14 Push alerts enabled! You will be alerted even when screen is off.');
+      }
+    } catch(e: any) { showToast('Push setup failed: '+(e.message||'unknown error')); }
+    setPushLoading(false);
+  }
 
   // Live elapsed timer
   useEffect(() => {
@@ -352,6 +397,14 @@ export default function OfficerDashboard() {
                 style={{ background: soundArmed ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', border: `1px solid ${soundArmed ? 'rgba(34,197,94,0.35)' : '#30363d'}`, borderRadius: 6, color: soundArmed ? '#22c55e' : '#6b7280', fontSize: 14, padding: '2px 8px', cursor: 'pointer', lineHeight: '1.6' }}
               >
                 {soundArmed ? '🔔' : '🔕'}
+              </button>
+              <button
+                onClick={togglePushSubscription}
+                disabled={pushLoading}
+                title={pushEnabled ? 'Push alerts ON — tap to disable' : 'Enable push alerts when screen is off'}
+                style={{ background: pushEnabled ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', border: `1px solid ${pushEnabled ? 'rgba(34,197,94,0.35)' : '#30363d'}`, borderRadius: 6, color: pushEnabled ? '#22c55e' : '#6b7280', fontSize: 11, padding: '2px 8px', cursor: pushLoading ? 'not-allowed' : 'pointer', lineHeight: '1.6', opacity: pushLoading ? 0.6 : 1 }}
+              >
+                {pushLoading ? '...' : pushEnabled ? '\uD83D\uDCF2 Push ON' : '\uD83D\uDCF2 Push OFF'}
               </button>
               <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#8b949e', fontSize: 12, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Logout</button>
             </div>
