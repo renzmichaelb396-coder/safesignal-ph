@@ -1,7 +1,7 @@
 {
-  "name": "SafeSignal PH",
-  "short_name": "SafeSignal",
-  "description": "Emergency help, one tap away.",
+  "name": "Pasay City Emergency Response",
+  "short_name": "PCER",
+  "description": "Pasay City emergency help, one tap away.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f0f23",
