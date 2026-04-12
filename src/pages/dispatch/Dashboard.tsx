@@ -88,7 +88,6 @@ export default function Dashboard() {
 
       leafletMapRef.current.on('load', () => {
         const canvas = leafletMapRef.current!.getCanvas();
-        canvas.style.filter = 'invert(1) hue-rotate(180deg)';
         canvas.style.borderRadius = 'inherit';
       });
 

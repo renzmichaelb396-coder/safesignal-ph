@@ -149,7 +149,7 @@ export default function SosActive() {
         zoomOffset: -1,
       }).addTo(map);
       const tilePaneEl = map.getPanes().tilePane as HTMLElement;
-      if (tilePaneEl) tilePaneEl.style.filter = 'invert(1) hue-rotate(180deg)';
+      // Light map — no filter needed
 
       // Pulsing RED location pin — citizen dot (matches dispatch view RED color)
       const pulseIcon = window.L.divIcon({

@@ -307,7 +307,6 @@ export default function OfficerDashboard() {
         // Place the blue dot immediately once the map is ready
         mapInstanceRef.current.on('load', () => {
           const canvas = mapInstanceRef.current!.getCanvas();
-          canvas.style.filter = 'invert(1) hue-rotate(180deg)';
           canvas.style.borderRadius = 'inherit';
           reportLocation();
           if (pendingCitizenRef.current) { const { lat, lng } = pendingCitizenRef.current; pendingCitizenRef.current = null; updateMap(lat, lng); }
