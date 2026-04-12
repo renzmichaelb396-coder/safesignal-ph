@@ -9,11 +9,12 @@ export default function Register() {
   const [form, setForm] = useState({
     full_name: '', phone: '', address: '', barangay: 'Barangay 001',
     pin: '', confirm_pin: '', photo_url: '', terms: false, privacy: false,
-    gov_id_type: '', gov_id_number: '',
+    gov_id_type: '', gov_id_number: '', gov_id_photo: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [photoCompressing, setPhotoCompressing] = useState(false);
+  const [govIdCompressing, setGovIdCompressing] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,6 +23,7 @@ export default function Register() {
     if (!form.photo_url) { setError('Please upload your selfie photo'); return; }
     if (!form.gov_id_type) { setError('Please select your government ID type'); return; }
     if (!form.gov_id_number.trim()) { setError('Please enter your government ID number'); return; }
+    if (!form.gov_id_photo) { setError('Please upload a photo of your government ID'); return; }
     if (!form.terms) { setError('Please accept the terms and conditions'); return; }
     if (!form.privacy) { setError('Please accept the Data Privacy consent (RA 10173)'); return; }
     if (!/^09\d{9}$/.test(form.phone)) { setError('Phone must be 11 digits starting with 09'); return; }
@@ -39,6 +41,7 @@ export default function Register() {
         photo_url: form.photo_url || null,
         gov_id_type: form.gov_id_type,
         gov_id_number: form.gov_id_number.trim(),
+        gov_id_photo: form.gov_id_photo,
       });
       localStorage.setItem('pending_citizen_id', String(data.citizen_id));
       navigate('/verify');
@@ -80,6 +83,45 @@ export default function Register() {
 
       const compressed = canvas.toDataURL('image/jpeg', 0.7);
       setForm(f => ({ ...f, photo_url: compressed }));
+    };
+
+    img.src = objectUrl;
+  };
+
+  const handleGovIdPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setGovIdCompressing(true);
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      // ID documents: allow larger dimension so text is readable
+      const MAX_DIMENSION = 1200;
+      let { width, height } = img;
+
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        if (width > height) {
+          height = Math.round((height * MAX_DIMENSION) / width);
+          width = MAX_DIMENSION;
+        } else {
+          width = Math.round((width * MAX_DIMENSION) / height);
+          height = MAX_DIMENSION;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const compressed = canvas.toDataURL('image/jpeg', 0.8);
+      setForm(f => ({ ...f, gov_id_photo: compressed }));
+      setGovIdCompressing(false);
     };
 
     img.src = objectUrl;
@@ -171,6 +213,43 @@ export default function Register() {
           </select>
           <input style={inputStyle} placeholder="Enter your ID number *" value={form.gov_id_number}
             onChange={e => setForm(f => ({ ...f, gov_id_number: e.target.value }))} />
+
+          {/* Gov ID Photo Upload */}
+          <div style={{ marginTop: 10 }}>
+            <label htmlFor="gov-id-upload" style={{ cursor: 'pointer', display: 'block' }}>
+              <div style={{
+                width: '100%', minHeight: 90, borderRadius: 10,
+                border: form.gov_id_photo ? '2px solid var(--ph-gold)' : '2px dashed rgba(255,199,44,0.4)',
+                background: 'rgba(255,199,44,0.04)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                overflow: 'hidden', position: 'relative',
+              }}>
+                {form.gov_id_photo ? (
+                  <>
+                    <img src={form.gov_id_photo} alt="Gov ID"
+                      style={{ width: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 8 }} />
+                    <div style={{
+                      position: 'absolute', bottom: 0, left: 0, right: 0,
+                      background: 'rgba(0,0,0,0.55)', padding: '4px 8px', textAlign: 'center',
+                    }}>
+                      <span style={{ color: 'var(--ph-gold)', fontSize: 11 }}>✓ ID Photo Uploaded — Tap to Change</span>
+                    </div>
+                  </>
+                ) : govIdCompressing ? (
+                  <span style={{ color: '#aaa', fontSize: 12 }}>Compressing photo…</span>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 24, marginBottom: 4 }}>🪪</span>
+                    <span style={{ color: 'var(--ph-gold)', fontSize: 12, fontWeight: 600 }}>Tap to Upload ID Photo *</span>
+                    <span style={{ color: '#888', fontSize: 10, marginTop: 2 }}>Front side — must be clearly visible</span>
+                  </>
+                )}
+              </div>
+              <input id="gov-id-upload" type="file" accept="image/*" capture="environment"
+                onChange={handleGovIdPhotoUpload} style={{ display: 'none' }} />
+            </label>
+          </div>
+
           <p style={{ color: '#888', fontSize: 11, marginTop: 6, marginBottom: 0 }}>
             Your ID is stored securely and used only to verify your identity in case of misuse.
           </p>
