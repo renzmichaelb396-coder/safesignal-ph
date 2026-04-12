@@ -26,6 +26,11 @@ export default function Dashboard() {
   // Only auto-zoom when the PRIORITY alert changes (new ID). After first zoom, user can pan/zoom freely.
   const autoZoomAlertIdRef = useRef<number | null>(null);
   const [soundArmed, setSoundArmed] = useState(false);
+  const alarmIntervalRef = useRef<any>(null);
+  const soundArmedRef = useRef(false);
+  // Nearby officers per alert id (fetched once per ACTIVE alert)
+  const [nearbyOfficers, setNearbyOfficers] = useState<Record<number, any[]>>({});
+  const fetchedNearbyRef = useRef<Set<number>>(new Set());
 
   // Live timer + PST clock
   useEffect(() => {
@@ -77,7 +82,7 @@ export default function Dashboard() {
 
       leafletMapRef.current = new maplibregl.Map({
         container: mapRef.current!,
-        style: 'https://tiles.openfreemap.org/styles/liberty',
+        style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
         center: [120.9932, 14.5378],
         zoom: 14,
       });
@@ -128,6 +133,22 @@ export default function Dashboard() {
           if (needsAlarm) startAlarmLoop(); else stopAlarmLoop();
         }
         React.startTransition(() => { setAlerts(() => incoming); });
+        // Fetch nearby officers once per new ACTIVE alert (fire-and-forget)
+        const token = localStorage.getItem('dispatch_token');
+        if (token) {
+          for (const a of incoming) {
+            if (a.status === 'ACTIVE' && !fetchedNearbyRef.current.has(a.id) && a.lat != null && a.lng != null) {
+              fetchedNearbyRef.current.add(a.id);
+              fetch(`/api/dispatch/nearby-officers?lat=${a.lat}&lng=${a.lng}`, {
+                headers: { Authorization: 'Bearer ' + token },
+              }).then(r => r.json()).then(d => {
+                if (d.officers?.length) {
+                  setNearbyOfficers(prev => ({ ...prev, [a.id]: d.officers }));
+                }
+              }).catch(() => {});
+            }
+          }
+        }
       } catch {}
     };
 
@@ -181,19 +202,36 @@ export default function Dashboard() {
         const marker = officerMarkersRef.current.get(ofc.officer_id);
         marker.setLngLat([ofc.lng, ofc.lat]);
       } else {
-        // Wrapper: blue dot + visible name label below
+        // Waze-style officer marker: double pulsing ring + large blue dot + name badge
+        if (!document.getElementById('officer-pulse-style')) {
+          const s = document.createElement('style'); s.id = 'officer-pulse-style';
+          s.textContent = '@keyframes ofcPulse{0%{transform:translate(-50%,-50%) scale(1);opacity:0.65}100%{transform:translate(-50%,-50%) scale(2.8);opacity:0}}';
+          document.head.appendChild(s);
+        }
         const wrapper = document.createElement('div');
         wrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer;pointer-events:auto';
 
+        const dotWrap = document.createElement('div');
+        dotWrap.style.cssText = 'position:relative;width:42px;height:42px;display:flex;align-items:center;justify-content:center';
+
+        const pulse1 = document.createElement('div');
+        pulse1.style.cssText = 'position:absolute;top:50%;left:50%;width:42px;height:42px;border-radius:50%;background:rgba(59,130,246,0.45);animation:ofcPulse 1.8s ease-out infinite;pointer-events:none';
+        const pulse2 = document.createElement('div');
+        pulse2.style.cssText = 'position:absolute;top:50%;left:50%;width:42px;height:42px;border-radius:50%;background:rgba(59,130,246,0.28);animation:ofcPulse 1.8s ease-out infinite 0.7s;pointer-events:none';
+
         const dot = document.createElement('div');
-        dot.style.cssText = 'width:28px;height:28px;background:#3b82f6;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;box-shadow:0 0 0 3px rgba(59,130,246,0.4),0 2px 12px rgba(59,130,246,0.8)';
+        dot.style.cssText = 'position:relative;z-index:2;width:42px;height:42px;background:#1d4ed8;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;box-shadow:0 0 0 3px rgba(59,130,246,0.5),0 4px 20px rgba(59,130,246,0.9),0 2px 6px rgba(0,0,0,0.7)';
         dot.textContent = initials;
 
+        dotWrap.appendChild(pulse1);
+        dotWrap.appendChild(pulse2);
+        dotWrap.appendChild(dot);
+
         const nameLabel = document.createElement('div');
-        nameLabel.style.cssText = 'background:rgba(30,64,175,0.96);color:#fff;font-size:11px;font-weight:800;padding:2px 8px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.7);margin-top:4px;max-width:140px;overflow:hidden;text-overflow:ellipsis;border:1px solid rgba(255,255,255,0.25);letter-spacing:0.02em';
+        nameLabel.style.cssText = 'background:rgba(29,78,216,0.97);color:#fff;font-size:11px;font-weight:800;padding:2px 10px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,0.7);margin-top:5px;max-width:140px;overflow:hidden;text-overflow:ellipsis;border:1px solid rgba(255,255,255,0.3);letter-spacing:0.02em';
         nameLabel.textContent = ofc.full_name || ofc.badge_number;
 
-        wrapper.appendChild(dot);
+        wrapper.appendChild(dotWrap);
         wrapper.appendChild(nameLabel);
         wrapper.title = ofc.full_name + ' · ' + ofc.badge_number;
 
@@ -251,16 +289,17 @@ export default function Dashboard() {
       let pulseClass = '';
 
       if (!['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(alert.status)) continue;
+      // Citizen markers are ALWAYS red — officers are always blue
       if (alert.status === 'ACTIVE' && alert.is_suspicious) {
-        color = '#f97316'; size = 24; pulseClass = 'pin-suspicious';
+        color = '#E63946'; size = 24; pulseClass = 'pin-suspicious';
       } else if (alert.status === 'ACTIVE') {
         color = '#E63946'; size = 24; pulseClass = 'pin-active';
       } else if (alert.status === 'ACKNOWLEDGED') {
-        color = '#eab308'; size = 24;
+        color = '#E63946'; size = 24;
       } else if (alert.status === 'EN_ROUTE') {
-        color = '#38bdf8'; size = 22;
+        color = '#E63946'; size = 22;
       } else if (alert.status === 'ON_SCENE') {
-        color = '#f97316'; size = 22;
+        color = '#E63946'; size = 22;
       }
 
       if (markersRef.current.has(alert.id)) {
@@ -326,8 +365,8 @@ export default function Dashboard() {
   const armSound = () => {
     if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
     audioCtxRef.current.resume().catch(() => {});
-    setSoundArmed(true);
     soundArmedRef.current = true;
+    setSoundArmed(true);
     // If there are already unacknowledged alerts, start alarm immediately on arm
     const needsAlarm = alerts.some(a => ['ACTIVE', 'ACKNOWLEDGED'].includes(a.status));
     if (needsAlarm) setTimeout(startAlarmLoop, 100);
@@ -532,6 +571,63 @@ export default function Dashboard() {
                           <div style={{ marginTop: 4, fontSize: 10, color: '#38bdf8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                             <span>🚔</span>
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(alert as any).officer_name}</span>
+                          </div>
+                        )}
+                        {/* ESTOC 30s countdown badge */}
+                        {alert.status === 'ACTIVE' && (() => {
+                          const secElapsed = Math.floor((now - alert.triggered_at) / 1000);
+                          const secLeft = Math.max(0, 30 - secElapsed);
+                          const expired = secLeft === 0;
+                          const pct = Math.max(0, secLeft / 30);
+                          const badgeColor = expired ? '#dc2626' : pct > 0.5 ? '#22c55e' : '#eab308';
+                          return (
+                            <div
+                              onClick={e => e.stopPropagation()}
+                              style={{ marginTop: 6, padding: '5px 8px', borderRadius: 7, background: expired ? 'rgba(220,38,38,0.15)' : 'rgba(0,0,0,0.12)', border: `1px solid ${badgeColor}40`, display: 'flex', alignItems: 'center', gap: 6 }}
+                            >
+                              {expired ? (
+                                <>
+                                  <span style={{ fontSize: 13 }}>📞</span>
+                                  <span style={{ color: '#dc2626', fontSize: 11, fontWeight: 800, letterSpacing: 0.3, animation: 'pulse 1s infinite' }}>CALL ESTOC NOW — 30s elapsed</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span style={{ fontSize: 11 }}>⏱</span>
+                                  <span style={{ color: badgeColor, fontSize: 11, fontWeight: 700 }}>ESTOC call in {secLeft}s</span>
+                                  <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                                    <div style={{ height: '100%', width: `${pct * 100}%`, background: badgeColor, borderRadius: 2, transition: 'width 1s linear' }} />
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
+                        {/* Nearby Officers panel */}
+                        {nearbyOfficers[alert.id]?.length > 0 && (
+                          <div onClick={e => e.stopPropagation()} style={{ marginTop: 6, background: 'rgba(0,0,0,0.15)', borderRadius: 7, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                            <p style={{ color: '#94a3b8', fontSize: 10, fontWeight: 700, margin: 0, padding: '4px 8px', letterSpacing: 0.5, textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                              📍 Nearest Officers
+                            </p>
+                            {nearbyOfficers[alert.id].slice(0, 3).map((o: any, idx: number) => (
+                              <div key={o.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderTop: idx > 0 ? '1px solid rgba(255,255,255,0.05)' : undefined }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <span style={{ color: '#e1e4ed', fontSize: 11, fontWeight: 600 }}>{o.full_name}</span>
+                                  <span style={{ color: '#6b7280', fontSize: 10, marginLeft: 4 }}>{o.badge_number}</span>
+                                  <span style={{ color: '#38bdf8', fontSize: 10, marginLeft: 4 }}>{Number(o.distance_km).toFixed(2)}km</span>
+                                </div>
+                                {o.phone ? (
+                                  <a
+                                    href={`tel:${o.phone}`}
+                                    onClick={e => e.stopPropagation()}
+                                    style={{ background: '#16a34a', borderRadius: 5, padding: '2px 7px', color: '#fff', fontSize: 10, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap', marginLeft: 6 }}
+                                  >
+                                    📞 Call
+                                  </a>
+                                ) : (
+                                  <span style={{ color: '#4b5563', fontSize: 10, marginLeft: 6 }}>No #</span>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>

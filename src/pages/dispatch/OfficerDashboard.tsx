@@ -48,6 +48,7 @@ export default function OfficerDashboard() {
   const hasInitialLoadRef = useRef(false);
   const alarmIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const soundArmedRef = useRef(false);
+  const hasZoomedToAssignmentRef = useRef<number | null>(null);
   const [toastMsg, setToastMsg] = useState('');
   const [soundArmed, setSoundArmed] = useState(false);
   const [dispositionNotes, setDispositionNotes] = useState('');
@@ -130,7 +131,11 @@ export default function OfficerDashboard() {
     // map.on('load') inside initMap() handles the first location report.
     const interval = setInterval(fetchAssignment, 5000);
     const locInterval = setInterval(reportLocation, 10000); // Report GPS every 10s after map ready
-    return () => { clearInterval(interval); clearInterval(locInterval); };
+    return () => {
+      clearInterval(interval);
+      clearInterval(locInterval);
+      if (alarmIntervalRef.current) { clearInterval(alarmIntervalRef.current); alarmIntervalRef.current = null; }
+    };
   }, []);
 
   function showToast(msg: string) { setToastMsg(msg); setTimeout(() => setToastMsg(''), 2500); }
@@ -223,10 +228,22 @@ export default function OfficerDashboard() {
     if (officerMarkerRef.current) {
       officerMarkerRef.current.setLngLat([lng, lat]);
     } else {
+      // Waze-style "you are here" dot: pulsing ring + bold blue circle
+      if (!document.getElementById('officer-self-pulse-style')) {
+        const s = document.createElement('style'); s.id = 'officer-self-pulse-style';
+        s.textContent = '@keyframes selfPulse{0%{transform:translate(-50%,-50%) scale(1);opacity:0.6}100%{transform:translate(-50%,-50%) scale(3);opacity:0}}';
+        document.head.appendChild(s);
+      }
+      const elWrap = document.createElement('div');
+      elWrap.style.cssText = 'position:relative;width:28px;height:28px;display:flex;align-items:center;justify-content:center';
+      const selfPulse = document.createElement('div');
+      selfPulse.style.cssText = 'position:absolute;top:50%;left:50%;width:28px;height:28px;border-radius:50%;background:rgba(59,130,246,0.5);animation:selfPulse 2s ease-out infinite;pointer-events:none';
       const el = document.createElement('div');
-      el.style.cssText = 'width:18px;height:18px;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(59,130,246,0.8);cursor:default';
+      el.style.cssText = 'position:relative;z-index:2;width:28px;height:28px;background:#2563eb;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 3px rgba(59,130,246,0.4),0 2px 14px rgba(59,130,246,0.9);cursor:default';
       el.title = 'Your location';
-      officerMarkerRef.current = new maplibregl.Marker({ element: el })
+      elWrap.appendChild(selfPulse);
+      elWrap.appendChild(el);
+      officerMarkerRef.current = new maplibregl.Marker({ element: elWrap })
         .setLngLat([lng, lat])
         .addTo(mapInstanceRef.current);
     }
@@ -263,7 +280,7 @@ export default function OfficerDashboard() {
         const PASAY_CENTER: [number, number] = [120.9982, 14.5378];
         mapInstanceRef.current = new maplibregl.Map({
           container: mapRef.current,
-          style: 'https://tiles.openfreemap.org/styles/liberty',
+          style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
           center: PASAY_CENTER,
           zoom: 14,
         });
@@ -297,19 +314,38 @@ export default function OfficerDashboard() {
         if (needsAlarm) startAlarmLoop(); else stopAlarmLoop();
       }
       hasInitialLoadRef.current = true;
+      // Continuous alarm: loop while assignment is ACTIVE (unacknowledged), stop on acknowledge
+      if (incoming?.status === 'ACTIVE' && soundArmedRef.current) {
+        if (!alarmIntervalRef.current) {
+          playAssignmentAlert();
+          alarmIntervalRef.current = setInterval(() => playAssignmentAlert(), 2000);
+        }
+      } else {
+        if (alarmIntervalRef.current) {
+          clearInterval(alarmIntervalRef.current);
+          alarmIntervalRef.current = null;
+        }
+      }
       setAssignment(incoming);
       setLoading(false);
-      if (incoming) updateMap(incoming.lat, incoming.lng);
+      if (incoming) {
+        // Only fly to SOS location the FIRST time this assignment ID appears (or on new assignment).
+        // After that, user can freely zoom/pan — marker updates silently without re-zooming.
+        const shouldFly = incoming.id !== hasZoomedToAssignmentRef.current;
+        if (shouldFly) hasZoomedToAssignmentRef.current = incoming.id;
+        updateMap(incoming.lat, incoming.lng, shouldFly);
+      }
     } catch {
       setAssignment(null);
       setLoading(false);
     }
   }
 
-  function updateMap(lat: number, lng: number) {
+  function updateMap(lat: number, lng: number, flyTo: boolean = true) {
     if (!mapInstanceRef.current) { pendingCitizenRef.current = { lat, lng }; return; }
     const maplibregl = (window as any).maplibregl;
-    mapInstanceRef.current.flyTo({ center: [lng, lat], zoom: 16 });
+    // Only fly when explicitly requested (new assignment ID) — lets user zoom/pan freely after initial fly-in
+    if (flyTo) mapInstanceRef.current.flyTo({ center: [lng, lat], zoom: 16 });
     if (markerRef.current) { markerRef.current.setLngLat([lng, lat]); } else {
       const popup = new maplibregl.Popup({ offset: 36, closeOnClick: false, className: 'sos-popup' }).setHTML(
         '<div style="background:#7f0000;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.6);">🚨 SOS — Citizen Location</div>'
@@ -386,8 +422,8 @@ export default function OfficerDashboard() {
                 onClick={() => {
                   if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
                   audioCtxRef.current.resume().catch(() => {});
-                  setSoundArmed(true);
                   soundArmedRef.current = true;
+                  setSoundArmed(true);
                   // Start alarm immediately if there's already an unacknowledged assignment
                   if (assignment && ['ACTIVE', 'ACKNOWLEDGED'].includes(assignment.status)) {
                     setTimeout(startAlarmLoop, 100);

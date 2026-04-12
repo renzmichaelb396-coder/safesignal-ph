@@ -34,6 +34,10 @@ export default function SosConfirm() {
   const [geoError, setGeoError] = useState('');
   const [incidentPhoto, setIncidentPhoto] = useState<string | null>(null);
   const [photoCompressing, setPhotoCompressing] = useState(false);
+  // Safety gate: 'ask' → 5s auto-advance or YES/NO → 'cancel' or 'pin'
+  const [gatePhase, setGatePhase] = useState<'ask' | 'cancel' | 'pin'>('ask');
+  const [gateTimer, setGateTimer] = useState(5);
+  const [cancelCode, setCancelCode] = useState('');
 
   useEffect(() => {
     if (authLoading) return;
@@ -41,6 +45,14 @@ export default function SosConfirm() {
       navigate('/login');
     }
   }, [user, authLoading, navigate]);
+
+  // 5-second auto-advance: if user doesn't tap YES/NO, SOS fires automatically (coercion protection)
+  useEffect(() => {
+    if (gatePhase !== 'ask') return;
+    if (gateTimer <= 0) { setGatePhase('pin'); return; }
+    const t = setTimeout(() => setGateTimer(gateTimer - 1), 1000);
+    return () => clearTimeout(t);
+  }, [gatePhase, gateTimer]);
 
   useEffect(() => {
     if (showCountdown && countdown > 0) {
@@ -130,6 +142,132 @@ export default function SosConfirm() {
       setLoading(false);
     }
   };
+
+  // Safety gate — YES/NO screen with 5s auto-fire
+  if (gatePhase === 'ask') {
+    return (
+      <div
+        className="citizen-container flex flex-col items-center justify-center min-h-screen"
+        style={{ background: '#3d0a0a', padding: '40px 24px' }}
+      >
+        <div className="flex flex-col items-center gap-6 w-full" style={{ maxWidth: 340 }}>
+          <span style={{ fontSize: 56 }}>🚨</span>
+          <h1 style={{ color: '#fff', fontSize: 24, fontWeight: 900, textAlign: 'center', margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>
+            Real Emergency?
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 14, textAlign: 'center', margin: 0 }}>
+            Are you in immediate danger and need police assistance?
+          </p>
+          {/* Auto-fire countdown ring */}
+          <div style={{ position: 'relative', width: 100, height: 100 }}>
+            <svg style={{ position: 'absolute', inset: 0, width: 100, height: 100, transform: 'rotate(-90deg)' }}>
+              <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="6" />
+              <circle
+                cx="50" cy="50" r="42"
+                fill="none"
+                stroke="#ff6b6b"
+                strokeWidth="6"
+                strokeDasharray={`${(1 - gateTimer / 5) * 263.9} 263.9`}
+                style={{ transition: 'stroke-dasharray 1s linear' }}
+              />
+            </svg>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ color: '#ffc107', fontSize: 28, fontWeight: 800 }}>{gateTimer}</span>
+              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>auto-send</span>
+            </div>
+          </div>
+          <div className="flex gap-4 w-full">
+            <button
+              onClick={() => setGatePhase('cancel')}
+              style={{
+                flex: 1, padding: '16px', borderRadius: 14,
+                background: 'rgba(255,255,255,0.12)',
+                border: '2px solid rgba(255,255,255,0.25)',
+                color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              ✋ NO
+            </button>
+            <button
+              onClick={() => setGatePhase('pin')}
+              style={{
+                flex: 1, padding: '16px', borderRadius: 14,
+                background: 'rgba(200,30,30,0.9)',
+                border: '2px solid rgba(255,107,107,0.5)',
+                color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              🚨 YES
+            </button>
+          </div>
+          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center' }}>
+            SOS will send automatically in {gateTimer}s if you don't respond
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Cancel screen — must enter correct code; wrong code fires SOS anyway (coercion protection)
+  if (gatePhase === 'cancel') {
+    const handleCancelSubmit = () => {
+      if (cancelCode === '1234') {
+        navigate('/home');
+      } else {
+        // Wrong code = possible coercion → fire SOS anyway
+        setGatePhase('pin');
+      }
+    };
+    return (
+      <div
+        className="citizen-container flex flex-col items-center justify-center min-h-screen"
+        style={{ background: '#0d1117', padding: '40px 24px' }}
+      >
+        <div className="flex flex-col items-center gap-6 w-full" style={{ maxWidth: 340 }}>
+          <span style={{ fontSize: 48 }}>🔐</span>
+          <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 900, textAlign: 'center', margin: 0 }}>
+            Safety Code Required
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, textAlign: 'center', margin: 0 }}>
+            Enter your 4-digit safety code to cancel. If you are being forced, enter any wrong code — your SOS will still be sent silently.
+          </p>
+          <input
+            type="number"
+            inputMode="numeric"
+            maxLength={4}
+            value={cancelCode}
+            onChange={e => setCancelCode(e.target.value.slice(0, 4))}
+            placeholder="_ _ _ _"
+            style={{
+              width: '100%', padding: '16px', borderRadius: 12, fontSize: 24,
+              fontWeight: 700, textAlign: 'center', letterSpacing: 8,
+              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
+              color: '#fff', outline: 'none',
+            }}
+          />
+          <button
+            onClick={handleCancelSubmit}
+            disabled={cancelCode.length !== 4}
+            style={{
+              width: '100%', padding: '16px', borderRadius: 12,
+              background: cancelCode.length === 4 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              color: '#fff', fontSize: 15, fontWeight: 700,
+              cursor: cancelCode.length !== 4 ? 'not-allowed' : 'pointer',
+            }}
+          >
+            Cancel SOS
+          </button>
+          <button
+            onClick={() => setGatePhase('pin')}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,107,107,0.8)', fontSize: 13, cursor: 'pointer', padding: '4px 0' }}
+          >
+            Go back — I need help
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (showCountdown) {
     return (

@@ -77,7 +77,7 @@ async function initDb(): Promise<void> {
     ]);
     // ── Phase 2: tables that depend on stations or citizens ───────────────────
     await Promise.all([
-      pool.query(`CREATE TABLE IF NOT EXISTS station_settings (id SERIAL PRIMARY KEY, station_id INT UNIQUE REFERENCES stations(id), surge_threshold INT DEFAULT 5, surge_window_minutes INT DEFAULT 2, cooldown_minutes INT DEFAULT 10, strike_limit INT DEFAULT 3)`),
+      pool.query(`CREATE TABLE IF NOT EXISTS station_settings (id SERIAL PRIMARY KEY, station_id INT UNIQUE REFERENCES stations(id), surge_threshold INT DEFAULT 5, surge_window_minutes INT DEFAULT 2, cooldown_minutes INT DEFAULT 10, strike_limit INT DEFAULT 2)`),
       pool.query(`CREATE TABLE IF NOT EXISTS officers (id SERIAL PRIMARY KEY, station_id INT REFERENCES stations(id), badge_number TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL, full_name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'DISPATCHER', password_hash TEXT NOT NULL, is_active BOOL DEFAULT true, last_login BIGINT, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`),
       pool.query(`CREATE TABLE IF NOT EXISTS citizen_trust_scores (id SERIAL PRIMARY KEY, citizen_id INT UNIQUE REFERENCES citizens(id), score INT DEFAULT 100, total_alerts INT DEFAULT 0, false_alarms INT DEFAULT 0, resolved_emergencies INT DEFAULT 0, last_updated BIGINT)`),
       pool.query(`CREATE TABLE IF NOT EXISTS otp_codes (id SERIAL PRIMARY KEY, citizen_id INT REFERENCES citizens(id), code TEXT NOT NULL, expires_at BIGINT)`),
@@ -104,8 +104,11 @@ async function initDb(): Promise<void> {
         .then(() => pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_photo TEXT`))
         .then(() => pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='citizens' AND column_name='is_suspended' AND data_type='integer') THEN ALTER TABLE citizens ALTER COLUMN is_suspended TYPE BOOLEAN USING (is_suspended::integer != 0); END IF; END $$`))
         .then(() => pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='citizens' AND column_name='verified' AND data_type='integer') THEN ALTER TABLE citizens ALTER COLUMN verified TYPE BOOLEAN USING (verified::integer != 0); END IF; END $$`)),
-      // sos_alerts — single column add
+      // sos_alerts — column adds sequential on same table
       pool.query(`ALTER TABLE sos_alerts ADD COLUMN IF NOT EXISTS incident_photo TEXT`),
+      // officers — duty_status and phone for nearby-officers feature
+      pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS duty_status TEXT DEFAULT 'ON_DUTY'`)
+        .then(() => pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS phone TEXT`)),
     ]);
     // ── Phase 6: indexes (all idempotent, run in parallel) ────────────────────
     await Promise.all([
@@ -124,7 +127,7 @@ async function initDb(): Promise<void> {
     const stationId = stationResult.rows[0].id;
     await pool.query(`
       INSERT INTO station_settings (station_id, surge_threshold, surge_window_minutes, cooldown_minutes, strike_limit)
-      VALUES ($1, 5, 2, 10, 3)
+      VALUES ($1, 5, 2, 10, 2)
       ON CONFLICT (station_id) DO NOTHING
     `, [stationId]);
     const officers = [
@@ -364,6 +367,51 @@ app.post('/api/dispatch/login', async (req: any, res: any) => {
   } catch (error) { console.error('Login error:', error); res.status(500).json({ error: 'Failed to process login' }); }
 });
 
+// POST /api/dispatch/register
+app.post('/api/dispatch/register', async (req: any, res: any) => {
+  try {
+    const { full_name, email, badge_number, password, role } = req.body;
+    if (!full_name || !email || !badge_number || !password) {
+      res.status(400).json({ error: 'full_name, email, badge_number, and password are required' }); return;
+    }
+    const allowedRoles = ['OFFICER', 'DISPATCHER'];
+    const assignedRole = allowedRoles.includes(role) ? role : 'OFFICER';
+
+    // Check for duplicate email or badge_number
+    const existing = await pool.query(
+      'SELECT id FROM officers WHERE email = $1 OR badge_number = $2',
+      [email, badge_number]
+    );
+    if (existing.rows.length > 0) {
+      res.status(409).json({ error: 'An account with this email or badge number already exists.' }); return;
+    }
+
+    // Get station
+    const stationResult = await pool.query('SELECT id FROM stations LIMIT 1');
+    let stationId: number;
+    if (stationResult.rows.length > 0) {
+      stationId = stationResult.rows[0].id;
+    } else {
+      const newStation = await pool.query(
+        `INSERT INTO stations (name, barangay, contact_number) VALUES ($1, $2, $3) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id`,
+        ['Pasay City Police Station', 'Pasay City', '(02) 833-0000']
+      );
+      stationId = newStation.rows[0].id;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      `INSERT INTO officers (full_name, email, badge_number, station_id, role, password_hash, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, true) RETURNING id, full_name, email, badge_number, role`,
+      [full_name, email, badge_number, stationId, assignedRole, passwordHash]
+    );
+    res.status(201).json({ message: 'Account created successfully.', officer: result.rows[0] });
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ error: 'Registration failed. Please try again.' });
+  }
+});
+
 // GET /api/dispatch/alerts
 app.get('/api/dispatch/alerts', requireOfficerAuth, async (req: any, res: any) => {
   try {
@@ -560,7 +608,7 @@ app.post('/api/dispatch/alerts/:id/false-alarm', requireOfficerAuth, async (req:
     const citizen = citizenResult.rows[0];
     const settingsResult = await pool.query('SELECT * FROM station_settings LIMIT 1');
     const settings = settingsResult.rows[0];
-    const strikeLimit = settings?.strike_limit || 3;
+    const strikeLimit = settings?.strike_limit || 2;
     const newStrikes = (citizen.strike_count || 0) + 1;
     let isSuspended = citizen.is_suspended;
     let suspensionReason = citizen.suspension_reason;
@@ -647,7 +695,7 @@ app.patch('/api/dispatch/citizens/:id/verify', requireOfficerAuth, async (req: a
 // GET /api/dispatch/officers
 app.get('/api/dispatch/officers', requireOfficerAuth, async (_req: any, res: any) => {
   try {
-    const result = await pool.query(`SELECT o.*, s.name as station_name FROM officers o LEFT JOIN stations s ON o.station_id = s.id WHERE o.is_active = 1 ORDER BY o.created_at DESC`);
+    const result = await pool.query(`SELECT o.*, s.name as station_name, ol.lat as officer_lat, ol.lng as officer_lng, ol.status as duty_status, ol.updated_at as location_updated_at FROM officers o LEFT JOIN stations s ON o.station_id = s.id LEFT JOIN officer_locations ol ON ol.officer_id = o.id ORDER BY o.created_at DESC`);
     res.json({ officers: result.rows.map((o: any) => { const r = { ...o }; delete r.password_hash; return r; }) });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch officers' }); }
 });
@@ -675,8 +723,9 @@ app.post('/api/dispatch/officers/:id/toggle-active', requireAdminAuth, async (re
     const officer = officerResult.rows[0];
     if (!officer) { res.status(404).json({ error: 'Officer not found' }); return; }
     if (officer.id === officerPayload.id) { res.status(400).json({ error: 'Cannot deactivate yourself' }); return; }
-    await pool.query('UPDATE officers SET is_active = $1 WHERE id = $2', [officer.is_active ? 0 : 1, officer.id]);
-    res.json({ success: true, is_active: !officer.is_active });
+    const newActive = officer.is_active ? 0 : 1;
+    await pool.query('UPDATE officers SET is_active = $1 WHERE id = $2', [newActive, officer.id]);
+    res.json({ success: true, is_active: newActive });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to toggle officer status' }); }
 });
 
@@ -718,48 +767,41 @@ app.get('/api/dispatch/stats', requireOfficerAuth, async (req: any, res: any) =>
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch stats' }); }
 });
 
-// GET /api/dispatch/reports — weekly or monthly grouping for Metrics page
+// GET /api/dispatch/reports — weekly or monthly grouping, timezone-aware (Manila)
 app.get('/api/dispatch/reports', requireOfficerAuth, async (req: any, res: any) => {
   try {
-    const { groupBy, period } = req.query;
-    let sinceMs = 0;
-    if (period === '30d') sinceMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    else if (period === '90d') sinceMs = Date.now() - 90 * 24 * 60 * 60 * 1000;
-    // else 'all' — no lower bound
-
-    // Group by ISO week (Mon–Sun) or calendar month using epoch ms column
-    let labelExpr: string;
-    if (groupBy === 'month') {
-      // e.g. "2026-04"
-      labelExpr = `TO_CHAR(TO_TIMESTAMP(triggered_at / 1000), 'YYYY-MM')`;
-    } else {
-      // default: week — e.g. "2026-W14"
-      labelExpr = `TO_CHAR(DATE_TRUNC('week', TO_TIMESTAMP(triggered_at / 1000)), 'YYYY-"W"IW')`;
-    }
-
-    const result = await pool.query(
-      `SELECT
-         ${labelExpr} AS label,
-         COUNT(*) AS total,
-         SUM(CASE WHEN status = 'RESOLVED' THEN 1 ELSE 0 END) AS resolved,
-         SUM(CASE WHEN status = 'FALSE_ALARM' THEN 1 ELSE 0 END) AS false_alarms,
-         SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled,
-         ROUND(AVG(CASE WHEN acknowledged_at IS NOT NULL THEN (acknowledged_at - triggered_at) / 60000.0 ELSE NULL END)::numeric, 1) AS avg_response_min
-       FROM sos_alerts
-       WHERE triggered_at >= $1
-       GROUP BY label
-       ORDER BY label ASC`,
-      [sinceMs]
-    );
-
-    res.json({ reports: result.rows.map(r => ({
-      label: r.label,
-      total: parseInt(r.total, 10),
-      resolved: parseInt(r.resolved, 10),
-      false_alarms: parseInt(r.false_alarms, 10),
-      cancelled: parseInt(r.cancelled, 10),
-      avg_response_min: r.avg_response_min != null ? parseFloat(r.avg_response_min) : null,
-    })) });
+    const groupBy = (req.query.groupBy as string) === 'month' ? 'month' : 'week';
+    const periodParam = req.query.period as string;
+    const cutoff = periodParam === '30d' ? Date.now() - 30 * 24 * 60 * 60 * 1000
+      : periodParam === 'all' ? 0
+      : Date.now() - 90 * 24 * 60 * 60 * 1000;
+    const result = await pool.query(`
+      SELECT
+        DATE_TRUNC($1, to_timestamp(triggered_at / 1000.0) AT TIME ZONE 'Asia/Manila') AS period_start,
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE status = 'RESOLVED')::int AS resolved,
+        COUNT(*) FILTER (WHERE status = 'FALSE_ALARM')::int AS false_alarms,
+        COUNT(*) FILTER (WHERE status = 'CANCELLED')::int AS cancelled,
+        AVG(CASE WHEN acknowledged_at IS NOT NULL AND triggered_at IS NOT NULL
+            THEN (acknowledged_at - triggered_at) / 60000.0 END) AS avg_response_min
+      FROM sos_alerts
+      WHERE triggered_at >= $2
+      GROUP BY period_start
+      ORDER BY period_start DESC
+      LIMIT 12
+    `, [groupBy, cutoff]);
+    const reports = result.rows.map((r: any) => ({
+      period_start: r.period_start,
+      label: groupBy === 'month'
+        ? new Date(r.period_start).toLocaleDateString('en-PH', { month: 'short', year: 'numeric', timeZone: 'Asia/Manila' })
+        : 'Wk ' + new Date(r.period_start).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' }),
+      total: r.total,
+      resolved: r.resolved,
+      false_alarms: r.false_alarms,
+      cancelled: r.cancelled,
+      avg_response_min: r.avg_response_min != null ? Math.round(parseFloat(r.avg_response_min) * 10) / 10 : null,
+    }));
+    res.json({ reports });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch reports' }); }
 });
 
@@ -940,6 +982,13 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
     if (citizen.is_suspended) { res.status(403).json({ error: 'Account suspended', reason: citizen.suspension_reason }); return; }
     const pinHash = hashPin(pin);
     if (citizen.pin_hash !== pinHash) { res.status(401).json({ error: 'Invalid PIN' }); return; }
+    // Geo-fence: only accept SOS from within Pasay City boundaries
+    const PASAY_LAT_MIN = 14.510, PASAY_LAT_MAX = 14.590;
+    const PASAY_LNG_MIN = 120.970, PASAY_LNG_MAX = 121.030;
+    if (lat < PASAY_LAT_MIN || lat > PASAY_LAT_MAX || lng < PASAY_LNG_MIN || lng > PASAY_LNG_MAX) {
+      res.status(403).json({ error: 'Outside coverage area. SafeSignal PH currently covers Pasay City only.' });
+      return;
+    }
     const settingsResult = await pool.query('SELECT * FROM station_settings LIMIT 1');
     const settings = settingsResult.rows[0];
     const cooldownMs = (settings?.cooldown_minutes || 10) * 60 * 1000;
@@ -1042,6 +1091,37 @@ app.post('/api/citizen/resend-otp', async (req: any, res: any) => {
     await sendSmsOtp(phone, otpCode);
     res.json({ message: 'OTP resent' });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to resend OTP' }); }
+});
+
+// GET /api/dispatch/nearby-officers?lat=X&lng=Y
+app.get('/api/dispatch/nearby-officers', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const lat = parseFloat(req.query.lat as string);
+    const lng = parseFloat(req.query.lng as string);
+    if (isNaN(lat) || isNaN(lng)) { res.status(400).json({ error: 'lat and lng are required' }); return; }
+    const fifteenMinAgo = Date.now() - 15 * 60 * 1000;
+    // Haversine distance in km using PostgreSQL math
+    const result = await pool.query(
+      `SELECT o.id, o.full_name, o.badge_number, o.phone, o.duty_status,
+              ol.lat, ol.lng, ol.updated_at,
+              (6371 * acos(
+                cos(radians($1)) * cos(radians(ol.lat)) *
+                cos(radians(ol.lng) - radians($2)) +
+                sin(radians($1)) * sin(radians(ol.lat))
+              )) AS distance_km
+       FROM officer_locations ol
+       JOIN officers o ON ol.officer_id = o.id
+       WHERE o.is_active = true
+         AND ol.updated_at > $3
+       ORDER BY distance_km ASC
+       LIMIT 5`,
+      [lat, lng, fifteenMinAgo]
+    );
+    res.json({ officers: result.rows });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch nearby officers' });
+  }
 });
 
 // GET /api/dispatch/officer-locations
