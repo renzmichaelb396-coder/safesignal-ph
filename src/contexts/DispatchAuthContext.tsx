@@ -16,7 +16,7 @@ interface OfficerUser {
 interface DispatchAuthContextType {
   officer: OfficerUser | null;
   loading: boolean;
-  login: (email: string, password: string, badge_number: string) => Promise<void>;
+  login: (email: string, password: string, badge_number: string, remember?: boolean) => Promise<void>;
   logout: () => void;
 }
 
@@ -57,8 +57,8 @@ export function DispatchAuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string, badge_number: string) => {
-    const data: any = await dispatchApi.login({ email, password, badge_number });
+  const login = async (email: string, password: string, badge_number: string, remember?: boolean) => {
+    const data: any = await dispatchApi.login({ email, password, badge_number, remember });
     // Normalize officer: API returns 'name', interface expects 'full_name'
     const officer = { ...data.officer, full_name: data.officer.full_name || data.officer.name };
     saveSession(data.token, officer);
