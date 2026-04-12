@@ -90,6 +90,7 @@ export const dispatchApi = {
   suspendCitizen: (id, reason) => request(`/api/dispatch/citizens/${id}/suspend`, { method: 'POST', body: JSON.stringify({ reason }) }, 'officer'),
   unsuspendCitizen: (id) => request(`/api/dispatch/citizens/${id}/unsuspend`, { method: 'POST' }, 'officer'),
   resetStrikes: (id) => request(`/api/dispatch/citizens/${id}/reset-strikes`, { method: 'POST' }, 'officer'),
+  verifyCitizen: (id, verified) => request(`/api/dispatch/citizens/${id}/verify`, { method: 'PATCH', body: JSON.stringify({ verified }) }, 'officer'),
   getOfficers: () => request('/api/dispatch/officers', {}, 'officer'),
   addOfficer: (body) => request('/api/dispatch/officers', { method: 'POST', body: JSON.stringify(body) }, 'officer'),
   toggleOfficerActive: (id) => request(`/api/dispatch/officers/${id}/toggle-active`, { method: 'POST' }, 'officer'),

@@ -77,6 +77,9 @@ async function initDb(): Promise<void> {
     await pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS heading FLOAT`);
     await pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ON_DUTY'`);
     await pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS updated_at BIGINT`);
+    await pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_type TEXT`);
+    await pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_number TEXT`);
+    await pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_photo TEXT`);
     const stationResult = await pool.query(`
       INSERT INTO stations (name, barangay, latitude, longitude, contact_number)
       VALUES ($1, $2, $3, $4, $5)
@@ -425,6 +428,16 @@ app.post('/api/dispatch/citizens/:id/reset-strikes', requireOfficerAuth, async (
   catch (error) { console.error(error); res.status(500).json({ error: 'Failed to reset strikes' }); }
 });
 
+// PATCH /api/dispatch/citizens/:id/verify — Station Admin only
+app.patch('/api/dispatch/citizens/:id/verify', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    if (req.officer.role !== 'STATION_ADMIN') { res.status(403).json({ error: 'Only Station Admin can verify citizens' }); return; }
+    const { verified } = req.body;
+    await pool.query(`UPDATE citizens SET verified = $1 WHERE id = $2`, [verified ? 1 : 0, req.params.id]);
+    res.json({ success: true, verified: !!verified });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to update verification status' }); }
+});
+
 // GET /api/dispatch/officers
 app.get('/api/dispatch/officers', requireOfficerAuth, async (_req: any, res: any) => {
   try {
@@ -532,15 +545,16 @@ async function sendSmsOtp(phone: string, code: string): Promise<void> {
 // POST /api/citizen/register
 app.post('/api/citizen/register', async (req: any, res: any) => {
   try {
-    const { full_name, phone, address, barangay, pin, photo_url, gov_id_type, gov_id_number } = req.body;
+    const { full_name, phone, address, barangay, pin, photo_url, gov_id_type, gov_id_number, gov_id_photo } = req.body;
     if (!full_name || !phone || !pin) { res.status(400).json({ error: 'full_name, phone, and pin are required' }); return; }
     if (!gov_id_type || !gov_id_number) { res.status(400).json({ error: 'Government ID type and number are required' }); return; }
+    if (!gov_id_photo) { res.status(400).json({ error: 'A photo of your government ID is required' }); return; }
     if (!/^09\d{9}$/.test(phone)) { res.status(400).json({ error: 'Phone must be 11 digits starting with 09' }); return; }
     if (!/^\d{4}$/.test(pin)) { res.status(400).json({ error: 'PIN must be 4 digits' }); return; }
     const existing = await pool.query('SELECT id FROM citizens WHERE phone = $1', [phone]);
     if (existing.rows.length > 0) { res.status(409).json({ error: 'Phone number already registered' }); return; }
     const pinHash = hashPin(pin);
-    const result = await pool.query(`INSERT INTO citizens (full_name, phone, address, barangay, pin_hash, photo_url, verified, gov_id_type, gov_id_number) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8) RETURNING id`, [full_name, phone, address || null, barangay || null, pinHash, photo_url || null, gov_id_type, gov_id_number]);
+    const result = await pool.query(`INSERT INTO citizens (full_name, phone, address, barangay, pin_hash, photo_url, verified, gov_id_type, gov_id_number, gov_id_photo) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9) RETURNING id`, [full_name, phone, address || null, barangay || null, pinHash, photo_url || null, gov_id_type, gov_id_number, gov_id_photo]);
     const citizenId = result.rows[0].id;
     await pool.query(`INSERT INTO citizen_trust_scores (citizen_id, score, total_alerts, false_alarms, resolved_emergencies) VALUES ($1, 100, 0, 0, 0)`, [citizenId]);
     const otpCode = String(Math.floor(100000 + Math.random() * 900000));
