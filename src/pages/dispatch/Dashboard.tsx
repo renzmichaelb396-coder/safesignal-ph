@@ -26,8 +26,6 @@ export default function Dashboard() {
   // Only auto-zoom when the PRIORITY alert changes (new ID). After first zoom, user can pan/zoom freely.
   const autoZoomAlertIdRef = useRef<number | null>(null);
   const [soundArmed, setSoundArmed] = useState(false);
-  const alarmIntervalRef = useRef<any>(null);
-  const soundArmedRef = useRef(false);
   // Nearby officers per alert id (fetched once per ACTIVE alert)
   const [nearbyOfficers, setNearbyOfficers] = useState<Record<number, any[]>>({});
   const fetchedNearbyRef = useRef<Set<number>>(new Set());
