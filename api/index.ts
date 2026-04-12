@@ -23,8 +23,8 @@ const pool = new Pool({
     'postgresql://postgres.royymgtupuecnxqhnzle:RespondPH_Pilot2025@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres',
   ssl: { rejectUnauthorized: false },
   max: 5,
-  connectionTimeoutMillis: 10000,
-  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: 10000,
 });
 
 function hashPin(pin: string): string {
@@ -64,32 +64,45 @@ async function initDb(): Promise<void> {
     } catch (fixErr) {
       console.error('[SafeSignal] PNP-002 fix error:', fixErr);
     }
-    // Create tables if they don't exist yet (idempotent schema bootstrap)
-    await pool.query(`CREATE TABLE IF NOT EXISTS stations (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, barangay TEXT, latitude FLOAT, longitude FLOAT, contact_number TEXT, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS station_settings (id SERIAL PRIMARY KEY, station_id INT UNIQUE REFERENCES stations(id), surge_threshold INT DEFAULT 5, surge_window_minutes INT DEFAULT 2, cooldown_minutes INT DEFAULT 10, strike_limit INT DEFAULT 3)`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS officers (id SERIAL PRIMARY KEY, station_id INT REFERENCES stations(id), badge_number TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL, full_name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'DISPATCHER', password_hash TEXT NOT NULL, is_active BOOL DEFAULT true, last_login BIGINT, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS citizens (id SERIAL PRIMARY KEY, full_name TEXT NOT NULL, phone TEXT UNIQUE NOT NULL, address TEXT, barangay TEXT, city TEXT, pin_hash TEXT NOT NULL, photo_url TEXT, verified BOOL DEFAULT false, strike_count INT DEFAULT 0, is_suspended BOOL DEFAULT false, suspension_reason TEXT, registered_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000), last_active BIGINT)`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS citizen_trust_scores (id SERIAL PRIMARY KEY, citizen_id INT UNIQUE REFERENCES citizens(id), score INT DEFAULT 100, total_alerts INT DEFAULT 0, false_alarms INT DEFAULT 0, resolved_emergencies INT DEFAULT 0, last_updated BIGINT)`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS sos_alerts (id SERIAL PRIMARY KEY, citizen_id INT REFERENCES citizens(id), lat FLOAT NOT NULL, lng FLOAT NOT NULL, status TEXT NOT NULL DEFAULT 'ACTIVE', triggered_at BIGINT, acknowledged_at BIGINT, resolved_at BIGINT, cancelled_at BIGINT, location_accuracy FLOAT, assigned_officer_id INT REFERENCES officers(id), is_suspicious BOOL DEFAULT false, suspicious_reason TEXT, notes TEXT, cancellation_reason TEXT)`);
+    // ── Phase 1: base tables with no cross-table FK (run in parallel) ──────────
+    await Promise.all([
+      pool.query(`CREATE TABLE IF NOT EXISTS stations (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, barangay TEXT, latitude FLOAT, longitude FLOAT, contact_number TEXT, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`),
+      pool.query(`CREATE TABLE IF NOT EXISTS citizens (id SERIAL PRIMARY KEY, full_name TEXT NOT NULL, phone TEXT UNIQUE NOT NULL, address TEXT, barangay TEXT, city TEXT, pin_hash TEXT NOT NULL, photo_url TEXT, verified BOOL DEFAULT false, strike_count INT DEFAULT 0, is_suspended BOOL DEFAULT false, suspension_reason TEXT, registered_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000), last_active BIGINT)`),
+    ]);
+    // ── Phase 2: tables that depend on stations or citizens ───────────────────
+    await Promise.all([
+      pool.query(`CREATE TABLE IF NOT EXISTS station_settings (id SERIAL PRIMARY KEY, station_id INT UNIQUE REFERENCES stations(id), surge_threshold INT DEFAULT 5, surge_window_minutes INT DEFAULT 2, cooldown_minutes INT DEFAULT 10, strike_limit INT DEFAULT 3)`),
+      pool.query(`CREATE TABLE IF NOT EXISTS officers (id SERIAL PRIMARY KEY, station_id INT REFERENCES stations(id), badge_number TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL, full_name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'DISPATCHER', password_hash TEXT NOT NULL, is_active BOOL DEFAULT true, last_login BIGINT, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`),
+      pool.query(`CREATE TABLE IF NOT EXISTS citizen_trust_scores (id SERIAL PRIMARY KEY, citizen_id INT UNIQUE REFERENCES citizens(id), score INT DEFAULT 100, total_alerts INT DEFAULT 0, false_alarms INT DEFAULT 0, resolved_emergencies INT DEFAULT 0, last_updated BIGINT)`),
+      pool.query(`CREATE TABLE IF NOT EXISTS otp_codes (id SERIAL PRIMARY KEY, citizen_id INT REFERENCES citizens(id), code TEXT NOT NULL, expires_at BIGINT)`),
+    ]);
+    // ── Phase 3: tables that depend on officers ───────────────────────────────
+    await Promise.all([
+      pool.query(`CREATE TABLE IF NOT EXISTS sos_alerts (id SERIAL PRIMARY KEY, citizen_id INT REFERENCES citizens(id), lat FLOAT NOT NULL, lng FLOAT NOT NULL, status TEXT NOT NULL DEFAULT 'ACTIVE', triggered_at BIGINT, acknowledged_at BIGINT, resolved_at BIGINT, cancelled_at BIGINT, location_accuracy FLOAT, assigned_officer_id INT REFERENCES officers(id), is_suspicious BOOL DEFAULT false, suspicious_reason TEXT, notes TEXT, cancellation_reason TEXT)`),
+      pool.query(`CREATE TABLE IF NOT EXISTS officer_locations (officer_id INT UNIQUE REFERENCES officers(id), lat FLOAT, lng FLOAT, heading FLOAT, status TEXT DEFAULT 'ON_DUTY', updated_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`),
+    ]);
+    // ── Phase 4: tables that depend on sos_alerts ─────────────────────────────
     await pool.query(`CREATE TABLE IF NOT EXISTS alert_location_history (id SERIAL PRIMARY KEY, alert_id INT REFERENCES sos_alerts(id), lat FLOAT NOT NULL, lng FLOAT NOT NULL, recorded_at BIGINT)`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS otp_codes (id SERIAL PRIMARY KEY, citizen_id INT REFERENCES citizens(id), code TEXT NOT NULL, expires_at BIGINT)`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS officer_locations (officer_id INT UNIQUE REFERENCES officers(id), lat FLOAT, lng FLOAT, heading FLOAT, status TEXT DEFAULT 'ON_DUTY', updated_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`);
-    await pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS heading FLOAT`);
-    await pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ON_DUTY'`);
-    await pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS updated_at BIGINT`);
-    await pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_type TEXT`);
-    await pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_number TEXT`);
-    await pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_photo TEXT`);
-    await pool.query(`ALTER TABLE sos_alerts ADD COLUMN IF NOT EXISTS incident_photo TEXT`);
-    // Migrate is_suspended / verified from INTEGER to BOOLEAN if needed (idempotent)
-    await pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='citizens' AND column_name='is_suspended' AND data_type='integer') THEN ALTER TABLE citizens ALTER COLUMN is_suspended TYPE BOOLEAN USING (is_suspended::integer != 0); END IF; END $$`);
-    await pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='citizens' AND column_name='verified' AND data_type='integer') THEN ALTER TABLE citizens ALTER COLUMN verified TYPE BOOLEAN USING (verified::integer != 0); END IF; END $$`);
-    // Performance indexes — make every query on sos_alerts fast even at scale
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_status ON sos_alerts(status)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_triggered ON sos_alerts(triggered_at)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_citizen ON sos_alerts(citizen_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_officer ON sos_alerts(assigned_officer_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_citizens_phone ON citizens(phone)`);
+    // ── Phase 5: column additions + migrations (all idempotent, run in parallel)
+    await Promise.all([
+      pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS heading FLOAT`),
+      pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ON_DUTY'`),
+      pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS updated_at BIGINT`),
+      pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_type TEXT`),
+      pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_number TEXT`),
+      pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_photo TEXT`),
+      pool.query(`ALTER TABLE sos_alerts ADD COLUMN IF NOT EXISTS incident_photo TEXT`),
+      pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='citizens' AND column_name='is_suspended' AND data_type='integer') THEN ALTER TABLE citizens ALTER COLUMN is_suspended TYPE BOOLEAN USING (is_suspended::integer != 0); END IF; END $$`),
+      pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='citizens' AND column_name='verified' AND data_type='integer') THEN ALTER TABLE citizens ALTER COLUMN verified TYPE BOOLEAN USING (verified::integer != 0); END IF; END $$`),
+    ]);
+    // ── Phase 6: indexes (all idempotent, run in parallel) ────────────────────
+    await Promise.all([
+      pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_status ON sos_alerts(status)`),
+      pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_triggered ON sos_alerts(triggered_at)`),
+      pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_citizen ON sos_alerts(citizen_id)`),
+      pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_officer ON sos_alerts(assigned_officer_id)`),
+      pool.query(`CREATE INDEX IF NOT EXISTS idx_citizens_phone ON citizens(phone)`),
+    ]);
     const stationResult = await pool.query(`
       INSERT INTO stations (name, barangay, latitude, longitude, contact_number)
       VALUES ($1, $2, $3, $4, $5)
@@ -118,13 +131,24 @@ async function initDb(): Promise<void> {
         console.log('[SafeSignal] Seeded officer:', officer.badge);
       }
     }
-    // Seed demo citizen account for demos
+    // Seed demo citizen account — always reset to verified/active on cold start
     await pool.query(`
       INSERT INTO citizens (full_name, phone, address, barangay, city, pin_hash, verified, strike_count, is_suspended)
       VALUES ('Demo Citizen', '09171234567', '123 Leveriza St', 'Barangay 76', 'Pasay City', $1, true, 0, false)
-      ON CONFLICT (phone) DO NOTHING
+      ON CONFLICT (phone) DO UPDATE
+        SET pin_hash = EXCLUDED.pin_hash,
+            verified = true,
+            is_suspended = false,
+            suspension_reason = NULL,
+            strike_count = 0
     `, [hashPin('1234')]);
-    console.log('[SafeSignal] Demo citizen ensured: 09171234567 / 1234');
+    // Also ensure trust score row exists for demo citizen
+    await pool.query(`
+      INSERT INTO citizen_trust_scores (citizen_id, score, total_alerts, false_alarms, resolved_emergencies)
+      SELECT id, 100, 0, 0, 0 FROM citizens WHERE phone = '09171234567'
+      ON CONFLICT (citizen_id) DO NOTHING
+    `);
+    console.log('[SafeSignal] Demo citizen ensured: 09171234567 / PIN 1234 (verified, active)');
         seeded = true;
     console.log('[SafeSignal] initDb complete');
   } catch (err) {
@@ -280,12 +304,97 @@ app.get('/api/dispatch/alerts', requireOfficerAuth, async (req: any, res: any) =
 // GET /api/dispatch/alerts/export
 app.get('/api/dispatch/alerts/export', requireOfficerAuth, async (_req: any, res: any) => {
   try {
-    const result = await pool.query(`SELECT a.id, c.full_name, c.phone, c.barangay, a.status, a.triggered_at, a.acknowledged_at, a.resolved_at, a.cancelled_at, a.lat, a.lng, a.notes, a.cancellation_reason, o.full_name as officer_name, o.badge_number as officer_badge, t.score as trust_score FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id LEFT JOIN officers o ON a.assigned_officer_id = o.id WHERE a.status IN ('RESOLVED','CANCELLED','FALSE_ALARM') ORDER BY a.triggered_at DESC`);
-    const headers = ['ID','Citizen','Phone','Barangay','Status','Triggered','Acknowledged','Resolved','Cancelled','Lat','Lng','Officer','Badge','Trust Score','Notes'];
-    const rows = result.rows.map((a: any) => [a.id, a.full_name, a.phone, a.barangay, a.status, a.triggered_at ? new Date(a.triggered_at).toISOString() : '', a.acknowledged_at ? new Date(a.acknowledged_at).toISOString() : '', a.resolved_at ? new Date(a.resolved_at).toISOString() : '', a.cancelled_at ? new Date(a.cancelled_at).toISOString() : '', a.lat, a.lng, a.officer_name || '', a.officer_badge || '', a.trust_score || '', (a.notes || a.cancellation_reason || '').replace(/,/g, ';')]);
-    const csv = [headers, ...rows].map((r: any[]) => r.join(',')).join('\n');
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename="safesignal-alerts.csv"');
+    const result = await pool.query(`SELECT a.id, c.full_name, c.phone, c.barangay, a.status, a.triggered_at, a.acknowledged_at, a.resolved_at, a.cancelled_at, a.lat, a.lng, a.notes, a.cancellation_reason, o.full_name as officer_name, o.badge_number as officer_badge, t.score as trust_score FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id LEFT JOIN citizen_trust_scores t ON t.citizen_id = c.id LEFT JOIN officers o ON a.assigned_officer_id = o.id ORDER BY a.triggered_at DESC`);
+
+    // Format a BIGINT timestamp to Philippine readable date
+    const fmtDate = (ts: any) => {
+      if (!ts) return '';
+      const d = new Date(Number(ts));
+      return d.toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    };
+    const fmtShort = (ts: any) => {
+      if (!ts) return '';
+      return new Date(Number(ts)).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: '2-digit' });
+    };
+    // CSV cell — quote if contains comma, newline, or quote
+    const cell = (v: any) => {
+      const s = v == null ? '' : String(v);
+      return (s.includes(',') || s.includes('\n') || s.includes('"')) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const row = (...cols: any[]) => cols.map(cell).join(',');
+
+    const now = Date.now();
+    const total = result.rows.length;
+    const resolved = result.rows.filter((r: any) => r.status === 'RESOLVED').length;
+    const falseAlarms = result.rows.filter((r: any) => r.status === 'FALSE_ALARM').length;
+    const cancelled = result.rows.filter((r: any) => r.status === 'CANCELLED').length;
+    const active = result.rows.filter((r: any) => ['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(r.status)).length;
+    const resolutionRate = total > 0 ? ((resolved / total) * 100).toFixed(1) : '0.0';
+    const falseAlarmRate = total > 0 ? ((falseAlarms / total) * 100).toFixed(1) : '0.0';
+
+    const responseTimes = result.rows
+      .filter((r: any) => r.status === 'RESOLVED' && r.acknowledged_at && r.triggered_at)
+      .map((r: any) => (Number(r.acknowledged_at) - Number(r.triggered_at)) / 60000);
+    const avgResponse = responseTimes.length > 0
+      ? (responseTimes.reduce((a: number, b: number) => a + b, 0) / responseTimes.length).toFixed(1)
+      : 'N/A';
+
+    const firstAlert = result.rows.length > 0 ? result.rows[result.rows.length - 1].triggered_at : null;
+    const lastAlert  = result.rows.length > 0 ? result.rows[0].triggered_at : null;
+    const reportPeriod = firstAlert && lastAlert
+      ? `${fmtShort(firstAlert)} — ${fmtShort(lastAlert)}`
+      : 'No alerts recorded';
+
+    // Build CSV with BOM (Excel UTF-8), letterhead, summary, then data
+    const lines: string[] = [];
+    lines.push('\uFEFF'); // BOM
+    lines.push(row('PASAY CITY POLICE STATION'));
+    lines.push(row('SafeSignal PH — Emergency Response System'));
+    lines.push(row('INCIDENT REPORT EXPORT'));
+    lines.push(row(''));
+    lines.push(row('Date Generated:', fmtDate(now)));
+    lines.push(row('Report Period:', reportPeriod));
+    lines.push(row('Generated By:', 'SafeSignal PH Dispatch System'));
+    lines.push(row(''));
+    lines.push(row('--- SUMMARY ---'));
+    lines.push(row('Total Incidents:', total));
+    lines.push(row('Resolved:', resolved));
+    lines.push(row('Cancelled:', cancelled));
+    lines.push(row('False Alarms:', falseAlarms));
+    lines.push(row('Active/In-Progress:', active));
+    lines.push(row('Resolution Rate:', `${resolutionRate}%`));
+    lines.push(row('False Alarm Rate:', `${falseAlarmRate}%`));
+    lines.push(row('Avg Response Time (Resolved):', avgResponse === 'N/A' ? 'N/A' : `${avgResponse} min`));
+    lines.push(row(''));
+    lines.push(row('--- INCIDENT LOG ---'));
+    lines.push(row('Incident #','Citizen Name','Phone','Barangay','Status','Date / Time Triggered','Date / Time Acknowledged','Date / Time Resolved','Date / Time Cancelled','GPS Latitude','GPS Longitude','Assigned Officer','Badge No.','Trust Score','Notes / Disposition'));
+    for (const a of result.rows) {
+      lines.push(row(
+        a.id,
+        a.full_name,
+        a.phone,
+        a.barangay || '',
+        a.status,
+        fmtDate(a.triggered_at),
+        fmtDate(a.acknowledged_at),
+        fmtDate(a.resolved_at),
+        fmtDate(a.cancelled_at),
+        a.lat != null ? Number(a.lat).toFixed(6) : '',
+        a.lng != null ? Number(a.lng).toFixed(6) : '',
+        a.officer_name || '',
+        a.officer_badge || '',
+        a.trust_score != null ? a.trust_score : '',
+        a.notes || a.cancellation_reason || '',
+      ));
+    }
+    lines.push(row(''));
+    lines.push(row('--- END OF REPORT ---'));
+    lines.push(row('This document is computer-generated from SafeSignal PH. For official use only.'));
+
+    const csv = lines.join('\r\n');
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }); // YYYY-MM-DD
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="PCPS-SafeSignal-Incident-Report-${today}.csv"`);
     res.send(csv);
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to export alerts' }); }
 });

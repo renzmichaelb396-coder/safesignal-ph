@@ -96,15 +96,6 @@ export default function Citizens() {
     finally { setActionLoading(null); }
   };
 
-  const handleVerify = async (citizenId: string, verified: boolean) => {
-    setActionLoading(citizenId); setActionError('');
-    try {
-      await dispatchApi.verifyCitizen(citizenId, verified);
-      setCitizens(citizens.map(c => c.id === citizenId ? { ...c, verified } : c));
-    } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to update verification'); }
-    finally { setActionLoading(null); }
-  };
-
   const getTrustColor = (score: number) => {
     if (score >= 80) return '#4caf50';
     if (score >= 60) return '#8bc34a';
@@ -119,8 +110,6 @@ export default function Citizens() {
     return 'rgba(244, 67, 54, 0.1)';
   };
 
-  const unverifiedCount = citizens.filter(c => !c.verified).length;
-
   return (
     <DispatchLayout>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#0d1117', color: '#e6edf3' }}>
@@ -133,26 +122,8 @@ export default function Citizens() {
               </h1>
               <p style={{ margin: 0, fontSize: '13px', color: '#8b949e' }}>
                 {filteredCitizens.length} result{filteredCitizens.length !== 1 ? 's' : ''}
-                {unverifiedCount > 0 && filter !== 'verified' && (
-                  <span style={{ marginLeft: 10, color: '#ff9800', fontWeight: 600 }}>
-                    • {unverifiedCount} awaiting ID verification
-                  </span>
-                )}
               </p>
             </div>
-            {isAdmin && unverifiedCount > 0 && (
-              <button
-                onClick={() => setFilter(filter === 'unverified' ? '' : 'unverified')}
-                style={{
-                  padding: '6px 14px', fontSize: '12px', fontWeight: 700,
-                  background: filter === 'unverified' ? '#ff9800' : 'rgba(255,152,0,0.12)',
-                  color: filter === 'unverified' ? '#000' : '#ff9800',
-                  border: '1px solid #ff9800', borderRadius: 6, cursor: 'pointer',
-                }}
-              >
-                {filter === 'unverified' ? '✓ Showing Unverified' : `Review ${unverifiedCount} Unverified`}
-              </button>
-            )}
           </div>
         </div>
 
@@ -282,17 +253,7 @@ export default function Citizens() {
                             <p style={{ margin: 0, fontWeight: 600, fontSize: '14px' }}>{citizen.full_name}</p>
                             {isVerified && (
                               <span style={{ padding: '2px 7px', fontSize: '10px', fontWeight: 700, backgroundColor: 'rgba(76,175,80,0.15)', color: '#4caf50', borderRadius: '3px' }}>
-                                ID VERIFIED
-                              </span>
-                            )}
-                            {!isVerified && hasGovId && (
-                              <span style={{ padding: '2px 7px', fontSize: '10px', fontWeight: 700, backgroundColor: 'rgba(255,152,0,0.15)', color: '#ff9800', borderRadius: '3px' }}>
-                                PENDING REVIEW
-                              </span>
-                            )}
-                            {!isVerified && !hasGovId && (
-                              <span style={{ padding: '2px 7px', fontSize: '10px', fontWeight: 700, backgroundColor: 'rgba(139,148,158,0.15)', color: '#8b949e', borderRadius: '3px' }}>
-                                NO ID
+                                VERIFIED
                               </span>
                             )}
                             {isSuspended && (
@@ -377,27 +338,6 @@ export default function Citizens() {
 
                         {/* Actions row */}
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: '1px solid #21262d', paddingTop: 14 }}>
-
-                          {/* Verify / Unverify — Admin only */}
-                          {isAdmin && hasGovId && (
-                            isVerified ? (
-                              <button
-                                onClick={() => handleVerify(citizen.id, false)}
-                                disabled={actionLoading === citizen.id}
-                                style={{ padding: '7px 14px', fontSize: '12px', fontWeight: 700, color: '#8b949e', backgroundColor: 'rgba(139,148,158,0.1)', border: '1px solid #8b949e', borderRadius: '5px', cursor: 'pointer', opacity: actionLoading === citizen.id ? 0.5 : 1 }}
-                              >
-                                {actionLoading === citizen.id ? '...' : 'Remove Verification'}
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleVerify(citizen.id, true)}
-                                disabled={actionLoading === citizen.id}
-                                style={{ padding: '7px 14px', fontSize: '12px', fontWeight: 700, color: '#4caf50', backgroundColor: 'rgba(76,175,80,0.12)', border: '1px solid #4caf50', borderRadius: '5px', cursor: 'pointer', opacity: actionLoading === citizen.id ? 0.5 : 1 }}
-                              >
-                                {actionLoading === citizen.id ? '...' : '✓ Mark ID Verified'}
-                              </button>
-                            )
-                          )}
 
                           {/* Reset Strikes */}
                           {citizen.strike_count > 0 && (

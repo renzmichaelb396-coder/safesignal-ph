@@ -146,15 +146,266 @@ export default function Metrics() {
     window.print();
   };
 
+  const printDate = new Date().toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: '2-digit' });
+  const printTime = new Date().toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hour12: true });
+
   return (
     <DispatchLayout>
       <style>{`
         @media print {
-          nav, aside, .no-print { display: none !important; }
-          body { background: white !important; color: black !important; }
-          .print-section { page-break-inside: avoid; }
+          /* Hide everything on screen */
+          body * { visibility: hidden !important; }
+          /* Except our print document */
+          #ss-print-doc, #ss-print-doc * { visibility: visible !important; }
+          #ss-print-doc {
+            position: fixed !important;
+            top: 0 !important; left: 0 !important;
+            width: 100% !important; height: auto !important;
+            background: white !important;
+            padding: 0 !important; margin: 0 !important;
+          }
+          @page { margin: 18mm 16mm; }
+        }
+        /* Screen: hide print doc */
+        @media screen { #ss-print-doc { display: none !important; } }
+
+        /* Print document styles */
+        #ss-print-doc {
+          font-family: 'Arial', sans-serif;
+          color: #000;
+          font-size: 11pt;
+          line-height: 1.4;
+        }
+        #ss-print-doc .pnp-header {
+          text-align: center;
+          border-bottom: 3px solid #1a237e;
+          padding-bottom: 10px;
+          margin-bottom: 16px;
+        }
+        #ss-print-doc .pnp-header .org-line {
+          font-size: 8pt;
+          color: #444;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+          margin-bottom: 2px;
+        }
+        #ss-print-doc .pnp-header .station-name {
+          font-size: 14pt;
+          font-weight: 800;
+          color: #1a237e;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+        #ss-print-doc .pnp-header .report-title {
+          font-size: 12pt;
+          font-weight: 700;
+          margin-top: 4px;
+          color: #000;
+        }
+        #ss-print-doc .pnp-header .report-meta {
+          font-size: 9pt;
+          color: #555;
+          margin-top: 3px;
+        }
+        #ss-print-doc .section-title {
+          font-size: 9pt;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.8px;
+          color: #1a237e;
+          border-bottom: 1px solid #1a237e;
+          padding-bottom: 3px;
+          margin: 14px 0 8px 0;
+        }
+        #ss-print-doc .summary-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr 1fr;
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+        #ss-print-doc .summary-cell {
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          padding: 8px 10px;
+          text-align: center;
+        }
+        #ss-print-doc .summary-cell .val {
+          font-size: 20pt;
+          font-weight: 800;
+          color: #1a237e;
+          display: block;
+        }
+        #ss-print-doc .summary-cell .lbl {
+          font-size: 7pt;
+          text-transform: uppercase;
+          color: #555;
+          letter-spacing: 0.5px;
+        }
+        #ss-print-doc .targets-table,
+        #ss-print-doc .report-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 9pt;
+          margin-bottom: 12px;
+        }
+        #ss-print-doc .targets-table th,
+        #ss-print-doc .report-table th {
+          background: #1a237e;
+          color: white;
+          padding: 6px 10px;
+          text-align: left;
+          font-size: 8pt;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        #ss-print-doc .targets-table td,
+        #ss-print-doc .report-table td {
+          padding: 6px 10px;
+          border-bottom: 1px solid #e0e0e0;
+          vertical-align: middle;
+        }
+        #ss-print-doc .targets-table tr:nth-child(even) td,
+        #ss-print-doc .report-table tr:nth-child(even) td {
+          background: #f5f5f5;
+        }
+        #ss-print-doc .badge-met { color: #2e7d32; font-weight: 700; }
+        #ss-print-doc .badge-miss { color: #c62828; font-weight: 700; }
+        #ss-print-doc .badge-na { color: #888; }
+        #ss-print-doc .sig-block {
+          margin-top: 32px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 40px;
+        }
+        #ss-print-doc .sig-line {
+          border-top: 1px solid #000;
+          padding-top: 4px;
+          font-size: 9pt;
+          text-align: center;
+          margin-top: 40px;
+        }
+        #ss-print-doc .sig-role { font-size: 8pt; color: #555; margin-top: 2px; text-align: center; }
+        #ss-print-doc .footer-note {
+          margin-top: 20px;
+          font-size: 7.5pt;
+          color: #888;
+          text-align: center;
+          border-top: 1px solid #eee;
+          padding-top: 6px;
         }
       `}</style>
+
+      {/* ══ PRINT-ONLY DOCUMENT ═════════════════════════════════════════════ */}
+      <div id="ss-print-doc">
+        {/* Letterhead */}
+        <div className="pnp-header">
+          <div className="org-line">Republic of the Philippines · National Police Commission</div>
+          <div className="org-line">Philippine National Police · National Capital Region Police Office</div>
+          <div className="station-name">Pasay City Police Station</div>
+          <div className="report-title">SafeSignal PH — Emergency Response Metrics Report</div>
+          <div className="report-meta">Date Printed: {printDate} at {printTime} &nbsp;|&nbsp; System: SafeSignal PH v1.0</div>
+        </div>
+
+        {/* Summary KPIs */}
+        <div className="section-title">Summary Statistics</div>
+        <div className="summary-grid">
+          <div className="summary-cell"><span className="val">{total}</span><span className="lbl">Total SOS Alerts</span></div>
+          <div className="summary-cell"><span className="val">{resolved}</span><span className="lbl">Resolved</span></div>
+          <div className="summary-cell"><span className="val">{falseAlarms}</span><span className="lbl">False Alarms</span></div>
+          <div className="summary-cell"><span className="val">{avgResponseMin != null ? `${avgResponseMin.toFixed(1)}m` : 'N/A'}</span><span className="lbl">Avg Response Time</span></div>
+          <div className="summary-cell"><span className="val">{active + acknowledged + enRoute + onScene}</span><span className="lbl">Active / In-Progress</span></div>
+          <div className="summary-cell"><span className="val">{cancelled}</span><span className="lbl">Cancelled</span></div>
+          <div className="summary-cell"><span className="val">{resolutionRate}%</span><span className="lbl">Resolution Rate</span></div>
+          <div className="summary-cell"><span className="val">{activeCitizens}</span><span className="lbl">Registered Citizens</span></div>
+        </div>
+
+        {/* Pilot Targets */}
+        <div className="section-title">Pilot Performance vs. Targets</div>
+        <table className="targets-table">
+          <thead><tr><th>Metric</th><th>Current</th><th>Target</th><th>Baseline (Manual)</th><th>Status</th></tr></thead>
+          <tbody>
+            {targets.map((t, i) => (
+              <tr key={i}>
+                <td style={{ fontWeight: 600 }}>{t.label}</td>
+                <td style={{ fontWeight: 700 }}>{t.current}</td>
+                <td>{t.target}</td>
+                <td style={{ color: '#555' }}>{t.baseline}</td>
+                <td className={!t.hasData ? 'badge-na' : t.met ? 'badge-met' : 'badge-miss'}>
+                  {!t.hasData ? 'Awaiting Data' : t.met ? '✓ MET' : '✗ NOT MET'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Status Breakdown */}
+        <div className="section-title">Alert Status Breakdown</div>
+        <table className="targets-table">
+          <thead><tr><th>Status</th><th>Count</th><th>% of Total</th></tr></thead>
+          <tbody>
+            {[
+              { label: 'Active (Unassigned)', val: active },
+              { label: 'Acknowledged', val: acknowledged },
+              { label: 'En Route', val: enRoute },
+              { label: 'On Scene', val: onScene },
+              { label: 'Resolved', val: resolved },
+              { label: 'Cancelled', val: cancelled },
+              { label: 'False Alarm', val: falseAlarms },
+            ].map((r, i) => (
+              <tr key={i}>
+                <td>{r.label}</td>
+                <td style={{ fontWeight: 700 }}>{r.val}</td>
+                <td>{total > 0 ? `${((r.val / total) * 100).toFixed(1)}%` : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Period breakdown if data exists */}
+        {reports.length > 0 && (
+          <>
+            <div className="section-title">{groupBy === 'month' ? 'Monthly' : 'Weekly'} Breakdown</div>
+            <table className="report-table">
+              <thead><tr><th>Period</th><th>Total SOS</th><th>Resolved</th><th>False Alarms</th><th>Cancelled</th><th>Avg Response</th><th>Resolution %</th></tr></thead>
+              <tbody>
+                {[...reports].reverse().map((r, i) => {
+                  const rr = (r.resolved + r.false_alarms + r.cancelled) > 0
+                    ? Math.round((r.resolved / (r.resolved + r.false_alarms + r.cancelled)) * 100) : 0;
+                  return (
+                    <tr key={i}>
+                      <td style={{ fontWeight: 600 }}>{r.label}</td>
+                      <td>{r.total}</td>
+                      <td>{r.resolved}</td>
+                      <td>{r.false_alarms}</td>
+                      <td>{r.cancelled}</td>
+                      <td>{r.avg_response_min != null ? `${r.avg_response_min} min` : '—'}</td>
+                      <td>{(r.resolved + r.false_alarms + r.cancelled) > 0 ? `${rr}%` : '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {/* Signature Block */}
+        <div className="sig-block">
+          <div>
+            <div className="sig-line">Prepared by</div>
+            <div className="sig-role">SafeSignal PH Dispatch System</div>
+          </div>
+          <div>
+            <div className="sig-line">Noted by</div>
+            <div className="sig-role">Station Commander, Pasay City Police Station</div>
+          </div>
+        </div>
+
+        <div className="footer-note">
+          This report is computer-generated from SafeSignal PH Emergency Response System. For official use only.
+          Unauthorized reproduction or distribution is prohibited.
+        </div>
+      </div>
+      {/* ══ END PRINT DOCUMENT ═════════════════════════════════════════════ */}
       <div
         style={{
           flex: 1,
