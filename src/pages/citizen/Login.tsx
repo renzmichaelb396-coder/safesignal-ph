@@ -5,8 +5,8 @@ import { useCitizenAuth } from '../../hooks/useCitizenAuth';
 export default function Login() {
   const [, navigate] = useLocation();
   const { login, user, loading: authLoading } = useCitizenAuth();
-  const [phone, setPhone] = useState('09172345678');
-  const [pin, setPin] = useState('1234');
+  const [phone, setPhone] = useState('');
+  const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -59,8 +59,8 @@ export default function Login() {
           alt="Pasay City Police"
           style={{ width: 90, height: 90, objectFit: 'contain', marginBottom: 16 }}
         />
-        <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 800, margin: 0, textAlign: 'center' }}>
-          RespondPH
+        <h1 style={{ color: '#fff', fontSize: 18, fontWeight: 800, margin: 0, textAlign: 'center', lineHeight: 1.2 }}>
+          Pasay City Emergency Response
         </h1>
         <p style={{ color: '#999', fontSize: 13, margin: '4px 0 32px', textAlign: 'center' }}>
           Pasay City Police Station
@@ -115,10 +115,9 @@ export default function Login() {
           </p>
         </form>
       </div>
-      <div className="w-full rounded-xl py-3 px-4 text-center"
-        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-        <span style={{ color: '#ffd700', fontSize: 12 }}>Demo: <strong>09172345678</strong> / PIN: <strong>1234</strong></span>
-      </div>
+      <p style={{ color: '#555', fontSize: 11, textAlign: 'center', margin: 0 }}>
+        Pasay City Police Station — Authorized Citizens Only
+      </p>
     </div>
   );
 }
