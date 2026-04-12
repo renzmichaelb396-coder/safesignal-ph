@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { citizenApi } from '../../lib/api';
 
-const BARANGAYS = Array.from({ length: 201 }, (_, i) => `Barangay ${i + 1}`);
+const BARANGAYS = Array.from({ length: 201 }, (_, i) => `Barangay ${String(i + 1).padStart(3, '0')}`);
 
 export default function Register() {
   const [, navigate] = useLocation();
   const [form, setForm] = useState({
-    full_name: '', phone: '', address: '', barangay: 'Barangay 1',
-    pin: '', confirm_pin: '', photo_url: '', terms: false
+    full_name: '', phone: '', address: '', barangay: 'Barangay 001',
+    pin: '', confirm_pin: '', photo_url: '', terms: false, privacy: false
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,8 @@ export default function Register() {
     setError('');
 
     if (!form.photo_url) { setError('Please upload your selfie photo'); return; }
-    if (!form.terms) { setError('Please accept the terms'); return; }
+    if (!form.terms) { setError('Please accept the terms and conditions'); return; }
+    if (!form.privacy) { setError('Please accept the Data Privacy consent (RA 10173)'); return; }
     if (!/^09\d{9}$/.test(form.phone)) { setError('Phone must be 11 digits starting with 09'); return; }
     if (!/^\d{4}$/.test(form.pin)) { setError('PIN must be exactly 4 digits'); return; }
     if (form.pin !== form.confirm_pin) { setError('PINs do not match'); return; }
@@ -173,6 +174,19 @@ export default function Register() {
           <label htmlFor="terms" style={{ color: '#ccc', fontSize: 12, lineHeight: 1.5 }}>
             I understand that <strong style={{ color: 'var(--sos-red)' }}>false alarms</strong> will result in strikes
             and possible account suspension. I will only use this for genuine emergencies.
+          </label>
+        </div>
+
+        <div className="flex items-start gap-3 p-3 rounded-xl"
+          style={{ background: 'rgba(0,56,168,0.1)', border: '1px solid rgba(0,56,168,0.4)' }}>
+          <input type="checkbox" id="privacy" checked={form.privacy}
+            onChange={e => setForm(f => ({ ...f, privacy: e.target.checked }))}
+            style={{ marginTop: 2, accentColor: '#1e4c8f', width: 16, height: 16 }} />
+          <label htmlFor="privacy" style={{ color: '#ccc', fontSize: 12, lineHeight: 1.5 }}>
+            I consent to the collection and processing of my personal data (name, phone, photo, location)
+            by the <strong style={{ color: '#4da6ff' }}>Pasay City Police Station</strong> for emergency
+            response purposes, in accordance with the{' '}
+            <strong style={{ color: '#4da6ff' }}>Data Privacy Act of 2012 (RA 10173)</strong>.
           </label>
         </div>
 
