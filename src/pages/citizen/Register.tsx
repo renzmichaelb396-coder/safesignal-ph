@@ -98,7 +98,7 @@ export default function Register() {
         </Link>
         <div>
           <h1 style={{ color: '#fff', fontSize: 20, fontWeight: 700, margin: 0 }}>Create Account</h1>
-          <p style={{ color: '#888', fontSize: 12, margin: 0 }}>Register for RespondPH</p>
+          <p style={{ color: '#888', fontSize: 12, margin: 0 }}>Register with Pasay City Police</p>
         </div>
       </div>
 
