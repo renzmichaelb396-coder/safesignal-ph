@@ -532,14 +532,15 @@ async function sendSmsOtp(phone: string, code: string): Promise<void> {
 // POST /api/citizen/register
 app.post('/api/citizen/register', async (req: any, res: any) => {
   try {
-    const { full_name, phone, address, barangay, pin, photo_url } = req.body;
+    const { full_name, phone, address, barangay, pin, photo_url, gov_id_type, gov_id_number } = req.body;
     if (!full_name || !phone || !pin) { res.status(400).json({ error: 'full_name, phone, and pin are required' }); return; }
+    if (!gov_id_type || !gov_id_number) { res.status(400).json({ error: 'Government ID type and number are required' }); return; }
     if (!/^09\d{9}$/.test(phone)) { res.status(400).json({ error: 'Phone must be 11 digits starting with 09' }); return; }
     if (!/^\d{4}$/.test(pin)) { res.status(400).json({ error: 'PIN must be 4 digits' }); return; }
     const existing = await pool.query('SELECT id FROM citizens WHERE phone = $1', [phone]);
     if (existing.rows.length > 0) { res.status(409).json({ error: 'Phone number already registered' }); return; }
     const pinHash = hashPin(pin);
-    const result = await pool.query(`INSERT INTO citizens (full_name, phone, address, barangay, pin_hash, photo_url, verified) VALUES ($1, $2, $3, $4, $5, $6, 0) RETURNING id`, [full_name, phone, address || null, barangay || null, pinHash, photo_url || null]);
+    const result = await pool.query(`INSERT INTO citizens (full_name, phone, address, barangay, pin_hash, photo_url, verified, gov_id_type, gov_id_number) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8) RETURNING id`, [full_name, phone, address || null, barangay || null, pinHash, photo_url || null, gov_id_type, gov_id_number]);
     const citizenId = result.rows[0].id;
     await pool.query(`INSERT INTO citizen_trust_scores (citizen_id, score, total_alerts, false_alarms, resolved_emergencies) VALUES ($1, 100, 0, 0, 0)`, [citizenId]);
     const otpCode = String(Math.floor(100000 + Math.random() * 900000));

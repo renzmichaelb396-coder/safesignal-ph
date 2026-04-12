@@ -8,7 +8,8 @@ export default function Register() {
   const [, navigate] = useLocation();
   const [form, setForm] = useState({
     full_name: '', phone: '', address: '', barangay: 'Barangay 001',
-    pin: '', confirm_pin: '', photo_url: '', terms: false, privacy: false
+    pin: '', confirm_pin: '', photo_url: '', terms: false, privacy: false,
+    gov_id_type: '', gov_id_number: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,6 +20,8 @@ export default function Register() {
     setError('');
 
     if (!form.photo_url) { setError('Please upload your selfie photo'); return; }
+    if (!form.gov_id_type) { setError('Please select your government ID type'); return; }
+    if (!form.gov_id_number.trim()) { setError('Please enter your government ID number'); return; }
     if (!form.terms) { setError('Please accept the terms and conditions'); return; }
     if (!form.privacy) { setError('Please accept the Data Privacy consent (RA 10173)'); return; }
     if (!/^09\d{9}$/.test(form.phone)) { setError('Phone must be 11 digits starting with 09'); return; }
@@ -34,6 +37,8 @@ export default function Register() {
         barangay: form.barangay,
         pin: form.pin,
         photo_url: form.photo_url || null,
+        gov_id_type: form.gov_id_type,
+        gov_id_number: form.gov_id_number.trim(),
       });
       localStorage.setItem('pending_citizen_id', String(data.citizen_id));
       navigate('/verify');
@@ -144,6 +149,31 @@ export default function Register() {
           <label style={{ color: '#aaa', fontSize: 12, display: 'block', marginBottom: 4 }}>Address</label>
           <input style={inputStyle} placeholder="123 Leveriza St" value={form.address}
             onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
+        </div>
+
+        <div style={{ background: 'rgba(255,199,44,0.06)', border: '1px solid rgba(255,199,44,0.2)', borderRadius: 12, padding: '12px 14px' }}>
+          <label style={{ color: 'var(--ph-gold)', fontSize: 11, fontWeight: 700, display: 'block', marginBottom: 8, letterSpacing: 0.5 }}>
+            🪪 GOVERNMENT ID — Required for Verification
+          </label>
+          <select style={{ ...inputStyle, marginBottom: 8, cursor: 'pointer' }} value={form.gov_id_type}
+            onChange={e => setForm(f => ({ ...f, gov_id_type: e.target.value }))}>
+            <option value="" style={{ background: '#1a1a3e' }}>Select ID Type *</option>
+            <option value="PhilSys" style={{ background: '#1a1a3e' }}>PhilSys / National ID</option>
+            <option value="Passport" style={{ background: '#1a1a3e' }}>Philippine Passport</option>
+            <option value="Driver's License" style={{ background: '#1a1a3e' }}>Driver's License (LTO)</option>
+            <option value="SSS" style={{ background: '#1a1a3e' }}>SSS ID</option>
+            <option value="GSIS" style={{ background: '#1a1a3e' }}>GSIS ID</option>
+            <option value="Voter's ID" style={{ background: '#1a1a3e' }}>Voter's ID (COMELEC)</option>
+            <option value="PRC" style={{ background: '#1a1a3e' }}>PRC ID</option>
+            <option value="Postal ID" style={{ background: '#1a1a3e' }}>Postal ID</option>
+            <option value="Barangay ID" style={{ background: '#1a1a3e' }}>Barangay ID</option>
+            <option value="School ID" style={{ background: '#1a1a3e' }}>School ID</option>
+          </select>
+          <input style={inputStyle} placeholder="Enter your ID number *" value={form.gov_id_number}
+            onChange={e => setForm(f => ({ ...f, gov_id_number: e.target.value }))} />
+          <p style={{ color: '#888', fontSize: 11, marginTop: 6, marginBottom: 0 }}>
+            Your ID is stored securely and used only to verify your identity in case of misuse.
+          </p>
         </div>
 
         <div>
