@@ -137,16 +137,30 @@ async function initDb(): Promise<void> {
       }
     }
     // Seed demo citizen account — always reset to verified/active on cold start
-    await pool.query(`
-      INSERT INTO citizens (full_name, phone, address, barangay, city, pin_hash, verified, strike_count, is_suspended)
-      VALUES ('Demo Citizen', '09171234567', '123 Leveriza St', 'Barangay 76', 'Pasay City', $1, true, 0, false)
-      ON CONFLICT (phone) DO UPDATE
-        SET pin_hash = EXCLUDED.pin_hash,
-            verified = true,
-            is_suspended = false,
-            suspension_reason = NULL,
-            strike_count = 0
-    `, [hashPin('1234')]);
+    // Try BOOLEAN literals (post-migration columns), fall back to INTEGER (pre-migration)
+    try {
+      await pool.query(`
+        INSERT INTO citizens (full_name, phone, address, barangay, city, pin_hash, verified, strike_count, is_suspended)
+        VALUES ('Demo Citizen', '09171234567', '123 Leveriza St', 'Barangay 76', 'Pasay City', $1, true, 0, false)
+        ON CONFLICT (phone) DO UPDATE
+          SET pin_hash = EXCLUDED.pin_hash,
+              verified = true,
+              is_suspended = false,
+              suspension_reason = NULL,
+              strike_count = 0
+      `, [hashPin('1234')]);
+    } catch {
+      await pool.query(`
+        INSERT INTO citizens (full_name, phone, address, barangay, city, pin_hash, verified, strike_count, is_suspended)
+        VALUES ('Demo Citizen', '09171234567', '123 Leveriza St', 'Barangay 76', 'Pasay City', $1, 1, 0, 0)
+        ON CONFLICT (phone) DO UPDATE
+          SET pin_hash = EXCLUDED.pin_hash,
+              verified = 1,
+              is_suspended = 0,
+              suspension_reason = NULL,
+              strike_count = 0
+      `, [hashPin('1234')]);
+    }
     // Also ensure trust score row exists for demo citizen
     await pool.query(`
       INSERT INTO citizen_trust_scores (citizen_id, score, total_alerts, false_alarms, resolved_emergencies)
