@@ -355,7 +355,7 @@ app.post('/api/dispatch/alerts/:id/false-alarm', requireOfficerAuth, async (req:
     const newStrikes = (citizen.strike_count || 0) + 1;
     let isSuspended = citizen.is_suspended;
     let suspensionReason = citizen.suspension_reason;
-    if (newStrikes >= strikeLimit) { isSuspended = true; suspensionReason = `Auto-suspended after ${newStrikes} false alarms`; }
+    if (newStrikes >= strikeLimit) { isSuspended = 1; suspensionReason = `Auto-suspended after ${newStrikes} false alarms`; }
     await pool.query(`UPDATE citizens SET strike_count = $1, is_suspended = $2, suspension_reason = $3 WHERE id = $4`, [newStrikes, isSuspended, suspensionReason, alert.citizen_id]);
     const trustResult = await pool.query('SELECT score FROM citizen_trust_scores WHERE citizen_id = $1', [alert.citizen_id]);
     const newScore = Math.max(0, (trustResult.rows[0]?.score || 100) - 15);
@@ -539,7 +539,7 @@ app.post('/api/citizen/register', async (req: any, res: any) => {
     const existing = await pool.query('SELECT id FROM citizens WHERE phone = $1', [phone]);
     if (existing.rows.length > 0) { res.status(409).json({ error: 'Phone number already registered' }); return; }
     const pinHash = hashPin(pin);
-    const result = await pool.query(`INSERT INTO citizens (full_name, phone, address, barangay, pin_hash, photo_url, verified) VALUES ($1, $2, $3, $4, $5, $6, false) RETURNING id`, [full_name, phone, address || null, barangay || null, pinHash, photo_url || null]);
+    const result = await pool.query(`INSERT INTO citizens (full_name, phone, address, barangay, pin_hash, photo_url, verified) VALUES ($1, $2, $3, $4, $5, $6, 0) RETURNING id`, [full_name, phone, address || null, barangay || null, pinHash, photo_url || null]);
     const citizenId = result.rows[0].id;
     await pool.query(`INSERT INTO citizen_trust_scores (citizen_id, score, total_alerts, false_alarms, resolved_emergencies) VALUES ($1, 100, 0, 0, 0)`, [citizenId]);
     const otpCode = String(Math.floor(100000 + Math.random() * 900000));
@@ -565,7 +565,7 @@ app.post('/api/citizen/verify-otp', async (req: any, res: any) => {
     const citizenResult = await pool.query('SELECT * FROM citizens WHERE id = $1', [citizen_id]);
     const citizen = citizenResult.rows[0];
     if (!citizen) { res.status(404).json({ error: 'Citizen not found' }); return; }
-    await pool.query('UPDATE citizens SET verified = true WHERE id = $1', [citizen_id]);
+    await pool.query('UPDATE citizens SET verified = 1 WHERE id = $1', [citizen_id]);
     await pool.query('DELETE FROM otp_codes WHERE citizen_id = $1', [citizen_id]);
     const token = signCitizenToken({ id: citizen.id, phone: citizen.phone });
     res.json({ token, citizen: { id: citizen.id, full_name: citizen.full_name, phone: citizen.phone } });
@@ -577,7 +577,7 @@ app.post('/api/citizen/forgot-pin', async (req: any, res: any) => {
   try {
     const { phone } = req.body;
     if (!phone) { res.status(400).json({ error: 'phone is required' }); return; }
-    const citizenResult = await pool.query('SELECT id, phone FROM citizens WHERE phone = $1 AND verified = true', [phone]);
+    const citizenResult = await pool.query('SELECT id, phone FROM citizens WHERE phone = $1 AND verified = 1', [phone]);
     if (!citizenResult.rows[0]) { res.status(404).json({ error: 'No verified account found for this number' }); return; }
     const citizen = citizenResult.rows[0];
     const otpCode = String(Math.floor(100000 + Math.random() * 900000));
