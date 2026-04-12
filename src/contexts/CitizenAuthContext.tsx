@@ -9,6 +9,7 @@ interface CitizenUser {
   full_name: string;
   phone: string;
   barangay?: string;
+  photo_url?: string;
   is_suspended?: boolean;
   suspension_reason?: string;
   trust?: { score: number; total_alerts: number; false_alarms: number; resolved_emergencies: number };
