@@ -8,6 +8,7 @@ export default function DispatchLogin() {
   const [badgeNumber, setBadgeNumber] = useState('PNP-001');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [, navigate] = useLocation();
   const { login, logout, officer } = useDispatchAuth();
 
@@ -55,7 +56,7 @@ export default function DispatchLogin() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password, badgeNumber);
+      await login(email, password, badgeNumber, rememberMe);
       const storedUser = localStorage.getItem('dispatch_user');
       const storedToken = localStorage.getItem('dispatch_token');
       const user = storedUser ? JSON.parse(storedUser) : null;
@@ -203,6 +204,17 @@ export default function DispatchLogin() {
                 onBlur={e => { e.currentTarget.style.borderColor = '#30363d'; }}
               />
             </div>
+
+            {/* Keep me logged in */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={e => setRememberMe(e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: '#ffc107', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: 13, color: '#8b949e' }}>Keep me logged in for 30 days</span>
+            </label>
 
             {error && (
               <div style={{ padding: '12px', backgroundColor: 'rgba(248,81,73,0.1)', border: '1px solid #f85149', borderRadius: '6px', fontSize: '13px', color: '#f85149' }}>
