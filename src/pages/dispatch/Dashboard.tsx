@@ -79,17 +79,23 @@ export default function Dashboard() {
       // Fix blank tiles on Vercel: use CDN worker instead of blob URL
       if (!maplibregl.workerUrl) maplibregl.workerUrl = 'https://unpkg.com/maplibre-gl@4/dist/maplibre-gl-csp-worker.js';
 
+      // CartoDB Voyager @2x raster inside MapLibre GL — pre-baked bold fonts + halos = best label readability
+      const rasterStyle = {
+        version: 8 as const,
+        sources: { voyager: { type: 'raster' as const, tiles: ['https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png','https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png','https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png','https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'], tileSize: 512, attribution: '&copy; OpenStreetMap &copy; CARTO' } },
+        layers: [{ id: 'voyager', type: 'raster' as const, source: 'voyager' }],
+      };
       leafletMapRef.current = new maplibregl.Map({
         container: mapRef.current!,
-        style: 'https://tiles.openfreemap.org/styles/liberty',
+        style: rasterStyle,
         center: [120.9932, 14.5378],
         zoom: 14,
       });
 
-      // Dark mode: invert canvas only — markers in overlay div stay normal
+      // invert(1) dark map — contrast(1.1) makes labels pop, no hue-rotate keeps text crisp
       leafletMapRef.current.on('load', () => {
         const canvas = leafletMapRef.current!.getCanvas();
-        canvas.style.filter = 'invert(1) hue-rotate(180deg)';
+        canvas.style.filter = 'invert(1) contrast(1.1)';
         canvas.style.borderRadius = 'inherit';
       });
 

@@ -298,17 +298,21 @@ export default function OfficerDashboard() {
         clearInterval(checkMapLibre);
         const maplibregl = (window as any).maplibregl;
         const PASAY_CENTER: [number, number] = [120.9982, 14.5378];
+        const rasterStyle = {
+          version: 8 as const,
+          sources: { voyager: { type: 'raster' as const, tiles: ['https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png','https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png','https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png','https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'], tileSize: 512, attribution: '&copy; OpenStreetMap &copy; CARTO' } },
+          layers: [{ id: 'voyager', type: 'raster' as const, source: 'voyager' }],
+        };
         mapInstanceRef.current = new maplibregl.Map({
           container: mapRef.current,
-          style: 'https://tiles.openfreemap.org/styles/liberty',
+          style: rasterStyle,
           center: PASAY_CENTER,
           zoom: 14,
         });
         // Place the blue dot immediately once the map is ready
         mapInstanceRef.current.on('load', () => {
-          // Dark mode: invert canvas only — markers in overlay stay normal
           const canvas = mapInstanceRef.current!.getCanvas();
-          canvas.style.filter = 'invert(1) hue-rotate(180deg)';
+          canvas.style.filter = 'invert(1) contrast(1.1)';
           canvas.style.borderRadius = 'inherit';
           reportLocation();
           if (pendingCitizenRef.current) { const { lat, lng } = pendingCitizenRef.current; pendingCitizenRef.current = null; updateMap(lat, lng); }
