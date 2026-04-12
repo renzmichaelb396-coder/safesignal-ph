@@ -982,13 +982,13 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
     if (citizen.is_suspended) { res.status(403).json({ error: 'Account suspended', reason: citizen.suspension_reason }); return; }
     const pinHash = hashPin(pin);
     if (citizen.pin_hash !== pinHash) { res.status(401).json({ error: 'Invalid PIN' }); return; }
-    // Geo-fence: only accept SOS from within Pasay City boundaries
-    const PASAY_LAT_MIN = 14.510, PASAY_LAT_MAX = 14.590;
-    const PASAY_LNG_MIN = 120.970, PASAY_LNG_MAX = 121.030;
-    if (lat < PASAY_LAT_MIN || lat > PASAY_LAT_MAX || lng < PASAY_LNG_MIN || lng > PASAY_LNG_MAX) {
-      res.status(403).json({ error: 'Outside coverage area. SafeSignal PH currently covers Pasay City only.' });
-      return;
-    }
+    // Geo-fence: DISABLED for testing — re-enable before live pilot
+    // const PASAY_LAT_MIN = 14.510, PASAY_LAT_MAX = 14.590;
+    // const PASAY_LNG_MIN = 120.970, PASAY_LNG_MAX = 121.030;
+    // if (lat < PASAY_LAT_MIN || lat > PASAY_LAT_MAX || lng < PASAY_LNG_MIN || lng > PASAY_LNG_MAX) {
+    //   res.status(403).json({ error: 'Outside coverage area. SafeSignal PH currently covers Pasay City only.' });
+    //   return;
+    // }
     const settingsResult = await pool.query('SELECT * FROM station_settings LIMIT 1');
     const settings = settingsResult.rows[0];
     const cooldownMs = (settings?.cooldown_minutes || 10) * 60 * 1000;
