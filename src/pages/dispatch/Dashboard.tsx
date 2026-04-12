@@ -571,7 +571,7 @@ export default function Dashboard() {
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(alert as any).officer_name}</span>
                           </div>
                         )}
-                        {/* ESTOC 30s countdown badge */}
+                        {/* STOC 30s countdown badge */}
                         {alert.status === 'ACTIVE' && (() => {
                           const secElapsed = Math.floor((now - alert.triggered_at) / 1000);
                           const secLeft = Math.max(0, 30 - secElapsed);
@@ -586,12 +586,12 @@ export default function Dashboard() {
                               {expired ? (
                                 <>
                                   <span style={{ fontSize: 13 }}>📞</span>
-                                  <span style={{ color: '#dc2626', fontSize: 11, fontWeight: 800, letterSpacing: 0.3, animation: 'pulse 1s infinite' }}>CALL ESTOC NOW — 30s elapsed</span>
+                                  <span style={{ color: '#dc2626', fontSize: 11, fontWeight: 800, letterSpacing: 0.3, animation: 'pulse 1s infinite' }}>CALL STOC NOW — 30s elapsed</span>
                                 </>
                               ) : (
                                 <>
                                   <span style={{ fontSize: 11 }}>⏱</span>
-                                  <span style={{ color: badgeColor, fontSize: 11, fontWeight: 700 }}>ESTOC call in {secLeft}s</span>
+                                  <span style={{ color: badgeColor, fontSize: 11, fontWeight: 700 }}>STOC call in {secLeft}s</span>
                                   <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
                                     <div style={{ height: '100%', width: `${pct * 100}%`, background: badgeColor, borderRadius: 2, transition: 'width 1s linear' }} />
                                   </div>

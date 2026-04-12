@@ -1231,6 +1231,23 @@ app.patch('/api/officer/assignment/:id/status', requireOfficerAuth, async (req: 
 });
 
 
+// PATCH /api/officer/duty-status
+app.patch('/api/officer/duty-status', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const officerPayload = req.officer as OfficerPayload;
+    const { duty_status } = req.body;
+    if (!['ON_DUTY', 'OFF_DUTY'].includes(duty_status)) {
+      res.status(400).json({ error: 'duty_status must be ON_DUTY or OFF_DUTY' });
+      return;
+    }
+    await pool.query('UPDATE officers SET duty_status = $1 WHERE id = $2', [duty_status, officerPayload.id]);
+    res.json({ success: true, duty_status });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update duty status' });
+  }
+});
+
 // === ONE-TIME DB FIX ENDPOINT ===
 app.get('/api/fix-db', async (_req: any, res: any) => {
   try {

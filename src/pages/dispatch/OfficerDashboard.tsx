@@ -54,6 +54,8 @@ export default function OfficerDashboard() {
   const [dispositionNotes, setDispositionNotes] = useState('');
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
+  const [dutyStatus, setDutyStatus] = useState<'ON_DUTY' | 'OFF_DUTY'>('ON_DUTY');
+  const [dutyLoading, setDutyLoading] = useState(false);
 
   useEffect(() => {
     if (assignment?.lat != null && assignment?.lng != null) {
@@ -125,6 +127,7 @@ export default function OfficerDashboard() {
     }
 
     setOfficerName(officerObj?.full_name || officerObj?.name || 'Officer');
+    if (officerObj?.duty_status) setDutyStatus(officerObj.duty_status as 'ON_DUTY' | 'OFF_DUTY');
     fetchAssignment();
     loadMapLibre();
     // NOTE: do NOT call reportLocation() here — map isn't ready yet.
@@ -139,6 +142,23 @@ export default function OfficerDashboard() {
   }, []);
 
   function showToast(msg: string) { setToastMsg(msg); setTimeout(() => setToastMsg(''), 2500); }
+
+  async function toggleDutyStatus() {
+    const next = dutyStatus === 'ON_DUTY' ? 'OFF_DUTY' : 'ON_DUTY';
+    setDutyLoading(true);
+    try {
+      const res = await officerFetch('/api/officer/duty-status', {
+        method: 'PATCH',
+        body: JSON.stringify({ duty_status: next }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      setDutyStatus(next);
+      showToast(next === 'ON_DUTY' ? '✅ Status: On Duty' : '🔴 Status: Off Duty');
+    } catch {
+      showToast('Failed to update duty status');
+    }
+    setDutyLoading(false);
+  }
 
   // Urgent siren alert played when officer receives a new assignment
   function playAssignmentAlert() {
@@ -417,7 +437,23 @@ export default function OfficerDashboard() {
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#ffc107' }}>{officerName}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+            <div style={{ marginTop: 4, marginBottom: 4 }}>
+              <button
+                onClick={toggleDutyStatus}
+                disabled={dutyLoading}
+                title="Toggle on/off duty status"
+                style={{
+                  background: dutyStatus === 'ON_DUTY' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                  border: `1px solid ${dutyStatus === 'ON_DUTY' ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)'}`,
+                  borderRadius: 20, color: dutyStatus === 'ON_DUTY' ? '#4ade80' : '#f87171',
+                  fontSize: 11, fontWeight: 700, padding: '3px 10px', cursor: dutyLoading ? 'not-allowed' : 'pointer',
+                  letterSpacing: 0.5, textTransform: 'uppercase' as const, opacity: dutyLoading ? 0.6 : 1,
+                }}
+              >
+                {dutyLoading ? '...' : dutyStatus === 'ON_DUTY' ? '🟢 On Duty' : '🔴 Off Duty'}
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => {
                   if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
