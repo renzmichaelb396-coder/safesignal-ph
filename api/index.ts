@@ -58,14 +58,14 @@ async function initDb(): Promise<void> {
         const ghostId = ghost.rows[0].id;
         const real = await pool.query(`SELECT id FROM officers WHERE badge_number = 'PNP-002'`);
         const realId = real.rows.length > 0 ? real.rows[0].id : null;
-        await pool.query(`UPDATE officers SET email = 'ghost-002b@removed.local', is_active = 0 WHERE id = $1`, [ghostId]);
+        await pool.query(`UPDATE officers SET email = 'ghost-002b@removed.local', is_active = FALSE WHERE id = $1`, [ghostId]);
         if (realId) {
           await pool.query(`UPDATE sos_alerts SET assigned_officer_id = $1 WHERE assigned_officer_id = $2`, [realId, ghostId]);
         }
         console.log('[SafeSignal] PNP-002B ghost neutralized');
       }
       const officerFixHash = await bcrypt.hash('password123', 10);
-      await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer@pasay.safesignal.ph', password_hash = $1, is_active = 1 WHERE badge_number = 'PNP-002'`, [officerFixHash]);
+      await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer@pasay.safesignal.ph', password_hash = $1, is_active = TRUE WHERE badge_number = 'PNP-002'`, [officerFixHash]);
       console.log('[SafeSignal] PNP-002 force-corrected');
     } catch (fixErr) {
       console.error('[SafeSignal] PNP-002 fix error:', fixErr);
@@ -106,9 +106,10 @@ async function initDb(): Promise<void> {
         .then(() => pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='citizens' AND column_name='verified' AND data_type='integer') THEN ALTER TABLE citizens ALTER COLUMN verified TYPE BOOLEAN USING (verified::integer != 0); END IF; END $$`)),
       // sos_alerts — column adds sequential on same table
       pool.query(`ALTER TABLE sos_alerts ADD COLUMN IF NOT EXISTS incident_photo TEXT`),
-      // officers — duty_status and phone for nearby-officers feature
+      // officers — duty_status, phone, and is_active INT→BOOL migration
       pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS duty_status TEXT DEFAULT 'ON_DUTY'`)
-        .then(() => pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS phone TEXT`)),
+        .then(() => pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS phone TEXT`))
+        .then(() => pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='officers' AND column_name='is_active' AND data_type='integer') THEN ALTER TABLE officers ALTER COLUMN is_active TYPE BOOLEAN USING (is_active::integer != 0); END IF; END $$`)),
     ]);
     // ── Phase 6: indexes (all idempotent, run in parallel) ────────────────────
     await Promise.all([
@@ -139,7 +140,7 @@ async function initDb(): Promise<void> {
       const passwordHash = await bcrypt.hash('password123', 10);
       await pool.query(`
         INSERT INTO officers (station_id, badge_number, email, full_name, role, password_hash, is_active, phone)
-        VALUES ($1, $2, $3, $4, $5, $6, 1, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7)
         ON CONFLICT (badge_number) DO UPDATE SET phone = EXCLUDED.phone, full_name = EXCLUDED.full_name
       `, [stationId, officer.badge, officer.email, officer.full_name, officer.role, passwordHash, officer.phone]);
       console.log('[SafeSignal] Upserted officer:', officer.badge);
@@ -587,13 +588,13 @@ app.post('/api/dispatch/alerts/:id/repush', requireOfficerAuth, async (req: any,
       const fifteenMinAgo = Date.now() - 15 * 60 * 1000;
       const nearbyResult = await pool.query(
         `SELECT o.id FROM officers o JOIN officer_locations ol ON ol.officer_id = o.id
-         WHERE o.role = 'OFFICER' AND o.is_active = true AND ol.updated_at > $3
-           AND (6371 * acos(LEAST(1, cos(radians($1)) * cos(radians(ol.lat)) * cos(radians(ol.lng) - radians($2)) + sin(radians($1)) * sin(radians(ol.lat))))) < 5`,
+         WHERE o.role = 'OFFICER' AND o.is_active = TRUE AND ol.updated_at > $3
+           AND (6371 * acos(GREATEST(-1, LEAST(1, cos(radians($1)) * cos(radians(ol.lat)) * cos(radians(ol.lng) - radians($2)) + sin(radians($1)) * sin(radians(ol.lat)))))) < 5`,
         [alert.lat, alert.lng, fifteenMinAgo]
       );
       targetIds = nearbyResult.rows.map((r: any) => Number(r.id));
       if (targetIds.length === 0) {
-        const allResult = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = true`);
+        const allResult = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = TRUE`);
         targetIds = allResult.rows.map((r: any) => Number(r.id));
       }
     }
@@ -616,7 +617,7 @@ app.post('/api/dispatch/alerts/:id/resolve', requireOfficerAuth, async (req: any
     const alertResult = await pool.query('SELECT * FROM sos_alerts WHERE id = $1', [req.params.id]);
     const alert = alertResult.rows[0];
     if (!alert) { res.status(404).json({ error: 'Alert not found' }); return; }
-    if (!['ACTIVE', 'ACKNOWLEDGED'].includes(alert.status)) { res.status(400).json({ error: 'Alert cannot be resolved in current status' }); return; }
+    if (!['ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE'].includes(alert.status)) { res.status(400).json({ error: 'Alert cannot be resolved in current status' }); return; }
     const now = Date.now();
     await pool.query(`UPDATE sos_alerts SET status = 'RESOLVED', resolved_at = $1, notes = $2 WHERE id = $3`, [now, notes || null, alert.id]);
     const trustResult = await pool.query('SELECT score FROM citizen_trust_scores WHERE citizen_id = $1', [alert.citizen_id]);
@@ -740,7 +741,7 @@ app.post('/api/dispatch/officers', requireAdminAuth, async (req: any, res: any) 
     if (!full_name || !email || !badge_number || !password || !role) { res.status(400).json({ error: 'All fields are required' }); return; }
     const stationResult = await pool.query('SELECT id FROM stations LIMIT 1');
     const passwordHash = await bcrypt.hash(password, 10);
-    const result = await pool.query(`INSERT INTO officers (full_name, email, badge_number, station_id, role, password_hash, is_active) VALUES ($1, $2, $3, $4, $5, $6, 1) RETURNING id`, [full_name, email, badge_number, stationResult.rows[0].id, role, passwordHash]);
+    const result = await pool.query(`INSERT INTO officers (full_name, email, badge_number, station_id, role, password_hash, is_active) VALUES ($1, $2, $3, $4, $5, $6, TRUE) RETURNING id`, [full_name, email, badge_number, stationResult.rows[0].id, role, passwordHash]);
     res.status(201).json({ officer: { id: result.rows[0].id, full_name, email, badge_number, role } });
   } catch (err: any) {
     if (err.code === '23505') { res.status(409).json({ error: 'Email or badge number already exists' }); }
@@ -756,7 +757,7 @@ app.post('/api/dispatch/officers/:id/toggle-active', requireAdminAuth, async (re
     const officer = officerResult.rows[0];
     if (!officer) { res.status(404).json({ error: 'Officer not found' }); return; }
     if (officer.id === officerPayload.id) { res.status(400).json({ error: 'Cannot deactivate yourself' }); return; }
-    const newActive = officer.is_active ? 0 : 1;
+    const newActive = !officer.is_active;
     await pool.query('UPDATE officers SET is_active = $1 WHERE id = $2', [newActive, officer.id]);
     res.json({ success: true, is_active: newActive });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to toggle officer status' }); }
@@ -1035,35 +1036,40 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
     await pool.query('UPDATE citizens SET last_active = $1 WHERE id = $2', [now, cp.id]);
     const alertWithCitizen = await getAlertWithCitizen(alertId);
     broadcastEvent('new_alert', { alert: alertWithCitizen });
-    // Push to NEARBY officers first (within 5km, GPS active in last 15min) — fallback to ALL if none nearby
-    const fifteenMinAgo = Date.now() - 15 * 60 * 1000;
-    const nearbyPushResult = await pool.query(
-      `SELECT o.id FROM officers o JOIN officer_locations ol ON ol.officer_id = o.id
-       WHERE o.role = 'OFFICER' AND o.is_active = true AND ol.updated_at > $3
-         AND (6371 * acos(LEAST(1, cos(radians($1)) * cos(radians(ol.lat)) * cos(radians(ol.lng) - radians($2)) + sin(radians($1)) * sin(radians(ol.lat))))) < 5`,
-      [lat, lng, fifteenMinAgo]
-    );
-    let pushTargetIds = nearbyPushResult.rows.map((o: any) => Number(o.id));
-    if (pushTargetIds.length === 0) {
-      const allResult = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = true`);
-      pushTargetIds = allResult.rows.map((o: any) => Number(o.id));
-    }
-    if (pushTargetIds.length > 0) {
-      sendPushToOfficers(pushTargetIds, {
-        title: '🚨 NEW SOS — Immediate Response Required',
-        body: `Citizen: ${citizen.full_name} | Barangay: ${citizen.barangay || 'Unknown'} | Tap to respond NOW.`,
-        url: '/dispatch/login',
-      });
-    }
-    if (citizen.barangay) {
-      const windowMs = (settings?.surge_window_minutes || 2) * 60 * 1000;
-      // Surge count includes all in-progress statuses — an EN_ROUTE/ON_SCENE alert is still an active emergency.
-      const surgeResult = await pool.query(`SELECT COUNT(*) as count FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id WHERE c.barangay = $1 AND a.triggered_at > $2 AND a.status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE')`, [citizen.barangay, Date.now() - windowMs]);
-      const surgeCount = parseInt(surgeResult.rows[0].count, 10);
-      const threshold = settings?.surge_threshold || 5;
-      if (surgeCount >= threshold) {
-        broadcastEvent('surge_warning', { barangay: citizen.barangay, count: surgeCount, threshold, window_minutes: settings?.surge_window_minutes || 2, message: `SURGE ALERT: ${surgeCount} active alerts in ${citizen.barangay} within ${settings?.surge_window_minutes || 2} minutes!` });
+    // Push notifications + surge check — non-fatal: SOS is already created above
+    try {
+      // Push to NEARBY officers first (within 5km, GPS active in last 15min) — fallback to ALL if none nearby
+      const fifteenMinAgo = Date.now() - 15 * 60 * 1000;
+      const nearbyPushResult = await pool.query(
+        `SELECT o.id FROM officers o JOIN officer_locations ol ON ol.officer_id = o.id
+         WHERE o.role = 'OFFICER' AND o.is_active = TRUE AND ol.updated_at > $3
+           AND (6371 * acos(GREATEST(-1, LEAST(1, cos(radians($1)) * cos(radians(ol.lat)) * cos(radians(ol.lng) - radians($2)) + sin(radians($1)) * sin(radians(ol.lat)))))) < 5`,
+        [lat, lng, fifteenMinAgo]
+      );
+      let pushTargetIds = nearbyPushResult.rows.map((o: any) => Number(o.id));
+      if (pushTargetIds.length === 0) {
+        const allResult = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = TRUE`);
+        pushTargetIds = allResult.rows.map((o: any) => Number(o.id));
       }
+      if (pushTargetIds.length > 0) {
+        sendPushToOfficers(pushTargetIds, {
+          title: '🚨 NEW SOS — Immediate Response Required',
+          body: `Citizen: ${citizen.full_name} | Barangay: ${citizen.barangay || 'Unknown'} | Tap to respond NOW.`,
+          url: '/dispatch/login',
+        });
+      }
+      if (citizen.barangay) {
+        const windowMs = (settings?.surge_window_minutes || 2) * 60 * 1000;
+        // Surge count includes all in-progress statuses — an EN_ROUTE/ON_SCENE alert is still an active emergency.
+        const surgeResult = await pool.query(`SELECT COUNT(*) as count FROM sos_alerts a JOIN citizens c ON a.citizen_id = c.id WHERE c.barangay = $1 AND a.triggered_at > $2 AND a.status IN ('ACTIVE', 'ACKNOWLEDGED', 'EN_ROUTE', 'ON_SCENE')`, [citizen.barangay, Date.now() - windowMs]);
+        const surgeCount = parseInt(surgeResult.rows[0].count, 10);
+        const threshold = settings?.surge_threshold || 5;
+        if (surgeCount >= threshold) {
+          broadcastEvent('surge_warning', { barangay: citizen.barangay, count: surgeCount, threshold, window_minutes: settings?.surge_window_minutes || 2, message: `SURGE ALERT: ${surgeCount} active alerts in ${citizen.barangay} within ${settings?.surge_window_minutes || 2} minutes!` });
+        }
+      }
+    } catch (notifyErr) {
+      console.error('[SafeSignal] Non-fatal notify error (SOS still active):', notifyErr);
     }
     res.status(201).json({ alert: { id: alertId, status: 'ACTIVE', triggered_at: now } });
   } catch (error) { console.error('SOS error:', error); res.status(500).json({ error: 'Failed to process SOS request' }); }
@@ -1153,14 +1159,14 @@ app.get('/api/dispatch/nearby-officers', requireOfficerAuth, async (req: any, re
     const result = await pool.query(
       `SELECT o.id, o.full_name, o.badge_number, o.phone, o.duty_status,
               ol.lat, ol.lng, ol.updated_at,
-              (6371 * acos(
+              (6371 * acos(GREATEST(-1, LEAST(1,
                 cos(radians($1)) * cos(radians(ol.lat)) *
                 cos(radians(ol.lng) - radians($2)) +
                 sin(radians($1)) * sin(radians(ol.lat))
-              )) AS distance_km
+              )))) AS distance_km
        FROM officer_locations ol
        JOIN officers o ON ol.officer_id = o.id
-       WHERE o.is_active = true
+       WHERE o.is_active = TRUE
          AND ol.updated_at > $3
        ORDER BY distance_km ASC
        LIMIT 5`,
@@ -1305,7 +1311,7 @@ app.get('/api/fix-db', async (_req: any, res: any) => {
     let ghostResult = 'no PNP-002B found';
     if (ghost.rows.length > 0) {
       const ghostId = ghost.rows[0].id;
-      await pool.query(`UPDATE officers SET email = 'ghost-002b' || '@' || 'removed.local', is_active = 0 WHERE id = $1`, [ghostId]);
+      await pool.query(`UPDATE officers SET email = 'ghost-002b' || '@' || 'removed.local', is_active = FALSE WHERE id = $1`, [ghostId]);
       // Reassign alerts
       const real = await pool.query(`SELECT id FROM officers WHERE badge_number = 'PNP-002'`);
       if (real.rows.length > 0) {
@@ -1315,7 +1321,7 @@ app.get('/api/fix-db', async (_req: any, res: any) => {
     }
     // Step 2: force-correct PNP-002
     const pwHash = await bcrypt.hash('password123', 10);
-    await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer' || '@' || 'pasay.safesignal.ph', password_hash = $1, is_active = 1 WHERE badge_number = 'PNP-002'`, [pwHash]);
+    await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer' || '@' || 'pasay.safesignal.ph', password_hash = $1, is_active = TRUE WHERE badge_number = 'PNP-002'`, [pwHash]);
     // Step 3: verify
     const verify = await pool.query(`SELECT id, badge_number, email, role, is_active FROM officers WHERE badge_number IN ('PNP-002', 'PNP-002B') ORDER BY badge_number`);
     res.json({ success: true, ghost: ghostResult, officers: verify.rows });
