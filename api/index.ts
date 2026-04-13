@@ -279,17 +279,37 @@ async function getAlertWithCitizen(alertId: any): Promise<any> {
 async function sendPushToOfficers(officerIds: number[], payload: object): Promise<void> {
   try {
     const subs = await pool.query(
-      'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE officer_id = ANY($1)',
+      'SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE officer_id = ANY($1)',
       [officerIds]
     );
-    await Promise.allSettled(
+    if (subs.rows.length === 0) {
+      console.log(`[SafeSignal] sendPush: no subscriptions for officers ${officerIds.join(',')}`);
+      return;
+    }
+    const results = await Promise.allSettled(
       subs.rows.map(sub =>
         webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
           JSON.stringify(payload)
-        )
+        ).then(() => ({ id: sub.id, ok: true }))
+         .catch((err: any) => ({ id: sub.id, ok: false, status: err.statusCode, endpoint: sub.endpoint }))
       )
     );
+    // Clean up expired/invalid subscriptions (410 Gone = browser unsubscribed)
+    const expired = results
+      .filter(r => r.status === 'fulfilled' && !(r.value as any).ok && (r.value as any).status === 410)
+      .map(r => (r.value as any).id);
+    if (expired.length > 0) {
+      console.log(`[SafeSignal] sendPush: removing ${expired.length} expired subscription(s)`);
+      await pool.query('DELETE FROM push_subscriptions WHERE id = ANY($1)', [expired]).catch(() => {});
+    }
+    // Log failures that aren't just expired subscriptions
+    results.forEach(r => {
+      if (r.status === 'fulfilled') {
+        const v = r.value as any;
+        if (!v.ok) console.error(`[SafeSignal] sendPush failed status=${v.status} endpoint=${v.endpoint?.slice(0,60)}`);
+      }
+    });
   } catch (err) { console.error('[SafeSignal] sendPush error:', err); }
 }
 
@@ -331,6 +351,86 @@ app.delete('/api/officer/push-unsubscribe', requireOfficerAuth, async (req: any,
     await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [endpoint]);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: 'Failed to remove subscription' }); }
+});
+
+// POST /api/officer/test-push — officer tests their own push subscription
+app.post('/api/officer/test-push', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const officerId = (req.officer as OfficerPayload).id;
+    const subs = await pool.query('SELECT * FROM push_subscriptions WHERE officer_id = $1', [officerId]);
+    if (subs.rows.length === 0) {
+      return res.status(404).json({ error: 'No push subscription found. Tap "Push ON" first.' });
+    }
+    await sendPushToOfficers([officerId], {
+      title: '✅ SafeSignal Push Test',
+      body: 'If you see this, push notifications are working on your device!',
+      url: '/officer',
+    });
+    res.json({ ok: true, subscriptions: subs.rows.length });
+  } catch (err) { res.status(500).json({ error: 'Test push failed' }); }
+});
+
+// GET /api/officer/nearby-alerts — active unassigned SOS near officer's last GPS position
+app.get('/api/officer/nearby-alerts', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const officerPayload = req.officer as OfficerPayload;
+    // Get officer's last known position
+    const locResult = await pool.query(
+      'SELECT lat, lng FROM officer_locations WHERE officer_id = $1',
+      [officerPayload.id]
+    );
+    if (!locResult.rows[0]) {
+      return res.json({ alerts: [], message: 'Officer GPS not yet reported' });
+    }
+    const { lat, lng } = locResult.rows[0];
+    // Find active unassigned SOS within 3km
+    const result = await pool.query(
+      `SELECT a.id, a.lat, a.lng, a.status, a.triggered_at,
+              c.full_name as citizen_name, c.phone as citizen_phone, c.barangay,
+              (6371 * acos(GREATEST(-1, LEAST(1,
+                cos(radians($1)) * cos(radians(a.lat)) * cos(radians(a.lng) - radians($2)) +
+                sin(radians($1)) * sin(radians(a.lat))
+              )))) AS distance_km
+       FROM sos_alerts a
+       JOIN citizens c ON a.citizen_id = c.id
+       WHERE a.status = 'ACTIVE'
+         AND a.assigned_officer_id IS NULL
+       ORDER BY distance_km ASC
+       LIMIT 5`,
+      [lat, lng]
+    );
+    res.json({ alerts: result.rows });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to fetch nearby alerts' }); }
+});
+
+// POST /api/officer/claim-alert/:id — officer self-assigns to an unassigned active SOS
+app.post('/api/officer/claim-alert/:id', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const officerPayload = req.officer as OfficerPayload;
+    const alertId = parseInt(req.params.id, 10);
+    if (isNaN(alertId)) return res.status(400).json({ error: 'Invalid alert ID' });
+
+    // Atomic claim: only succeeds if still ACTIVE and unassigned
+    const result = await pool.query(
+      `UPDATE sos_alerts
+       SET assigned_officer_id = $1, status = 'ACKNOWLEDGED', acknowledged_at = $2
+       WHERE id = $3 AND status = 'ACTIVE' AND assigned_officer_id IS NULL
+       RETURNING id`,
+      [officerPayload.id, String(Date.now()), alertId]
+    );
+    if (!result.rows[0]) {
+      return res.status(409).json({ error: 'Alert already claimed or no longer active' });
+    }
+    const updated = await getAlertWithCitizen(alertId);
+    broadcastEvent('alert_updated', { alert: updated });
+    // Push confirmation to the officer (in case they need it)
+    sendPushToOfficers([officerPayload.id], {
+      title: '🚔 SOS Claimed — En Route',
+      body: `You have claimed alert #${alertId}. Proceed to citizen location.`,
+      url: '/officer',
+    });
+    res.json({ success: true, alert_id: alertId });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to claim alert' }); }
 });
 
 // ── SSE endpoint ──────────────────────────────────────────────────────────────

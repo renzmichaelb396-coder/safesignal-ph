@@ -57,6 +57,8 @@ export default function OfficerDashboard() {
   const [pushLoading, setPushLoading] = useState(false);
   const [dutyStatus, setDutyStatus] = useState<'ON_DUTY' | 'OFF_DUTY'>('ON_DUTY');
   const [dutyLoading, setDutyLoading] = useState(false);
+  const [nearbyAlerts, setNearbyAlerts] = useState<any[]>([]);
+  const [claimingId, setClaimingId] = useState<number | null>(null);
 
   useEffect(() => {
     if (assignment?.lat != null && assignment?.lng != null) {
@@ -130,14 +132,17 @@ export default function OfficerDashboard() {
     setOfficerName(officerObj?.full_name || officerObj?.name || 'Officer');
     if (officerObj?.duty_status) setDutyStatus(officerObj.duty_status as 'ON_DUTY' | 'OFF_DUTY');
     fetchAssignment();
+    fetchNearbyAlerts();
     loadMapLibre();
     // NOTE: do NOT call reportLocation() here — map isn't ready yet.
     // map.on('load') inside initMap() handles the first location report.
     const interval = setInterval(fetchAssignment, 5000);
     const locInterval = setInterval(reportLocation, 10000); // Report GPS every 10s after map ready
+    const nearbyInterval = setInterval(fetchNearbyAlerts, 10000); // Check nearby unassigned SOS every 10s
     return () => {
       clearInterval(interval);
       clearInterval(locInterval);
+      clearInterval(nearbyInterval);
       if (alarmIntervalRef.current) { clearInterval(alarmIntervalRef.current); alarmIntervalRef.current = null; }
     };
   }, []);
@@ -395,6 +400,35 @@ export default function OfficerDashboard() {
     }
   }
 
+  async function fetchNearbyAlerts() {
+    try {
+      const res = await officerFetch('/api/officer/nearby-alerts');
+      if (!res.ok) return;
+      const data = await res.json();
+      setNearbyAlerts(data.alerts || []);
+    } catch {}
+  }
+
+  async function claimAlert(alertId: number) {
+    setClaimingId(alertId);
+    try {
+      const res = await officerFetch('/api/officer/claim-alert/' + alertId, { method: 'POST' });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        showToast((d as any).error || 'Alert already taken or no longer active');
+        setClaimingId(null);
+        fetchNearbyAlerts();
+        return;
+      }
+      showToast('🚨 Alert claimed! You are acknowledged.');
+      setNearbyAlerts([]);
+      await fetchAssignment();
+    } catch {
+      showToast('Failed to claim alert');
+    }
+    setClaimingId(null);
+  }
+
   async function updateStatus(status: string, notes?: string) {
     if (!assignment) return;
     setUpdating(true);
@@ -489,6 +523,23 @@ export default function OfficerDashboard() {
               >
                 {pushLoading ? '...' : pushEnabled ? '\uD83D\uDCF2 Push ON' : '\uD83D\uDCF2 Push OFF'}
               </button>
+              {pushEnabled && (
+                <button
+                  onClick={async () => {
+                    showToast('Sending test push…');
+                    try {
+                      const res = await officerFetch('/api/officer/test-push', { method: 'POST' });
+                      const d = await res.json().catch(() => ({}));
+                      if (!res.ok) showToast((d as any).error || 'Test push failed');
+                      else showToast('📲 Test push sent! Check your notification shade.');
+                    } catch { showToast('Test push failed — check connection'); }
+                  }}
+                  title="Send a test push notification to verify locked-screen alerts work"
+                  style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.35)', borderRadius: 6, color: '#60a5fa', fontSize: 11, padding: '2px 8px', cursor: 'pointer', lineHeight: '1.6' }}
+                >
+                  📳 Test
+                </button>
+              )}
               <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#8b949e', fontSize: 12, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Logout</button>
             </div>
           </div>
@@ -537,10 +588,59 @@ export default function OfficerDashboard() {
         )}
 
         {!assignment ? (
-          <div style={{ textAlign: 'center', padding: '48px 0' }}>
-            <div style={{ fontSize: 56, marginBottom: 16 }}>🎯</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#e6edf3', marginBottom: 8 }}>No active assignment</div>
-            <div style={{ color: '#8b949e', fontSize: 14 }}>Waiting for dispatch...</div>
+          <div>
+            <div style={{ textAlign: 'center', padding: '32px 0 16px' }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>🎯</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#e6edf3', marginBottom: 6 }}>No active assignment</div>
+              <div style={{ color: '#8b949e', fontSize: 14 }}>
+                {nearbyAlerts.length > 0 ? 'Nearby SOS alerts you can respond to:' : 'Waiting for dispatch or nearby SOS…'}
+              </div>
+            </div>
+
+            {nearbyAlerts.length > 0 && (
+              <div>
+                {nearbyAlerts.map((alert: any) => (
+                  <div key={alert.id} style={{ background: '#161b22', border: '1px solid #e63946', borderRadius: 12, padding: 16, marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <span style={{ fontSize: 18 }}>🚨</span>
+                          <span style={{ fontSize: 16, fontWeight: 700, color: '#f87171' }}>SOS — {alert.citizen_name || 'Unknown'}</span>
+                        </div>
+                        {alert.barangay && (
+                          <div style={{ fontSize: 12, color: '#8b949e', marginBottom: 4 }}>📍 {alert.barangay}</div>
+                        )}
+                        {alert.citizen_phone && (
+                          <a href={'tel:' + alert.citizen_phone} style={{ fontSize: 13, color: '#4ade80', textDecoration: 'none', fontWeight: 700 }}>
+                            📞 {alert.citizen_phone}
+                          </a>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: '#fbbf24' }}>
+                          {Number(alert.distance_km).toFixed(2)} km
+                        </div>
+                        <div style={{ fontSize: 10, color: '#8b949e' }}>from you</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => claimAlert(alert.id)}
+                      disabled={claimingId !== null}
+                      style={{
+                        width: '100%', padding: '14px', borderRadius: 8,
+                        background: claimingId === alert.id ? '#1e3a5f' : '#1e40af',
+                        border: '2px solid #3b82f6', color: '#fff',
+                        fontSize: 15, fontWeight: 700, cursor: claimingId !== null ? 'not-allowed' : 'pointer',
+                        opacity: claimingId !== null && claimingId !== alert.id ? 0.5 : 1,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      }}
+                    >
+                      {claimingId === alert.id ? '⏳ Claiming…' : '🚔 Claim & Respond'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <div>

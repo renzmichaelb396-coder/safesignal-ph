@@ -27,9 +27,10 @@ export default function Dashboard() {
   const autoZoomAlertIdRef = useRef<number | null>(null);
   const repushCounterRef = useRef(0);
   const [soundArmed, setSoundArmed] = useState(false);
-  // Nearby officers per alert id (fetched once per ACTIVE alert)
+  // Nearby officers per alert id — re-fetched every 15s until at least one officer found
   const [nearbyOfficers, setNearbyOfficers] = useState<Record<number, any[]>>({});
-  const fetchedNearbyRef = useRef<Set<number>>(new Set());
+  // Map<alertId, lastFetchTimestamp> — re-fetch every 15s while list is empty
+  const fetchedNearbyRef = useRef<Map<number, number>>(new Map());
 
   // Live timer + PST clock
   useEffect(() => {
@@ -152,20 +153,25 @@ export default function Dashboard() {
             }
           }
         }
-        // Fetch nearby officers once per new ACTIVE alert (fire-and-forget)
+        // Fetch nearby officers for each ACTIVE alert.
+        // Re-fetches every 15s while the list is empty — handles the case where the officer
+        // opens their dashboard AFTER the SOS fires (first fetch would return 0).
         const token = localStorage.getItem('dispatch_token');
         if (token) {
           for (const a of incoming) {
-            if (a.status === 'ACTIVE' && !fetchedNearbyRef.current.has(a.id) && a.lat != null && a.lng != null) {
-              fetchedNearbyRef.current.add(a.id);
-              fetch(`/api/dispatch/nearby-officers?lat=${a.lat}&lng=${a.lng}`, {
-                headers: { Authorization: 'Bearer ' + token },
-              }).then(r => r.json()).then(d => {
-                if (d.officers?.length) {
-                  setNearbyOfficers(prev => ({ ...prev, [a.id]: d.officers }));
-                }
-              }).catch(() => {});
-            }
+            if (a.status !== 'ACTIVE' || a.lat == null || a.lng == null) continue;
+            const alreadyHasOfficers = (nearbyOfficers[a.id]?.length ?? 0) > 0;
+            if (alreadyHasOfficers) continue; // already found — no need to re-fetch
+            const lastFetch = fetchedNearbyRef.current.get(a.id) ?? 0;
+            if (Date.now() - lastFetch < 15000) continue; // throttle: max once per 15s
+            fetchedNearbyRef.current.set(a.id, Date.now());
+            fetch(`/api/dispatch/nearby-officers?lat=${a.lat}&lng=${a.lng}`, {
+              headers: { Authorization: 'Bearer ' + token },
+            }).then(r => r.json()).then(d => {
+              if (d.officers?.length) {
+                setNearbyOfficers(prev => ({ ...prev, [a.id]: d.officers }));
+              }
+            }).catch(() => {});
           }
         }
       } catch {}
@@ -588,6 +594,15 @@ export default function Dashboard() {
                             </span>
                           )}
                         </p>
+                        {alert.phone && (
+                          <a
+                            href={`tel:${alert.phone}`}
+                            onClick={e => e.stopPropagation()}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#4ade80', fontSize: 12, fontWeight: 700, textDecoration: 'none', marginBottom: 2 }}
+                          >
+                            📞 {alert.phone}
+                          </a>
+                        )}
                         <div className="flex items-center justify-between">
                           <span style={{ color: alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED' ? '#374151' : '#e1e4ed', fontSize: 12, fontFamily: 'monospace' }}>
                             {formatElapsed(Date.now() - alert.triggered_at)}
