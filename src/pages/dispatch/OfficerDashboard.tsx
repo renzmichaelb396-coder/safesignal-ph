@@ -74,10 +74,10 @@ export default function OfficerDashboard() {
     }).catch(() => {});
     const handler = (event: MessageEvent) => {
       if (event.data?.type === 'SW_ALARM') {
-        if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
-        soundArmedRef.current = true;
-        setSoundArmed(true);
-        startAlarmLoop();
+        // Push notification woke the app — show the tap-to-arm prompt.
+        // Cannot create AudioContext here because this is NOT a user gesture.
+        // The banner click will create the context synchronously when the officer taps.
+        setShowAlarmPrompt(true);
       }
     };
     navigator.serviceWorker.addEventListener('message', handler);
@@ -161,12 +161,12 @@ export default function OfficerDashboard() {
     setDutyLoading(false);
   }
 
-  // Urgent siren alert played when officer receives a new assignment
+  // Urgent siren alert played when officer receives a new assignment.
+  // AudioContext MUST already be in 'running' state — caller is responsible for creation in user gesture.
   function playAssignmentAlert() {
     try {
-      if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+      if (!audioCtxRef.current || audioCtxRef.current.state !== 'running') return;
       const ctx = audioCtxRef.current;
-      ctx.resume().catch(() => {}); // unblock browser autoplay policy
       const playTone = (startTime: number, freqHigh: number, freqLow: number, dur: number) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -462,14 +462,18 @@ export default function OfficerDashboard() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => {
-                  if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
-                  audioCtxRef.current.resume().catch(() => {});
+                  // Synchronous AudioContext creation inside user gesture — works on iOS/Android.
+                  // .resume() / setTimeout lose the gesture context on WebKit.
+                  try { audioCtxRef.current?.close(); } catch {}
+                  audioCtxRef.current = new AudioContext();
                   soundArmedRef.current = true;
                   setSoundArmed(true);
                   setShowAlarmPrompt(false);
-                  // Start alarm immediately if there's already an unacknowledged assignment
+                  // Play once immediately so the officer confirms sound is working
+                  playAssignmentAlert();
                   if (assignment && ['ACTIVE', 'ACKNOWLEDGED'].includes(assignment.status)) {
-                    setTimeout(startAlarmLoop, 100);
+                    if (alarmIntervalRef.current !== null) { clearInterval(alarmIntervalRef.current); alarmIntervalRef.current = null; }
+                    alarmIntervalRef.current = setInterval(() => { if (soundArmedRef.current) playAssignmentAlert(); }, 5500);
                   }
                 }}
                 title={soundArmed ? 'Alert sounds armed' : 'Tap to enable alert sounds'}
@@ -509,17 +513,21 @@ export default function OfficerDashboard() {
             <style>{`@keyframes alarmPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.75;transform:scale(0.98)}}`}</style>
             <button
               onClick={() => {
-                if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
-                audioCtxRef.current.resume().then(() => {
-                  soundArmedRef.current = true;
-                  setSoundArmed(true);
-                  setShowAlarmPrompt(false);
-                  if (assignment && ['ACTIVE', 'ACKNOWLEDGED'].includes(assignment.status)) startAlarmLoop();
-                }).catch(() => {
-                  soundArmedRef.current = true;
-                  setSoundArmed(true);
-                  setShowAlarmPrompt(false);
-                });
+                // Create a FRESH AudioContext synchronously inside the user gesture.
+                // iOS/Android WebKit loses the user-gesture context after ANY async boundary
+                // (.then(), await, setTimeout). Creating new AudioContext() here puts it in
+                // 'running' state immediately — no resume() needed.
+                try { audioCtxRef.current?.close(); } catch {}
+                audioCtxRef.current = new AudioContext();
+                soundArmedRef.current = true;
+                setSoundArmed(true);
+                setShowAlarmPrompt(false);
+                // Kick off the alarm immediately — we're still inside the sync gesture handler
+                if (alarmIntervalRef.current !== null) { clearInterval(alarmIntervalRef.current); alarmIntervalRef.current = null; }
+                playAssignmentAlert();
+                if (assignment && ['ACTIVE', 'ACKNOWLEDGED'].includes(assignment.status)) {
+                  alarmIntervalRef.current = setInterval(() => { if (soundArmedRef.current) playAssignmentAlert(); }, 5500);
+                }
               }}
               style={{ width: '100%', padding: '20px 16px', marginBottom: 14, borderRadius: 10, background: '#dc2626', border: '3px solid #f87171', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', letterSpacing: 0.5, animation: 'alarmPulse 0.85s ease-in-out infinite', textAlign: 'center' as const, display: 'block' }}
             >

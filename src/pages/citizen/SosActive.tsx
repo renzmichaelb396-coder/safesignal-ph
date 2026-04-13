@@ -5,7 +5,7 @@ import { citizenApi } from '../../lib/api';
 
 declare global {
   interface Window {
-    L?: any;
+    maplibregl?: any;
   }
 }
 
@@ -84,8 +84,9 @@ export default function SosActive() {
                 const newLat = position.coords.latitude;
                 const newLng = position.coords.longitude;
                 if (mapInstance.current && markerRef.current && newLat != null && newLng != null && !isNaN(newLat) && !isNaN(newLng)) {
-                  markerRef.current.setLatLng([newLat, newLng]);
-                  mapInstance.current.setView([newLat, newLng], 15);
+                  // MapLibre uses [lng, lat] order (opposite of Leaflet)
+                  markerRef.current.setLngLat([newLng, newLat]);
+                  mapInstance.current.easeTo({ center: [newLng, newLat], zoom: 15 });
                 }
               } catch (err) {
                 console.error('Failed to update location', err);
@@ -110,6 +111,8 @@ export default function SosActive() {
   // Show officer live location on citizen map (EN_ROUTE / ON_SCENE)
   useEffect(() => {
     if (!mapInstance.current) return;
+    const maplibregl = window.maplibregl;
+    if (!maplibregl) return;
     const officerLat = sosStatus?.officer_lat;
     const officerLng = sosStatus?.officer_lng;
     if (!officerLat || !officerLng) {
@@ -117,66 +120,115 @@ export default function SosActive() {
       return;
     }
     if (officerMarkerRef.current) {
-      officerMarkerRef.current.setLatLng([officerLat, officerLng]);
+      // MapLibre: [lng, lat] order
+      officerMarkerRef.current.setLngLat([officerLng, officerLat]);
     } else {
-      const icon = window.L.divIcon({
-        className: '',
-        html: `<div style="position:relative;width:32px;height:32px;"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:32px;height:32px;border-radius:50%;background:rgba(59,130,246,0.2);animation:officerPulse 2s ease-out infinite;"></div><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 2px 8px rgba(59,130,246,0.8);"></div></div><style>@keyframes officerPulse{0%{transform:translate(-50%,-50%) scale(0.5);opacity:1;}100%{transform:translate(-50%,-50%) scale(2);opacity:0;}}</style>`,
-        iconSize: [32, 32], iconAnchor: [16, 16],
-      });
-      officerMarkerRef.current = window.L.marker([officerLat, officerLng], { icon }).addTo(mapInstance.current).bindPopup('\ud83d\udc6e Officer Location');
+      // Blue pulsing officer dot — same visual as dispatch view
+      if (!document.getElementById('sos-officer-pulse-style')) {
+        const s = document.createElement('style'); s.id = 'sos-officer-pulse-style';
+        s.textContent = '@keyframes officerPulse{0%{transform:translate(-50%,-50%) scale(0.5);opacity:1;}100%{transform:translate(-50%,-50%) scale(2.2);opacity:0;}}';
+        document.head.appendChild(s);
+      }
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;width:32px;height:32px;';
+      const ring = document.createElement('div');
+      ring.style.cssText = 'position:absolute;top:50%;left:50%;width:32px;height:32px;border-radius:50%;background:rgba(59,130,246,0.22);animation:officerPulse 2s ease-out infinite;pointer-events:none';
+      const dot = document.createElement('div');
+      dot.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 2px 8px rgba(59,130,246,0.8);';
+      wrap.appendChild(ring); wrap.appendChild(dot);
+      officerMarkerRef.current = new maplibregl.Marker({ element: wrap })
+        .setLngLat([officerLng, officerLat])
+        .addTo(mapInstance.current);
     }
   }, [sosStatus?.officer_lat, sosStatus?.officer_lng, sosStatus]);
 
   useEffect(() => {
     if (!mapRef.current || !sosStatus || mapInstance.current) return;
-    const loadMap = () => {
-      if (!window.L) {
-        setTimeout(loadMap, 100);
-        return;
+
+    const lat = sosStatus?.lat || 14.5794;
+    const lng = sosStatus?.lng || 120.9749;
+
+    // ── Inject sosPulse keyframes once ──────────────────────────────────────
+    if (!document.getElementById('sos-pulse-style')) {
+      const s = document.createElement('style'); s.id = 'sos-pulse-style';
+      s.textContent = '@keyframes sosPulse{0%{transform:translate(-50%,-50%) scale(0.4);opacity:1;}100%{transform:translate(-50%,-50%) scale(2.2);opacity:0;}}';
+      document.head.appendChild(s);
+    }
+
+    // ── Build pulsing red SOS marker element ─────────────────────────────────
+    function buildSosDot() {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;width:44px;height:44px;';
+      const r1 = document.createElement('div');
+      r1.style.cssText = 'position:absolute;top:50%;left:50%;width:44px;height:44px;border-radius:50%;background:rgba(230,57,70,0.15);animation:sosPulse 1.6s ease-out infinite;pointer-events:none';
+      const r2 = document.createElement('div');
+      r2.style.cssText = 'position:absolute;top:50%;left:50%;width:28px;height:28px;border-radius:50%;background:rgba(230,57,70,0.28);animation:sosPulse 1.6s ease-out infinite 0.4s;pointer-events:none';
+      const dot = document.createElement('div');
+      dot.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:#E63946;border:3px solid #fff;box-shadow:0 2px 10px rgba(230,57,70,0.7);';
+      wrap.appendChild(r1); wrap.appendChild(r2); wrap.appendChild(dot);
+      return wrap;
+    }
+
+    // ── Load MapLibre and init the map ───────────────────────────────────────
+    function initMapLibreMap() {
+      const maplibregl = window.maplibregl;
+      if (!maplibregl || !mapRef.current || mapInstance.current) return;
+
+      // Load CSS if not already present
+      if (!document.getElementById('maplibre-css')) {
+        const link = document.createElement('link');
+        link.id = 'maplibre-css';
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css';
+        document.head.appendChild(link);
       }
-      // API returns lat/lng (normalized by normalizeAlert) — NOT latitude/longitude
-      const lat = sosStatus?.lat || 14.5794;
-      const lng = sosStatus?.lng || 120.9749;
-      const map = window.L.map(mapRef.current).setView([lat, lng], 15);
 
-      // OpenFreeMap Voyager @2x + dark mode via tile pane CSS inversion — no API key needed
-      window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 19,
-        tileSize: 512,
-        zoomOffset: -1,
-      }).addTo(map);
-      const tilePaneEl = map.getPanes().tilePane as HTMLElement;
-      // Light map — no filter needed
-
-      // Pulsing RED location pin — citizen dot (matches dispatch view RED color)
-      const pulseIcon = window.L.divIcon({
-        className: '',
-        html: `
-          <div style="position:relative;width:44px;height:44px;">
-            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;background:rgba(230,57,70,0.15);animation:sosPulse 1.6s ease-out infinite;"></div>
-            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;background:rgba(230,57,70,0.28);animation:sosPulse 1.6s ease-out infinite 0.4s;"></div>
-            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:#E63946;border:3px solid #fff;box-shadow:0 2px 10px rgba(230,57,70,0.7);"></div>
-          </div>
-          <style>
-            @keyframes sosPulse {
-              0% { transform: translate(-50%,-50%) scale(0.4); opacity: 1; }
-              100% { transform: translate(-50%,-50%) scale(2); opacity: 0; }
-            }
-          </style>
-        `,
-        iconSize: [44, 44],
-        iconAnchor: [22, 22],
+      // MapLibre uses [lng, lat] coordinate order
+      const map = new maplibregl.Map({
+        container: mapRef.current,
+        style: 'https://tiles.openfreemap.org/styles/liberty',
+        center: [lng, lat],
+        zoom: 15,
       });
 
-      const marker = window.L.marker([lat, lng], { icon: pulseIcon }).addTo(map);
+      map.on('load', () => {
+        const canvas = map.getCanvas();
+        canvas.style.borderRadius = 'inherit';
 
-      mapInstance.current = map;
-      markerRef.current = marker;
-    };
-    loadMap();
+        // Place pulsing red SOS marker
+        const marker = new maplibregl.Marker({ element: buildSosDot(), anchor: 'center' })
+          .setLngLat([lng, lat])
+          .addTo(map);
+
+        mapInstance.current = map;
+        markerRef.current = marker;
+      });
+    }
+
+    if (window.maplibregl) {
+      initMapLibreMap();
+    } else {
+      // Inject MapLibre JS once
+      if (!document.getElementById('maplibre-js')) {
+        const link = document.createElement('link');
+        link.id = 'maplibre-css';
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css';
+        if (!document.getElementById('maplibre-css')) document.head.appendChild(link);
+
+        const script = document.createElement('script');
+        script.id = 'maplibre-js';
+        script.src = 'https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js';
+        script.onload = () => initMapLibreMap();
+        document.head.appendChild(script);
+      } else {
+        // Script tag exists but not loaded yet — poll
+        const poll = setInterval(() => {
+          if (window.maplibregl) { clearInterval(poll); initMapLibreMap(); }
+        }, 100);
+        setTimeout(() => clearInterval(poll), 10000);
+      }
+    }
   }, [sosStatus, user]);
 
   const handleCancel = async () => {

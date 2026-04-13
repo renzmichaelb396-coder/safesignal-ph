@@ -255,6 +255,9 @@ function broadcastEvent(eventType: string, data: unknown): void {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const loginAttempts = new Map<string, { count: number; lockUntil: number }>();
+// Tracks the last time a repeat push was sent to each officer (officer_id → timestamp).
+// Prevents hammering the push service — max one repeat push per officer per 30s.
+const lastRepeatPush = new Map<number, number>();
 function recordFailedAttempt(key: string): void {
   const current = loginAttempts.get(key) || { count: 0, lockUntil: 0 };
   current.count += 1;
@@ -1240,7 +1243,29 @@ app.get('/api/officer/active-assignment', requireOfficerAuth, async (req: any, r
        ORDER BY a.triggered_at DESC LIMIT 1`,
       [officerPayload.id]
     );
-    res.json({ assignment: result.rows[0] || null });
+
+    const row = result.rows[0] || null;
+
+    // ── Repeat push: keep hammering the officer's phone until they acknowledge ─
+    // If the assignment is ACTIVE (unacknowledged) and is >30s old, resend a push
+    // notification every 30s so the phone alarm keeps firing even when screen is off.
+    if (row && row.status === 'ACTIVE') {
+      const offId = officerPayload.id as number;
+      const ageMs = Date.now() - Number(row.createdAt);
+      const lastSent = lastRepeatPush.get(offId) || 0;
+      const REPEAT_INTERVAL_MS = 30_000; // 30 seconds
+      if (ageMs > REPEAT_INTERVAL_MS && Date.now() - lastSent > REPEAT_INTERVAL_MS) {
+        lastRepeatPush.set(offId, Date.now());
+        sendPushToOfficers([offId], {
+          title: '🚨 URGENT — Unresponded SOS',
+          body: `Citizen ${row.citizenName} is still waiting. Open SafeSignal and respond NOW.`,
+          url: '/officer',
+          alertId: row.id,
+        }).catch(() => {});
+      }
+    }
+
+    res.json({ assignment: row });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch assignment' });
