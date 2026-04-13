@@ -671,7 +671,7 @@ app.post('/api/dispatch/alerts/:id/assign', requireOfficerAuth, async (req: any,
     const pushPayload = {
       title: '\uD83D\uDEA8 EMERGENCY \u2014 You have been assigned!',
       body: `Citizen: ${updated?.full_name || 'Unknown'} | Barangay: ${updated?.barangay || ''}`,
-      url: '/dispatch/login',
+      url: '/officer',  // Open officer dashboard directly
     };
     await sendPushToOfficers([Number(officer_id)], pushPayload);
     res.json({ alert: updated });
@@ -706,7 +706,7 @@ app.post('/api/dispatch/alerts/:id/repush', requireOfficerAuth, async (req: any,
       await sendPushToOfficers(targetIds, {
         title: `${statusLabel} — SafeSignal`,
         body: `Citizen: ${alert.full_name} | Barangay: ${alert.barangay || 'Unknown'} | Still waiting for response!`,
-        url: '/dispatch/login',
+        url: '/officer',  // Always open officer dashboard, not dispatch login
       });
     }
     res.json({ pushed: targetIds.length });
@@ -1158,7 +1158,7 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
         sendPushToOfficers(pushTargetIds, {
           title: '🚨 NEW SOS — Immediate Response Required',
           body: `Citizen: ${citizen.full_name} | Barangay: ${citizen.barangay || 'Unknown'} | Tap to respond NOW.`,
-          url: '/dispatch/login',
+          url: '/officer',  // Open officer dashboard directly
         });
       }
       if (citizen.barangay) {

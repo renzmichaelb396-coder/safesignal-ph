@@ -68,6 +68,42 @@ export default function OfficerDashboard() {
     }
   }, [assignment?.lat, assignment?.lng]);
 
+  // ── Auto-arm AudioContext on first user interaction (tap/click anywhere on page) ──
+  // iOS/Android WebKit requires a user gesture to create AudioContext.
+  // Instead of forcing officers to find a special button, we arm silently on the
+  // FIRST tap ANYWHERE on the page — the Claim button, any status update, anything.
+  useEffect(() => {
+    const arm = () => {
+      if (soundArmedRef.current) return;
+      try {
+        if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+          audioCtxRef.current = new AudioContext();
+        }
+        const ctx = audioCtxRef.current;
+        const finish = () => {
+          if (ctx.state === 'running') {
+            soundArmedRef.current = true;
+            setSoundArmed(true);
+            setShowAlarmPrompt(false);
+            // If there's already an active assignment waiting, start the alarm now
+            if (prevAssignmentIdRef.current !== null) startAlarmLoop();
+          }
+        };
+        if (ctx.state === 'suspended') {
+          ctx.resume().then(finish).catch(() => {});
+        } else {
+          finish();
+        }
+      } catch {}
+    };
+    document.addEventListener('click', arm, { once: true });
+    document.addEventListener('touchstart', arm, { once: true, passive: true });
+    return () => {
+      document.removeEventListener('click', arm);
+      document.removeEventListener('touchstart', arm);
+    };
+  }, []);
+
   // ── Service Worker registration + SW_ALARM listener ─────────────────────────
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
@@ -76,10 +112,8 @@ export default function OfficerDashboard() {
     }).catch(() => {});
     const handler = (event: MessageEvent) => {
       if (event.data?.type === 'SW_ALARM') {
-        // Push notification woke the app — show the tap-to-arm prompt.
-        // Cannot create AudioContext here because this is NOT a user gesture.
-        // The banner click will create the context synchronously when the officer taps.
-        setShowAlarmPrompt(true);
+        // Push notification woke the app — show the tap-to-arm prompt if not yet armed.
+        if (!soundArmedRef.current) setShowAlarmPrompt(true);
       }
     };
     navigator.serviceWorker.addEventListener('message', handler);
@@ -467,6 +501,13 @@ export default function OfficerDashboard() {
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', color: '#e6edf3', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       {toastMsg && (<div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', background: '#1a472a', border: '1px solid #3fb950', color: '#4ade80', padding: '10px 20px', borderRadius: 8, fontSize: 14, fontWeight: 600, zIndex: 9999, whiteSpace: 'nowrap' }}>{toastMsg}</div>)}
+
+      {/* Alarm-arm nudge — shown until officer taps anywhere on page */}
+      {!soundArmed && (
+        <div style={{ background: '#78350f', borderBottom: '1px solid #d97706', padding: '8px 16px', textAlign: 'center', fontSize: 13, color: '#fde68a', fontWeight: 600, letterSpacing: 0.3 }}>
+          🔕 TAP ANYWHERE on this page to enable alarm sounds
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ maxWidth: 540, margin: '0 auto', padding: '0 16px' }}>

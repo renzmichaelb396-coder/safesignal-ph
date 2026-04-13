@@ -52,6 +52,42 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
+  // ── Auto-arm alarm on first user interaction (tap/click anywhere) ───────────
+  // Dispatcher must click 🔔 to arm. But dispatchers often miss it. Arm silently
+  // on the FIRST tap anywhere — they don't need to know about a special button.
+  useEffect(() => {
+    const arm = () => {
+      if (soundArmedRef.current) return;
+      try {
+        // Create synchronously inside gesture — iOS/Android WebKit requirement
+        if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+          audioCtxRef.current = new AudioContext();
+        }
+        const ctx = audioCtxRef.current;
+        const finish = () => {
+          if (ctx.state === 'running') {
+            soundArmedRef.current = true;
+            setSoundArmed(true);
+            // Fire alarm immediately if there are already unacknowledged alerts
+            const needsAlarm = alerts.some((a: any) => ['ACTIVE', 'ACKNOWLEDGED'].includes(a.status));
+            if (needsAlarm) setTimeout(startAlarmLoop, 100);
+          }
+        };
+        if (ctx.state === 'suspended') {
+          ctx.resume().then(finish).catch(() => {});
+        } else {
+          finish();
+        }
+      } catch {}
+    };
+    document.addEventListener('click', arm, { once: true });
+    document.addEventListener('touchstart', arm, { once: true, passive: true });
+    return () => {
+      document.removeEventListener('click', arm);
+      document.removeEventListener('touchstart', arm);
+    };
+  }, [alerts]);
+
   // Load MapLibre GL CSS
   useEffect(() => {
     if (!document.getElementById('maplibre-css')) {
@@ -465,6 +501,12 @@ export default function Dashboard() {
 
   return (
     <>
+      {/* Alarm-arm nudge — disappears on first tap anywhere (auto-arm useEffect handles it) */}
+      {!soundArmed && (
+        <div style={{ background: '#78350f', borderBottom: '1px solid #d97706', padding: '7px 16px', textAlign: 'center', fontSize: 13, color: '#fde68a', fontWeight: 600, letterSpacing: 0.3, position: 'relative', zIndex: 100 }}>
+          🔕 TAP ANYWHERE on this page to enable alarm sounds for incoming SOS
+        </div>
+      )}
       <DispatchLayout>
         {/* dispatch-main: map (flex-1) + right panel (360px) */}
         <div className="dispatch-main">
