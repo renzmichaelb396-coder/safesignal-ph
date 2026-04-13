@@ -591,13 +591,13 @@ app.post('/api/dispatch/alerts/:id/repush', requireOfficerAuth, async (req: any,
       const fifteenMinAgo = Date.now() - 15 * 60 * 1000;
       const nearbyResult = await pool.query(
         `SELECT o.id FROM officers o JOIN officer_locations ol ON ol.officer_id = o.id
-         WHERE o.role = 'OFFICER' AND o.is_active = TRUE AND ol.updated_at > $3
+         WHERE o.role = 'OFFICER' AND o.is_active::INT = 1 AND ol.updated_at > $3::bigint
            AND (6371 * acos(GREATEST(-1, LEAST(1, cos(radians($1)) * cos(radians(ol.lat)) * cos(radians(ol.lng) - radians($2)) + sin(radians($1)) * sin(radians(ol.lat)))))) < 5`,
         [alert.lat, alert.lng, fifteenMinAgo]
       );
       targetIds = nearbyResult.rows.map((r: any) => Number(r.id));
       if (targetIds.length === 0) {
-        const allResult = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = TRUE`);
+        const allResult = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active::INT = 1`);
         targetIds = allResult.rows.map((r: any) => Number(r.id));
       }
     }
@@ -1045,13 +1045,13 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
       const fifteenMinAgo = Date.now() - 15 * 60 * 1000;
       const nearbyPushResult = await pool.query(
         `SELECT o.id FROM officers o JOIN officer_locations ol ON ol.officer_id = o.id
-         WHERE o.role = 'OFFICER' AND o.is_active = TRUE AND ol.updated_at > $3
+         WHERE o.role = 'OFFICER' AND o.is_active::INT = 1 AND ol.updated_at > $3::bigint
            AND (6371 * acos(GREATEST(-1, LEAST(1, cos(radians($1)) * cos(radians(ol.lat)) * cos(radians(ol.lng) - radians($2)) + sin(radians($1)) * sin(radians(ol.lat)))))) < 5`,
         [lat, lng, fifteenMinAgo]
       );
       let pushTargetIds = nearbyPushResult.rows.map((o: any) => Number(o.id));
       if (pushTargetIds.length === 0) {
-        const allResult = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = TRUE`);
+        const allResult = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active::INT = 1`);
         pushTargetIds = allResult.rows.map((o: any) => Number(o.id));
       }
       if (pushTargetIds.length > 0) {
@@ -1169,8 +1169,8 @@ app.get('/api/dispatch/nearby-officers', requireOfficerAuth, async (req: any, re
               )))) AS distance_km
        FROM officer_locations ol
        JOIN officers o ON ol.officer_id = o.id
-       WHERE o.is_active = TRUE
-         AND ol.updated_at > $3
+       WHERE o.is_active::INT = 1
+         AND ol.updated_at > $3::bigint
        ORDER BY distance_km ASC
        LIMIT 5`,
       [lat, lng, fifteenMinAgo]
@@ -1191,7 +1191,7 @@ app.get('/api/dispatch/officer-locations', requireOfficerAuth, async (_req: any,
               o.full_name, o.badge_number, o.role, o.phone, o.duty_status
        FROM officer_locations ol
        JOIN officers o ON ol.officer_id = o.id
-       WHERE ol.updated_at > $1
+       WHERE ol.updated_at > $1::bigint
        ORDER BY ol.updated_at DESC`,
       [fiveMinAgo]
     );
