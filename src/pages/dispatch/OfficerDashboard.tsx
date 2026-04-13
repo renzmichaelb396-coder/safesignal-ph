@@ -51,6 +51,7 @@ export default function OfficerDashboard() {
   const hasZoomedToAssignmentRef = useRef<number | null>(null);
   const [toastMsg, setToastMsg] = useState('');
   const [soundArmed, setSoundArmed] = useState(false);
+  const [showAlarmPrompt, setShowAlarmPrompt] = useState(false);
   const [dispositionNotes, setDispositionNotes] = useState('');
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
@@ -328,13 +329,16 @@ export default function OfficerDashboard() {
         prevAssignmentIdRef.current = incoming.id;
       } else if (!incoming) {
         prevAssignmentIdRef.current = null;
+        // Remove SOS marker so next assignment always creates a fresh, visible dot
+        if (markerRef.current) { markerRef.current.remove(); markerRef.current = null; }
+        hasZoomedToAssignmentRef.current = null;
       }
-      // Auto-arm alarm the moment an ACTIVE/ACKNOWLEDGED assignment arrives — no manual bell tap needed
+      // Mobile browsers (iOS/Android) block AudioContext without a prior user gesture.
+      // Auto-resuming silently fails — show a prominent tap-to-arm prompt instead.
       if (incoming && ['ACTIVE', 'ACKNOWLEDGED'].includes(incoming.status) && !soundArmedRef.current) {
-        if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
-        audioCtxRef.current.resume().catch(() => {});
-        soundArmedRef.current = true;
-        setSoundArmed(true);
+        setShowAlarmPrompt(true);
+      } else if (!incoming || !['ACTIVE', 'ACKNOWLEDGED'].includes(incoming.status)) {
+        setShowAlarmPrompt(false);
       }
       // Alarm loops while ACTIVE or ACKNOWLEDGED — stops the moment officer taps EN_ROUTE
       if (hasInitialLoadRef.current) {
@@ -364,7 +368,11 @@ export default function OfficerDashboard() {
     const maplibregl = (window as any).maplibregl;
     // Only fly when explicitly requested (new assignment ID) — lets user zoom/pan freely after initial fly-in
     if (flyTo) mapInstanceRef.current.flyTo({ center: [lng, lat], zoom: 16 });
-    if (markerRef.current) { markerRef.current.setLngLat([lng, lat]); } else {
+    if (markerRef.current) {
+      // Re-attach if marker was detached (MapLibre style reload or network glitch can orphan it)
+      if (!markerRef.current._map) markerRef.current.addTo(mapInstanceRef.current);
+      markerRef.current.setLngLat([lng, lat]);
+    } else {
       const popup = new maplibregl.Popup({ offset: 36, closeOnClick: false, className: 'sos-popup' }).setHTML(
         '<div style="background:#7f0000;color:#fff;padding:8px 12px;border-radius:6px;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.6);">🚨 SOS — Citizen Location</div>'
       );
@@ -458,6 +466,7 @@ export default function OfficerDashboard() {
                   audioCtxRef.current.resume().catch(() => {});
                   soundArmedRef.current = true;
                   setSoundArmed(true);
+                  setShowAlarmPrompt(false);
                   // Start alarm immediately if there's already an unacknowledged assignment
                   if (assignment && ['ACTIVE', 'ACKNOWLEDGED'].includes(assignment.status)) {
                     setTimeout(startAlarmLoop, 100);
@@ -494,6 +503,30 @@ export default function OfficerDashboard() {
         </div>
 
         {error && <div style={{ background: '#3d1a1a', border: '1px solid #e63946', borderRadius: 8, padding: 12, marginBottom: 16, color: '#ff6b6b', fontSize: 14 }}>{error}</div>}
+
+        {showAlarmPrompt && (
+          <>
+            <style>{`@keyframes alarmPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.75;transform:scale(0.98)}}`}</style>
+            <button
+              onClick={() => {
+                if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+                audioCtxRef.current.resume().then(() => {
+                  soundArmedRef.current = true;
+                  setSoundArmed(true);
+                  setShowAlarmPrompt(false);
+                  if (assignment && ['ACTIVE', 'ACKNOWLEDGED'].includes(assignment.status)) startAlarmLoop();
+                }).catch(() => {
+                  soundArmedRef.current = true;
+                  setSoundArmed(true);
+                  setShowAlarmPrompt(false);
+                });
+              }}
+              style={{ width: '100%', padding: '20px 16px', marginBottom: 14, borderRadius: 10, background: '#dc2626', border: '3px solid #f87171', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', letterSpacing: 0.5, animation: 'alarmPulse 0.85s ease-in-out infinite', textAlign: 'center' as const, display: 'block' }}
+            >
+              🔔 TAP HERE TO ACTIVATE ALARM SOUND
+            </button>
+          </>
+        )}
 
         {!assignment ? (
           <div style={{ textAlign: 'center', padding: '48px 0' }}>
