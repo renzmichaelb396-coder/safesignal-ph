@@ -118,6 +118,8 @@ export function getStatusBadgeClass(status) {
   const map = {
     ACTIVE: 'badge-active',
     ACKNOWLEDGED: 'badge-acknowledged',
+    EN_ROUTE: 'badge-en_route',
+    ON_SCENE: 'badge-on_scene',
     RESOLVED: 'badge-resolved',
     CANCELLED: 'badge-cancelled',
     FALSE_ALARM: 'badge-false_alarm',
