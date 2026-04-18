@@ -250,7 +250,7 @@ export default function SosActive() {
   const formatElapsed = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}m  ${secs}s`;
+    return `${mins}m ${secs}s`;
   };
 
   const getStatusColor = (status?: string) => {
@@ -260,6 +260,8 @@ export default function SosActive() {
       case 'EN_ROUTE': return '#60a5fa';
       case 'ON_SCENE': return '#f97316';
       case 'CANCELLED': return '#888';
+      case 'RESOLVED': return '#4ade80';
+      case 'FALSE_ALARM': return '#f97316';
       default: return '#888';
     }
   };
@@ -270,6 +272,8 @@ export default function SosActive() {
       case 'ACKNOWLEDGED': return 'Officer Assigned';
       case 'EN_ROUTE': return 'Officer En Route';
       case 'ON_SCENE': return 'Officer On Scene';
+    case 'RESOLVED': return 'Case Resolved';
+    case 'FALSE_ALARM': return 'Marked False Alarm';
       case 'CANCELLED': return 'Cancelled';
       default: return status || 'PENDING';
     }
@@ -282,6 +286,8 @@ export default function SosActive() {
       case 'ACKNOWLEDGED': return `${name} has been assigned and is responding.`;
       case 'EN_ROUTE': return `${name} is on the way to your location.`;
       case 'ON_SCENE': return `${name} has arrived at your location.`;
+      case 'RESOLVED': return 'Your emergency has been resolved. Stay safe.';
+      case 'FALSE_ALARM': return 'This alert was marked as a false alarm.';
       default: return 'Stay calm and stay where you are.';
     }
   };
@@ -423,7 +429,7 @@ export default function SosActive() {
       </div>
 
       {/* Strike Warning */}
-      {sosStatus?.citizen_strikes >= 2 && (
+      {sosStatus?.strike_count >= 2 && (
         <div style={{ padding: '10px 20px', background: 'rgba(230,57,70,0.15)', borderBottom: '1px solid rgba(230,57,70,0.25)' }}>
           <p style={{ color: '#ff6b6b', fontSize: 12, margin: 0, fontWeight: 600 }}>
             ⚠️ Strike {sosStatus.citizen_strikes}/3 — One more false alarm will suspend your account
