@@ -164,7 +164,7 @@ async function initDb(): Promise<void> {
         VALUES ('Demo Citizen', '09171234567', '123 Leveriza St', 'Barangay 76', 'Pasay City', $1, 1, 0, 0)
         ON CONFLICT (phone) DO UPDATE
           SET pin_hash = EXCLUDED.pin_hash,
-              verified = 1,
+              verified = TRUE,
               is_suspended = 0,
               suspension_reason = NULL,
               strike_count = 0
@@ -767,7 +767,7 @@ app.post('/api/dispatch/alerts/:id/suspicious', requireOfficerAuth, async (req: 
     const alertResult = await pool.query('SELECT * FROM sos_alerts WHERE id = $1', [req.params.id]);
     const alert = alertResult.rows[0];
     if (!alert) { res.status(404).json({ error: 'Alert not found' }); return; }
-    await pool.query(`UPDATE sos_alerts SET is_suspicious = 1, suspicious_reason = $1 WHERE id = $2`, [reason || 'Flagged by dispatcher', alert.id]);
+    await pool.query(`UPDATE sos_alerts SET is_suspicious = TRUE, suspicious_reason = $1 WHERE id = $2`, [reason || 'Flagged by dispatcher', alert.id]);
     const updated = await getFullAlert(alert.id);
     broadcastEvent('alert_updated', { alert: updated });
     res.json({ alert: updated });
@@ -782,7 +782,7 @@ app.get('/api/dispatch/citizens', requireOfficerAuth, async (req: any, res: any)
     const params: any[] = [];
     let paramIdx = 1;
     if (search) { query += ` AND (c.full_name ILIKE $${paramIdx} OR c.phone ILIKE $${paramIdx + 1})`; params.push(`%${search}%`, `%${search}%`); paramIdx += 2; }
-    if (filter === 'suspended') { query += ` AND c.is_suspended = 1`; }
+    if (filter === 'suspended') { query += ` AND c.is_suspended = TRUE`; }
     else if (filter === 'active') { query += ` AND (c.is_suspended = 0 OR c.is_suspended IS NULL)`; }
     query += ' ORDER BY c.registered_at DESC';
     const result = await pool.query(query, params);
@@ -803,7 +803,7 @@ app.get('/api/dispatch/citizens/:id', requireOfficerAuth, async (req: any, res: 
 
 // POST /api/dispatch/citizens/:id/suspend
 app.post('/api/dispatch/citizens/:id/suspend', requireOfficerAuth, async (req: any, res: any) => {
-  try { const { reason } = req.body; await pool.query(`UPDATE citizens SET is_suspended = 1, suspension_reason = $1 WHERE id = $2`, [reason || 'Suspended by dispatcher', req.params.id]); res.json({ success: true }); }
+  try { const { reason } = req.body; await pool.query(`UPDATE citizens SET is_suspended = TRUE, suspension_reason = $1 WHERE id = $2`, [reason || 'Suspended by dispatcher', req.params.id]); res.json({ success: true }); }
   catch (error) { console.error(error); res.status(500).json({ error: 'Failed to suspend citizen' }); }
 });
 
@@ -954,7 +954,7 @@ app.get('/api/dispatch/settings', requireOfficerAuth, async (_req: any, res: any
 app.put('/api/dispatch/settings', requireAdminAuth, async (req: any, res: any) => {
   try {
     const { surge_threshold, surge_window_minutes, cooldown_minutes, strike_limit } = req.body;
-    await pool.query(`UPDATE station_settings SET surge_threshold = COALESCE($1, surge_threshold), surge_window_minutes = COALESCE($2, surge_window_minutes), cooldown_minutes = COALESCE($3, cooldown_minutes), strike_limit = COALESCE($4, strike_limit) WHERE id = 1`, [surge_threshold || null, surge_window_minutes || null, cooldown_minutes || null, strike_limit || null]);
+    await pool.query(`UPDATE station_settings SET surge_threshold = COALESCE($1, surge_threshold), surge_window_minutes = COALESCE($2, surge_window_minutes), cooldown_minutes = COALESCE($3, cooldown_minutes), strike_limit = COALESCE($4, strike_limit) WHERE station_id = (SELECT id FROM stations LIMIT 1)`, [surge_threshold || null, surge_window_minutes || null, cooldown_minutes || null, strike_limit || null]);
     res.json({ success: true });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to update settings' }); }
 });
@@ -1015,7 +1015,7 @@ app.post('/api/citizen/verify-otp', async (req: any, res: any) => {
     const citizenResult = await pool.query('SELECT * FROM citizens WHERE id = $1', [citizen_id]);
     const citizen = citizenResult.rows[0];
     if (!citizen) { res.status(404).json({ error: 'Citizen not found' }); return; }
-    await pool.query('UPDATE citizens SET verified = 1 WHERE id = $1', [citizen_id]);
+    await pool.query('UPDATE citizens SET verified = TRUE WHERE id = $1', [citizen_id]);
     await pool.query('DELETE FROM otp_codes WHERE citizen_id = $1', [citizen_id]);
     const token = signCitizenToken({ id: citizen.id, phone: citizen.phone });
     res.json({ token, citizen: { id: citizen.id, full_name: citizen.full_name, phone: citizen.phone } });
@@ -1027,7 +1027,7 @@ app.post('/api/citizen/forgot-pin', async (req: any, res: any) => {
   try {
     const { phone } = req.body;
     if (!phone) { res.status(400).json({ error: 'phone is required' }); return; }
-    const citizenResult = await pool.query('SELECT id, phone FROM citizens WHERE phone = $1 AND verified = 1', [phone]);
+    const citizenResult = await pool.query('SELECT id, phone FROM citizens WHERE phone = $1 AND verified = TRUE', [phone]);
     if (!citizenResult.rows[0]) { res.status(404).json({ error: 'No verified account found for this number' }); return; }
     const citizen = citizenResult.rows[0];
     const otpCode = String(Math.floor(100000 + Math.random() * 900000));
@@ -1428,31 +1428,5 @@ app.patch('/api/officer/duty-status', requireOfficerAuth, async (req: any, res: 
   }
 });
 
-// === ONE-TIME DB FIX ENDPOINT ===
-app.get('/api/fix-db', async (_req: any, res: any) => {
-  try {
-    // Step 1: neutralize PNP-002B ghost
-    const ghost = await pool.query(`SELECT id, email, badge_number FROM officers WHERE badge_number = 'PNP-002B'`);
-    let ghostResult = 'no PNP-002B found';
-    if (ghost.rows.length > 0) {
-      const ghostId = ghost.rows[0].id;
-      await pool.query(`UPDATE officers SET email = 'ghost-002b' || '@' || 'removed.local', is_active = FALSE WHERE id = $1`, [ghostId]);
-      // Reassign alerts
-      const real = await pool.query(`SELECT id FROM officers WHERE badge_number = 'PNP-002'`);
-      if (real.rows.length > 0) {
-        await pool.query(`UPDATE sos_alerts SET assigned_officer_id = $1 WHERE assigned_officer_id = $2`, [real.rows[0].id, ghostId]);
-      }
-      ghostResult = 'neutralized id=' + ghostId;
-    }
-    // Step 2: force-correct PNP-002
-    const pwHash = await bcrypt.hash('password123', 10);
-    await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer' || '@' || 'pasay.safesignal.ph', password_hash = $1, is_active = TRUE WHERE badge_number = 'PNP-002'`, [pwHash]);
-    // Step 3: verify
-    const verify = await pool.query(`SELECT id, badge_number, email, role, is_active FROM officers WHERE badge_number IN ('PNP-002', 'PNP-002B') ORDER BY badge_number`);
-    res.json({ success: true, ghost: ghostResult, officers: verify.rows });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 export default app;
