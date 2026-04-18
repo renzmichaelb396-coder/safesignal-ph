@@ -164,7 +164,7 @@ async function initDb(): Promise<void> {
         VALUES ('Demo Citizen', '09171234567', '123 Leveriza St', 'Barangay 76', 'Pasay City', $1, 1, 0, 0)
         ON CONFLICT (phone) DO UPDATE
           SET pin_hash = EXCLUDED.pin_hash,
-              verified = TRUE,
+              verified = 1,
               is_suspended = 0,
               suspension_reason = NULL,
               strike_count = 0
@@ -767,7 +767,7 @@ app.post('/api/dispatch/alerts/:id/suspicious', requireOfficerAuth, async (req: 
     const alertResult = await pool.query('SELECT * FROM sos_alerts WHERE id = $1', [req.params.id]);
     const alert = alertResult.rows[0];
     if (!alert) { res.status(404).json({ error: 'Alert not found' }); return; }
-    await pool.query(`UPDATE sos_alerts SET is_suspicious = TRUE, suspicious_reason = $1 WHERE id = $2`, [reason || 'Flagged by dispatcher', alert.id]);
+    await pool.query(`UPDATE sos_alerts SET is_suspicious = 1, suspicious_reason = $1 WHERE id = $2`, [reason || 'Flagged by dispatcher', alert.id]);
     const updated = await getFullAlert(alert.id);
     broadcastEvent('alert_updated', { alert: updated });
     res.json({ alert: updated });
@@ -782,7 +782,7 @@ app.get('/api/dispatch/citizens', requireOfficerAuth, async (req: any, res: any)
     const params: any[] = [];
     let paramIdx = 1;
     if (search) { query += ` AND (c.full_name ILIKE $${paramIdx} OR c.phone ILIKE $${paramIdx + 1})`; params.push(`%${search}%`, `%${search}%`); paramIdx += 2; }
-    if (filter === 'suspended') { query += ` AND c.is_suspended = TRUE`; }
+    if (filter === 'suspended') { query += ` AND c.is_suspended = 1`; }
     else if (filter === 'active') { query += ` AND (c.is_suspended = 0 OR c.is_suspended IS NULL)`; }
     query += ' ORDER BY c.registered_at DESC';
     const result = await pool.query(query, params);
@@ -803,7 +803,7 @@ app.get('/api/dispatch/citizens/:id', requireOfficerAuth, async (req: any, res: 
 
 // POST /api/dispatch/citizens/:id/suspend
 app.post('/api/dispatch/citizens/:id/suspend', requireOfficerAuth, async (req: any, res: any) => {
-  try { const { reason } = req.body; await pool.query(`UPDATE citizens SET is_suspended = TRUE, suspension_reason = $1 WHERE id = $2`, [reason || 'Suspended by dispatcher', req.params.id]); res.json({ success: true }); }
+  try { const { reason } = req.body; await pool.query(`UPDATE citizens SET is_suspended = 1, suspension_reason = $1 WHERE id = $2`, [reason || 'Suspended by dispatcher', req.params.id]); res.json({ success: true }); }
   catch (error) { console.error(error); res.status(500).json({ error: 'Failed to suspend citizen' }); }
 });
 
@@ -1015,7 +1015,7 @@ app.post('/api/citizen/verify-otp', async (req: any, res: any) => {
     const citizenResult = await pool.query('SELECT * FROM citizens WHERE id = $1', [citizen_id]);
     const citizen = citizenResult.rows[0];
     if (!citizen) { res.status(404).json({ error: 'Citizen not found' }); return; }
-    await pool.query('UPDATE citizens SET verified = TRUE WHERE id = $1', [citizen_id]);
+    await pool.query('UPDATE citizens SET verified = 1 WHERE id = $1', [citizen_id]);
     await pool.query('DELETE FROM otp_codes WHERE citizen_id = $1', [citizen_id]);
     const token = signCitizenToken({ id: citizen.id, phone: citizen.phone });
     res.json({ token, citizen: { id: citizen.id, full_name: citizen.full_name, phone: citizen.phone } });
@@ -1027,7 +1027,7 @@ app.post('/api/citizen/forgot-pin', async (req: any, res: any) => {
   try {
     const { phone } = req.body;
     if (!phone) { res.status(400).json({ error: 'phone is required' }); return; }
-    const citizenResult = await pool.query('SELECT id, phone FROM citizens WHERE phone = $1 AND verified = TRUE', [phone]);
+    const citizenResult = await pool.query('SELECT id, phone FROM citizens WHERE phone = $1 AND verified = 1', [phone]);
     if (!citizenResult.rows[0]) { res.status(404).json({ error: 'No verified account found for this number' }); return; }
     const citizen = citizenResult.rows[0];
     const otpCode = String(Math.floor(100000 + Math.random() * 900000));
