@@ -152,7 +152,7 @@ export default function DispatchLogin() {
                 style={{ width: '96px', height: 'auto', filter: 'drop-shadow(0 4px 12px rgba(245,158,11,0.4))' }}
               />
             </div>
-            <h1 style={{ fontSize: '18px', fontWeight: 700, color: '#ffc107', margin: '0 0 8px 0', textAlign: 'center', lineHeight: 1.2 }}>Pasay City Emergency Response</h1>
+            <h1 style={{ fontSize: '18px', fontWeight: 700, color: '#ffc107', margin: '0 0 8px 0', textAlign: 'center', lineHeight: 1.2 }}>SafeSignal PH</h1>
             <p style={{ fontSize: '14px', color: '#8b949e', margin: 0 }}>Police Dispatch Console</p>
           </div>
 
@@ -259,7 +259,7 @@ export default function DispatchLogin() {
           </div>
 
           <p style={{ marginTop: '24px', textAlign: 'center', fontSize: '11px', color: '#8b949e' }}>
-            Pasay City Emergency Response v1.0 — Authorized Personnel Only
+            SafeSignal PH v1.0 — Authorized Personnel Only
           </p>
         </div>
 
