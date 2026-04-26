@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { OFFICER_SEEDS } from './seed-data';
 import webpush from 'web-push';
 
 // VAPID keys for Web Push (set in Vercel env vars)
@@ -36,6 +37,31 @@ const pool = new Pool({
 function hashPin(pin: string): string {
   return crypto.createHash('sha256').update(pin).digest('hex');
 }
+
+
+// ── Sub-station routing helpers ───────────────────────────────────────────────
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const SS_CENTERS: Record<string, { lat: number; lng: number }> = {
+  '1':    { lat: 14.5620, lng: 120.9990 },
+  '2':    { lat: 14.5560, lng: 120.9940 },
+  '3':    { lat: 14.5530, lng: 120.9920 },
+  '4':    { lat: 14.5460, lng: 120.9950 },
+  '5':    { lat: 14.5341, lng: 120.9963 },
+  '6':    { lat: 14.5490, lng: 120.9900 },
+  '7':    { lat: 14.5293, lng: 121.0012 },
+  '8':    { lat: 14.5198, lng: 121.0078 },
+  '9':    { lat: 14.5114, lng: 121.0137 },
+  '10':   { lat: 14.5348, lng: 121.0223 },
+  'MAIN': { lat: 14.5547, lng: 120.9987 },
+};
 
 let seeded = false;
 async function initDb(): Promise<void> {
@@ -109,6 +135,9 @@ async function initDb(): Promise<void> {
       // officers — duty_status, phone, and is_active INT→BOOL migration
       pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS duty_status TEXT DEFAULT 'ON_DUTY'`)
         .then(() => pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS phone TEXT`))
+        .then(() => pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS sub_station TEXT DEFAULT 'MAIN'`))
+        .then(() => pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS rank_title TEXT DEFAULT ''`))
+        .then(() => pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS duty_updated_at BIGINT DEFAULT 0`))
         .then(() => pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='officers' AND column_name='is_active' AND data_type='integer') THEN ALTER TABLE officers ALTER COLUMN is_active TYPE BOOLEAN USING (is_active::integer != 0); END IF; END $$`)),
     ]);
     // ── Phase 6: indexes (all idempotent, run in parallel) ────────────────────
@@ -177,6 +206,36 @@ async function initDb(): Promise<void> {
       ON CONFLICT (citizen_id) DO NOTHING
     `);
     console.log('[SafeSignal] Demo citizen ensured: 09171234567 / PIN 1234 (verified, active)');
+
+    // ── Bulk seed Pasay PNP officers from Excel roster ────────────────────────
+    try {
+      const countRes = await pool.query("SELECT COUNT(*) FROM officers WHERE badge_number NOT LIKE 'PNP-%'");
+      const existingCount = parseInt(countRes.rows[0].count, 10);
+      if (existingCount < 50 && OFFICER_SEEDS && OFFICER_SEEDS.length > 0) {
+        console.log('[SafeSignal] Seeding', OFFICER_SEEDS.length, 'PNP officers...');
+        const pasayHash = await bcrypt.hash('Pasay@2026', 10);
+        const badges = OFFICER_SEEDS.map((o: any) => o.badge);
+        const names  = OFFICER_SEEDS.map((o: any) => o.full_name);
+        const emails = OFFICER_SEEDS.map((o: any) => o.badge.replace(/[^a-z0-9]/gi, '').toLowerCase() + '@pasay.safesignal.ph');
+        const hashes = OFFICER_SEEDS.map(() => pasayHash);
+        const ranks  = OFFICER_SEEDS.map((o: any) => o.rank_title || '');
+        const subs   = OFFICER_SEEDS.map((o: any) => o.sub_station || 'MAIN');
+        await pool.query(
+          `INSERT INTO officers (badge_number, full_name, email, password_hash, role, is_active, rank_title, sub_station, duty_status)
+           SELECT b, n, e, h, 'OFFICER', TRUE, r, s, 'OFF_DUTY'
+           FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[]) AS t(b,n,e,h,r,s)
+           ON CONFLICT (badge_number) DO UPDATE SET
+             full_name = EXCLUDED.full_name,
+             rank_title = EXCLUDED.rank_title,
+             sub_station = EXCLUDED.sub_station`,
+          [badges, names, emails, hashes, ranks, subs]
+        );
+        console.log('[SafeSignal] Officer seeding complete:', OFFICER_SEEDS.length, 'records');
+      }
+    } catch (seedErr) {
+      console.error('[SafeSignal] Officer seed error (non-fatal):', seedErr);
+    }
+
         seeded = true;
     console.log('[SafeSignal] initDb complete');
   } catch (err) {
@@ -441,19 +500,19 @@ app.get('/api/dispatch/events', requireOfficerAuth, (req, res) => addSSEClient(r
 // POST /api/dispatch/login
 app.post('/api/dispatch/login', async (req: any, res: any) => {
   try {
-    const { email, password, badge_number } = req.body;
-    if (!email || !password || !badge_number) {
-      res.status(400).json({ error: 'email, password, and badge_number are required' }); return;
+    const { password, badge_number } = req.body;
+    if (!badge_number || !password) {
+      res.status(400).json({ error: 'badge_number and password are required' }); return;
     }
-    const attemptKey = email.toLowerCase();
+    const attemptKey = badge_number.toLowerCase();
     const attempts = loginAttempts.get(attemptKey);
     if (attempts && attempts.lockUntil > Date.now()) {
       const remaining = Math.ceil((attempts.lockUntil - Date.now()) / 1000);
       res.status(429).json({ error: `Too many attempts. Try again in ${remaining} seconds.` }); return;
     }
     const or = await pool.query(
-      `SELECT * FROM officers WHERE email = $1 AND badge_number = $2`,
-      [email, badge_number]
+      `SELECT * FROM officers WHERE badge_number = $1`,
+      [badge_number]
     );
     const officer = or.rows[0];
     if (!officer || !officer.is_active) { recordFailedAttempt(attemptKey); res.status(401).json({ error: 'Invalid credentials' }); return; }
@@ -832,7 +891,7 @@ app.patch('/api/dispatch/citizens/:id/verify', requireOfficerAuth, async (req: a
 // GET /api/dispatch/officers
 app.get('/api/dispatch/officers', requireOfficerAuth, async (_req: any, res: any) => {
   try {
-    const result = await pool.query(`SELECT o.*, s.name as station_name, ol.lat as officer_lat, ol.lng as officer_lng, ol.status as duty_status, ol.updated_at as location_updated_at FROM officers o LEFT JOIN stations s ON o.station_id = s.id LEFT JOIN officer_locations ol ON ol.officer_id = o.id ORDER BY o.created_at DESC`);
+    const result = await pool.query(`SELECT o.*, s.name as station_name, ol.lat as officer_lat, ol.lng as officer_lng, ol.status as location_status, ol.updated_at as location_updated_at FROM officers o LEFT JOIN stations s ON o.station_id = s.id LEFT JOIN officer_locations ol ON ol.officer_id = o.id ORDER BY o.created_at DESC`);
     res.json({ officers: result.rows.map((o: any) => { const r = { ...o }; delete r.password_hash; return r; }) });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Failed to fetch officers' }); }
 });
@@ -1141,19 +1200,39 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
     broadcastEvent('new_alert', { alert: alertWithCitizen });
     // Push notifications + surge check — non-fatal: SOS is already created above
     try {
-      // Push to NEARBY officers first (within 5km, GPS active in last 15min) — fallback to ALL if none nearby
-      const fifteenMinAgo = Date.now() - 15 * 60 * 1000;
-      const nearbyPushResult = await pool.query(
-        `SELECT o.id FROM officers o JOIN officer_locations ol ON ol.officer_id = o.id
-         WHERE o.role = 'OFFICER' AND o.is_active::INT = 1 AND ol.updated_at > $3::bigint
-           AND (6371 * acos(GREATEST(-1, LEAST(1, cos(radians($1)) * cos(radians(ol.lat)) * cos(radians(ol.lng) - radians($2)) + sin(radians($1)) * sin(radians(ol.lat)))))) < 5`,
-        [lat, lng, fifteenMinAgo]
-      );
-      let pushTargetIds = nearbyPushResult.rows.map((o: any) => Number(o.id));
-      if (pushTargetIds.length === 0) {
-        const allResult = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active::INT = 1`);
-        pushTargetIds = allResult.rows.map((o: any) => Number(o.id));
+      // Route SOS to nearest sub-station via Haversine, with 3-level fallback
+      let nearestSS = 'MAIN';
+      let minDist = Infinity;
+      for (const [ssKey, coords] of Object.entries(SS_CENTERS)) {
+        const d = haversineKm(lat, lng, coords.lat, coords.lng);
+        if (d < minDist) { minDist = d; nearestSS = ssKey; }
       }
+      console.log('[SafeSignal] SOS nearest sub-station:', nearestSS, '(' + minDist.toFixed(2) + 'km)');
+
+      // Level 1: ON_DUTY officers of nearest sub-station
+      const subResult = await pool.query(
+        `SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = TRUE AND duty_status = 'ON_DUTY' AND COALESCE(sub_station, 'MAIN') = $1`,
+        [nearestSS]
+      );
+      let pushTargetIds: number[] = subResult.rows.map((o: any) => Number(o.id));
+
+      if (pushTargetIds.length === 0) {
+        // Level 2: all ON_DUTY officers station-wide
+        const allOnDuty = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = TRUE AND duty_status = 'ON_DUTY'`);
+        pushTargetIds = allOnDuty.rows.map((o: any) => Number(o.id));
+      }
+
+      if (pushTargetIds.length === 0) {
+        // Level 3: all active officers (no one has self-reported yet — system just launched)
+        const allActive = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = TRUE`);
+        pushTargetIds = allActive.rows.map((o: any) => Number(o.id));
+        console.log('[SafeSignal] SOS fallback: no ON_DUTY officers found, notifying all', pushTargetIds.length, 'active officers');
+      }
+
+      // Always include dispatchers (STOC)
+      const dispRes = await pool.query(`SELECT id FROM officers WHERE role = 'DISPATCHER' AND is_active = TRUE`);
+      const dispIds = dispRes.rows.map((o: any) => Number(o.id));
+      pushTargetIds = [...new Set([...pushTargetIds, ...dispIds])];
       if (pushTargetIds.length > 0) {
         sendPushToOfficers(pushTargetIds, {
           title: '🚨 NEW SOS — Immediate Response Required',
@@ -1410,6 +1489,27 @@ app.patch('/api/officer/assignment/:id/status', requireOfficerAuth, async (req: 
   }
 });
 
+
+// GET /api/dispatch/substations — sub-station board for STOC
+app.get('/api/dispatch/substations', requireOfficerAuth, async (req: any, res: any) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+         COALESCE(sub_station, 'MAIN') as sub_station,
+         COUNT(*)::text as total,
+         SUM(CASE WHEN duty_status = 'ON_DUTY' AND is_active = TRUE THEN 1 ELSE 0 END)::text as on_duty,
+         SUM(CASE WHEN (duty_status IS NULL OR duty_status = 'OFF_DUTY') OR is_active = FALSE THEN 1 ELSE 0 END)::text as off_duty
+       FROM officers
+       WHERE role = 'OFFICER'
+       GROUP BY COALESCE(sub_station, 'MAIN')
+       ORDER BY COALESCE(sub_station, 'MAIN')`
+    );
+    res.json({ substations: result.rows });
+  } catch (error) {
+    console.error('[SafeSignal] substations error:', error);
+    res.status(500).json({ error: 'Failed to fetch substations' });
+  }
+});
 
 // PATCH /api/officer/duty-status
 app.patch('/api/officer/duty-status', requireOfficerAuth, async (req: any, res: any) => {

@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { useDispatchAuth } from '../../contexts/DispatchAuthContext';
 
 export default function DispatchLogin() {
-  const [email, setEmail] = useState('dispatcher@pasay.safesignal.ph');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('password123');
   const [badgeNumber, setBadgeNumber] = useState('PNP-001');
   const [error, setError] = useState('');
@@ -56,7 +56,9 @@ export default function DispatchLogin() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password, badgeNumber, rememberMe);
+      // Derive email from badge (officers don't have email accounts)
+      const derivedEmail = badgeNumber.replace(/[^a-z0-9]/gi, '').toLowerCase() + '@pasay.safesignal.ph';
+      await login(derivedEmail, password, badgeNumber, rememberMe);
       const storedUser = localStorage.getItem('dispatch_user');
       const storedToken = localStorage.getItem('dispatch_token');
       const user = storedUser ? JSON.parse(storedUser) : null;
