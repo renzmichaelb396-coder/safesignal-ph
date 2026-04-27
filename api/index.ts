@@ -146,6 +146,7 @@ async function initDb(): Promise<void> {
         .catch(e => console.warn('[SafeSignal] migration warning (officers):', e.message)),
     ]);
     // ── Phase 6: indexes (all idempotent, run in parallel) ────────────────────
+    console.log('[SafeSignal] Phase 6 start');
     await Promise.all([
       pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_status ON sos_alerts(status)`),
       pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_triggered ON sos_alerts(triggered_at)`),
@@ -153,6 +154,7 @@ async function initDb(): Promise<void> {
       pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_officer ON sos_alerts(assigned_officer_id)`),
       pool.query(`CREATE INDEX IF NOT EXISTS idx_citizens_phone ON citizens(phone)`),
     ]);
+    console.log('[SafeSignal] Phase 7 station upsert');
     const stationResult = await pool.query(`
       INSERT INTO stations (name, barangay, latitude, longitude, contact_number)
       VALUES ($1, $2, $3, $4, $5)
@@ -215,6 +217,7 @@ async function initDb(): Promise<void> {
       `, [hashPin('1234')]);
     }
     // Also ensure trust score row exists for demo citizen
+    console.log('[SafeSignal] Phase 9 trust score');
     await pool.query(`
       INSERT INTO citizen_trust_scores (citizen_id, score, total_alerts, false_alarms, resolved_emergencies)
       SELECT id, 100, 0, 0, 0 FROM citizens WHERE phone = '09171234567'
@@ -256,8 +259,10 @@ async function initDb(): Promise<void> {
 
         seeded = true;
     console.log('[SafeSignal] initDb complete');
-  } catch (err) {
-    console.error('[SafeSignal] initDb error:', err);
+  } catch (err: any) {
+    console.error('[SafeSignal] initDb error MESSAGE:', err?.message);
+    console.error('[SafeSignal] initDb error CODE:', err?.code);
+    console.error('[SafeSignal] initDb error DETAIL:', err?.detail);
   }
 }
 
