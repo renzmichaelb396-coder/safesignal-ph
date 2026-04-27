@@ -87,14 +87,14 @@ async function initDb(): Promise<void> {
         const ghostId = ghost.rows[0].id;
         const real = await pool.query(`SELECT id FROM officers WHERE badge_number = 'PNP-002'`);
         const realId = real.rows.length > 0 ? real.rows[0].id : null;
-        await pool.query(`UPDATE officers SET email = 'ghost-002b@removed.local', is_active = FALSE WHERE id = $1`, [ghostId]);
+        await pool.query(`UPDATE officers SET email = 'ghost-002b@removed.local', is_active = 0 WHERE id = $1`, [ghostId]);
         if (realId) {
           await pool.query(`UPDATE sos_alerts SET assigned_officer_id = $1 WHERE assigned_officer_id = $2`, [realId, ghostId]);
         }
         console.log('[SafeSignal] PNP-002B ghost neutralized');
       }
       const officerFixHash = await bcrypt.hash('password123', 10);
-      await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer@pasay.safesignal.ph', password_hash = $1, is_active = TRUE WHERE badge_number = 'PNP-002'`, [officerFixHash]);
+      await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer@pasay.safesignal.ph', password_hash = $1, is_active = 1 WHERE badge_number = 'PNP-002'`, [officerFixHash]);
       console.log('[SafeSignal] PNP-002 force-corrected');
     } catch (fixErr) {
       console.error('[SafeSignal] PNP-002 fix error:', fixErr);
@@ -1250,14 +1250,14 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
 
       // Level 1: ON_DUTY officers of nearest sub-station
       const subResult = await pool.query(
-        `SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = TRUE AND duty_status = 'ON_DUTY' AND COALESCE(sub_station, 'MAIN') = $1`,
+        `SELECT id FROM officers WHERE role = 'OFFICER' AND is_active::INT = 1 AND duty_status = 'ON_DUTY' AND COALESCE(sub_station, 'MAIN') = $1`,
         [nearestSS]
       );
       let pushTargetIds: number[] = subResult.rows.map((o: any) => Number(o.id));
 
       if (pushTargetIds.length === 0) {
         // Level 2: all ON_DUTY officers station-wide
-        const allOnDuty = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = TRUE AND duty_status = 'ON_DUTY'`);
+        const allOnDuty = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active::INT = 1 AND duty_status = 'ON_DUTY'`);
         pushTargetIds = allOnDuty.rows.map((o: any) => Number(o.id));
       }
 
