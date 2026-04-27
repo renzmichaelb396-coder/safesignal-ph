@@ -120,6 +120,41 @@ export default function OfficerDashboard() {
     return () => navigator.serviceWorker.removeEventListener('message', handler);
   }, []);
 
+  // ── Resume AudioContext when page becomes visible (after push notification tap) ──────────────
+  // Mobile browsers SUSPEND AudioContext when the page is hidden / screen locks.
+  // Without this, soundArmedRef stays true but ctx.state === 'suspended' → playAssignmentAlert()
+  // returns early silently → officer hears nothing even though sound was previously armed.
+  // Fix: whenever the page becomes visible again, resume ctx and restart the alarm loop if needed.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!audioCtxRef.current) return;
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume()
+          .then(() => {
+            if (audioCtxRef.current?.state !== 'running') return;
+            soundArmedRef.current = true;
+            setSoundArmed(true);
+            setShowAlarmPrompt(false);
+            // Re-start alarm loop if there is an active assignment awaiting response
+            if (alarmIntervalRef.current === null && prevAssignmentIdRef.current !== null) {
+              startAlarmLoop();
+            }
+          })
+          .catch(() => {
+            // resume() failed (iOS Safari strict mode) — show prompt so officer can tap manually
+            setShowAlarmPrompt(true);
+          });
+      } else if (audioCtxRef.current.state === 'running') {
+        // Context is already running — make sure armed flags are consistent
+        soundArmedRef.current = true;
+        setSoundArmed(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   async function togglePushSubscription() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       showToast('Push notifications not supported on this device'); return;
