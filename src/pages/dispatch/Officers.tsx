@@ -402,7 +402,7 @@ export default function Officers() {
                     {/* Search bar */}
                     <div style={{ padding: '12px 20px', borderBottom: '1px solid #30363d', display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ flex: 1, position: 'relative' }}>
-                        <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#8b949e', fontSize: '13px', pointerEvents: 'none' }}>🔍<</span>
+                        <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#8b949e', fontSize: '13px', pointerEvents: 'none' }}>🔍</span>
                         <input
                           type="text"
                           placeholder="Search by name, badge, email, or rank…
