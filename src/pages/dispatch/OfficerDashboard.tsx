@@ -606,6 +606,7 @@ export default function OfficerDashboard() {
           </div>
         </div>
       </div>
+      </div>
 
       {/* Duty Status Toggle — large tap target for field use */}
       <div style={{ maxWidth: 540, margin: '0 auto', padding: '10px 16px 0' }}>
