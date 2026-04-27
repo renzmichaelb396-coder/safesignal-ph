@@ -23,6 +23,8 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '10mb' }));
+// Ensure DB is fully initialized before handling any request (blocks until seeding completes)
+app.use(async (_req: any, _res: any, next: any) => { await initDb().catch(() => {}); next(); });
 app.use(express.urlencoded({ extended: true }));
 
 // ── Database ──────────────────────────────────────────────────────────────────
