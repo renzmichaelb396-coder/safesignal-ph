@@ -99,24 +99,24 @@ async function initDb(): Promise<void> {
     }
     // ── Phase 1: base tables with no cross-table FK (run in parallel) ──────────
     await Promise.all([
-      pool.query(`CREATE TABLE IF NOT EXISTS stations (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, barangay TEXT, latitude FLOAT, longitude FLOAT, contact_number TEXT, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`),
-      pool.query(`CREATE TABLE IF NOT EXISTS citizens (id SERIAL PRIMARY KEY, full_name TEXT NOT NULL, phone TEXT UNIQUE NOT NULL, address TEXT, barangay TEXT, city TEXT, pin_hash TEXT NOT NULL, photo_url TEXT, verified BOOL DEFAULT false, strike_count INT DEFAULT 0, is_suspended BOOL DEFAULT false, suspension_reason TEXT, registered_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000), last_active BIGINT)`),
+      pool.query(`CREATE TABLE IF NOT EXISTS stations (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, barangay TEXT, latitude FLOAT, longitude FLOAT, contact_number TEXT, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`).catch(e => console.warn('[SafeSignal] phase1 stations:', e.message)),
+      pool.query(`CREATE TABLE IF NOT EXISTS citizens (id SERIAL PRIMARY KEY, full_name TEXT NOT NULL, phone TEXT UNIQUE NOT NULL, address TEXT, barangay TEXT, city TEXT, pin_hash TEXT NOT NULL, photo_url TEXT, verified BOOL DEFAULT false, strike_count INT DEFAULT 0, is_suspended BOOL DEFAULT false, suspension_reason TEXT, registered_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000), last_active BIGINT)`).catch(e => console.warn('[SafeSignal] phase1 citizens:', e.message)),
     ]);
     // ── Phase 2: tables that depend on stations or citizens ───────────────────
     await Promise.all([
-      pool.query(`CREATE TABLE IF NOT EXISTS station_settings (id SERIAL PRIMARY KEY, station_id INT UNIQUE REFERENCES stations(id), surge_threshold INT DEFAULT 5, surge_window_minutes INT DEFAULT 2, cooldown_minutes INT DEFAULT 10, strike_limit INT DEFAULT 2)`),
-      pool.query(`CREATE TABLE IF NOT EXISTS officers (id SERIAL PRIMARY KEY, station_id INT REFERENCES stations(id), badge_number TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL, full_name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'DISPATCHER', password_hash TEXT NOT NULL, is_active BOOL DEFAULT true, last_login BIGINT, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`),
-      pool.query(`CREATE TABLE IF NOT EXISTS citizen_trust_scores (id SERIAL PRIMARY KEY, citizen_id INT UNIQUE REFERENCES citizens(id), score INT DEFAULT 100, total_alerts INT DEFAULT 0, false_alarms INT DEFAULT 0, resolved_emergencies INT DEFAULT 0, last_updated BIGINT)`),
-      pool.query(`CREATE TABLE IF NOT EXISTS otp_codes (id SERIAL PRIMARY KEY, citizen_id INT REFERENCES citizens(id), code TEXT NOT NULL, expires_at BIGINT)`),
+      pool.query(`CREATE TABLE IF NOT EXISTS station_settings (id SERIAL PRIMARY KEY, station_id INT UNIQUE REFERENCES stations(id), surge_threshold INT DEFAULT 5, surge_window_minutes INT DEFAULT 2, cooldown_minutes INT DEFAULT 10, strike_limit INT DEFAULT 2)`).catch(e => console.warn('[SafeSignal] phase2 station_settings:', e.message)),
+      pool.query(`CREATE TABLE IF NOT EXISTS officers (id SERIAL PRIMARY KEY, station_id INT REFERENCES stations(id), badge_number TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL, full_name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'DISPATCHER', password_hash TEXT NOT NULL, is_active BOOL DEFAULT true, last_login BIGINT, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`).catch(e => console.warn('[SafeSignal] phase2 officers:', e.message)),
+      pool.query(`CREATE TABLE IF NOT EXISTS citizen_trust_scores (id SERIAL PRIMARY KEY, citizen_id INT UNIQUE REFERENCES citizens(id), score INT DEFAULT 100, total_alerts INT DEFAULT 0, false_alarms INT DEFAULT 0, resolved_emergencies INT DEFAULT 0, last_updated BIGINT)`).catch(e => console.warn('[SafeSignal] phase2 trust_scores:', e.message)),
+      pool.query(`CREATE TABLE IF NOT EXISTS otp_codes (id SERIAL PRIMARY KEY, citizen_id INT REFERENCES citizens(id), code TEXT NOT NULL, expires_at BIGINT)`).catch(e => console.warn('[SafeSignal] phase2 otp_codes:', e.message)),
     ]);
     // ── Phase 3: tables that depend on officers ───────────────────────────────
     await Promise.all([
-      pool.query(`CREATE TABLE IF NOT EXISTS sos_alerts (id SERIAL PRIMARY KEY, citizen_id INT REFERENCES citizens(id), lat FLOAT NOT NULL, lng FLOAT NOT NULL, status TEXT NOT NULL DEFAULT 'ACTIVE', triggered_at BIGINT, acknowledged_at BIGINT, resolved_at BIGINT, cancelled_at BIGINT, location_accuracy FLOAT, assigned_officer_id INT REFERENCES officers(id), is_suspicious BOOL DEFAULT false, suspicious_reason TEXT, notes TEXT, cancellation_reason TEXT)`),
-      pool.query(`CREATE TABLE IF NOT EXISTS officer_locations (officer_id INT UNIQUE REFERENCES officers(id), lat FLOAT, lng FLOAT, heading FLOAT, status TEXT DEFAULT 'ON_DUTY', updated_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`),
-      pool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (id SERIAL PRIMARY KEY, officer_id INT REFERENCES officers(id), endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`),
+      pool.query(`CREATE TABLE IF NOT EXISTS sos_alerts (id SERIAL PRIMARY KEY, citizen_id INT REFERENCES citizens(id), lat FLOAT NOT NULL, lng FLOAT NOT NULL, status TEXT NOT NULL DEFAULT 'ACTIVE', triggered_at BIGINT, acknowledged_at BIGINT, resolved_at BIGINT, cancelled_at BIGINT, location_accuracy FLOAT, assigned_officer_id INT REFERENCES officers(id), is_suspicious BOOL DEFAULT false, suspicious_reason TEXT, notes TEXT, cancellation_reason TEXT)`).catch(e => console.warn('[SafeSignal] phase3 sos_alerts:', e.message)),
+      pool.query(`CREATE TABLE IF NOT EXISTS officer_locations (officer_id INT UNIQUE REFERENCES officers(id), lat FLOAT, lng FLOAT, heading FLOAT, status TEXT DEFAULT 'ON_DUTY', updated_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`).catch(e => console.warn('[SafeSignal] phase3 officer_locations:', e.message)),
+      pool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (id SERIAL PRIMARY KEY, officer_id INT REFERENCES officers(id), endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000))`).catch(e => console.warn('[SafeSignal] phase3 push_subscriptions:', e.message)),
     ]);
     // ── Phase 4: tables that depend on sos_alerts ─────────────────────────────
-    await pool.query(`CREATE TABLE IF NOT EXISTS alert_location_history (id SERIAL PRIMARY KEY, alert_id INT REFERENCES sos_alerts(id), lat FLOAT NOT NULL, lng FLOAT NOT NULL, recorded_at BIGINT)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS alert_location_history (id SERIAL PRIMARY KEY, alert_id INT REFERENCES sos_alerts(id), lat FLOAT NOT NULL, lng FLOAT NOT NULL, recorded_at BIGINT)`).catch(e => console.warn('[SafeSignal] phase4 alert_history:', e.message));
     // ── Phase 5: column additions + type migrations
     // CRITICAL: DDL on the same table MUST run sequentially (PostgreSQL exclusive locks).
     // Different tables can run in parallel safely.
@@ -148,25 +148,29 @@ async function initDb(): Promise<void> {
     // ── Phase 6: indexes (all idempotent, run in parallel) ────────────────────
     console.log('[SafeSignal] Phase 6 start');
     await Promise.all([
-      pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_status ON sos_alerts(status)`),
-      pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_triggered ON sos_alerts(triggered_at)`),
-      pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_citizen ON sos_alerts(citizen_id)`),
-      pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_officer ON sos_alerts(assigned_officer_id)`),
-      pool.query(`CREATE INDEX IF NOT EXISTS idx_citizens_phone ON citizens(phone)`),
+      pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_status ON sos_alerts(status)`).catch(e => console.warn('[SafeSignal] idx_sos_status:', e.message)),
+      pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_triggered ON sos_alerts(triggered_at)`).catch(e => console.warn('[SafeSignal] idx_sos_triggered:', e.message)),
+      pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_citizen ON sos_alerts(citizen_id)`).catch(e => console.warn('[SafeSignal] idx_sos_citizen:', e.message)),
+      pool.query(`CREATE INDEX IF NOT EXISTS idx_sos_officer ON sos_alerts(assigned_officer_id)`).catch(e => console.warn('[SafeSignal] idx_sos_officer:', e.message)),
+      pool.query(`CREATE INDEX IF NOT EXISTS idx_citizens_phone ON citizens(phone)`).catch(e => console.warn('[SafeSignal] idx_citizens_phone:', e.message)),
     ]);
+    // ── Phase 7: station + settings upsert ───────────────────────────────────
     console.log('[SafeSignal] Phase 7 station upsert');
-    const stationResult = await pool.query(`
-      INSERT INTO stations (name, barangay, latitude, longitude, contact_number)
-      VALUES ($1, $2, $3, $4, $5)
-      ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-      RETURNING id
-    `, ['Pasay City Police Station', 'Pasay City', 14.5378, 120.9932, '+63-2-8551-0000']);
-    const stationId = stationResult.rows[0].id;
-    await pool.query(`
-      INSERT INTO station_settings (station_id, surge_threshold, surge_window_minutes, cooldown_minutes, strike_limit)
-      VALUES ($1, 5, 2, 10, 2)
-      ON CONFLICT (station_id) DO NOTHING
-    `, [stationId]);
+    let stationId: number | null = null;
+    try {
+      const stationResult = await pool.query(`
+        INSERT INTO stations (name, barangay, latitude, longitude, contact_number)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+        RETURNING id
+      `, ['Pasay City Police Station', 'Pasay City', 14.5378, 120.9932, '+63-2-8551-0000']);
+      stationId = stationResult.rows[0].id;
+      await pool.query(`
+        INSERT INTO station_settings (station_id, surge_threshold, surge_window_minutes, cooldown_minutes, strike_limit)
+        VALUES ($1, 5, 2, 10, 2)
+        ON CONFLICT (station_id) DO NOTHING
+      `, [stationId]);
+    } catch (e: any) { console.warn('[SafeSignal] phase7 station upsert:', e.message); }
     const officers = [
       { badge: 'PNP-001', email: 'dispatcher@pasay.safesignal.ph', full_name: 'Maria Lopez', role: 'DISPATCHER', phone: '09171110001' },
       { badge: 'PNP-002', email: 'officer@pasay.safesignal.ph', full_name: 'Carlos Mendoza', role: 'OFFICER', phone: '09171110002' },
@@ -180,14 +184,16 @@ async function initDb(): Promise<void> {
           INSERT INTO officers (station_id, badge_number, email, full_name, role, password_hash, is_active, phone)
           VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7)
           ON CONFLICT (badge_number) DO UPDATE SET phone = EXCLUDED.phone, full_name = EXCLUDED.full_name
-        `, [stationId, officer.badge, officer.email, officer.full_name, officer.role, passwordHash, officer.phone]);
+        `, [stationId ?? null, officer.badge, officer.email, officer.full_name, officer.role, passwordHash, officer.phone]);
       } catch {
-        // Fallback: is_active is INT column — use 1
-        await pool.query(`
-          INSERT INTO officers (station_id, badge_number, email, full_name, role, password_hash, is_active, phone)
-          VALUES ($1, $2, $3, $4, $5, $6, 1, $7)
-          ON CONFLICT (badge_number) DO UPDATE SET phone = EXCLUDED.phone, full_name = EXCLUDED.full_name
-        `, [stationId, officer.badge, officer.email, officer.full_name, officer.role, passwordHash, officer.phone]);
+        try {
+          // Fallback: is_active is INT column — use 1
+          await pool.query(`
+            INSERT INTO officers (station_id, badge_number, email, full_name, role, password_hash, is_active, phone)
+            VALUES ($1, $2, $3, $4, $5, $6, 1, $7)
+            ON CONFLICT (badge_number) DO UPDATE SET phone = EXCLUDED.phone, full_name = EXCLUDED.full_name
+          `, [stationId ?? null, officer.badge, officer.email, officer.full_name, officer.role, passwordHash, officer.phone]);
+        } catch (e: any) { console.warn('[SafeSignal] officer upsert fallback failed:', officer.badge, e.message); }
       }
       console.log('[SafeSignal] Upserted officer:', officer.badge);
     }
@@ -222,7 +228,7 @@ async function initDb(): Promise<void> {
       INSERT INTO citizen_trust_scores (citizen_id, score, total_alerts, false_alarms, resolved_emergencies)
       SELECT id, 100, 0, 0, 0 FROM citizens WHERE phone = '09171234567'
       ON CONFLICT (citizen_id) DO NOTHING
-    `);
+    `).catch(e => console.warn('[SafeSignal] trust score insert:', e.message));
     console.log('[SafeSignal] Demo citizen ensured: 09171234567 / PIN 1234 (verified, active)');
 
     // ── Bulk seed Pasay PNP officers from Excel roster ────────────────────────
