@@ -68,7 +68,7 @@ let seeded = false;
 async function initDb(): Promise<void> {
   if (seeded) return;
   try {
-    await pool.query('SELECT 1');
+    await pool.query('SELECT 1').catch(e => { throw new Error('DB_PING:' + e.message); });
 
     // === PRIORITY FIX: Run PNP-002/002B cleanup FIRST, in own try-catch ===
     // DEF-08: rename officer PNP-102 "Maria Santos" to "Rosa Santos" to avoid name collision with demo citizen
@@ -266,9 +266,7 @@ async function initDb(): Promise<void> {
         seeded = true;
     console.log('[SafeSignal] initDb complete');
   } catch (err: any) {
-    console.error('[SafeSignal] initDb error MESSAGE:', err?.message);
-    console.error('[SafeSignal] initDb error CODE:', err?.code);
-    console.error('[SafeSignal] initDb error DETAIL:', err?.detail);
+    console.error('[SafeSignal] ERR:', String(err?.message).slice(0, 200));
   }
 }
 
