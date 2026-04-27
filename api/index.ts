@@ -4,7 +4,8 @@ import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { OFFICER_SEEDS } from '../seed-data';
+import fs from 'fs';
+import path from 'path';
 import webpush from 'web-push';
 
 // VAPID keys for Web Push (set in Vercel env vars)
@@ -211,15 +212,18 @@ async function initDb(): Promise<void> {
     try {
       const countRes = await pool.query("SELECT COUNT(*) FROM officers WHERE badge_number NOT LIKE 'PNP-%'");
       const existingCount = parseInt(countRes.rows[0].count, 10);
-      if (existingCount < 50 && OFFICER_SEEDS && OFFICER_SEEDS.length > 0) {
+      if (existingCount < 50) {
+        const seedPath = path.join(__dirname, '../seed-data.json');
+        const OFFICER_SEEDS: Array<{badge:string;full_name:string;rank_title:string;sub_station:string}> =
+          JSON.parse(fs.readFileSync(seedPath, 'utf8'));
         console.log('[SafeSignal] Seeding', OFFICER_SEEDS.length, 'PNP officers...');
         const pasayHash = await bcrypt.hash('Pasay@2026', 10);
-        const badges = OFFICER_SEEDS.map((o: any) => o.badge);
-        const names  = OFFICER_SEEDS.map((o: any) => o.full_name);
-        const emails = OFFICER_SEEDS.map((o: any) => o.badge.replace(/[^a-z0-9]/gi, '').toLowerCase() + '@pasay.safesignal.ph');
+        const badges = OFFICER_SEEDS.map((o) => o.badge);
+        const names  = OFFICER_SEEDS.map((o) => o.full_name);
+        const emails = OFFICER_SEEDS.map((o) => o.badge.replace(/[^a-z0-9]/gi, '').toLowerCase() + '@pasay.safesignal.ph');
         const hashes = OFFICER_SEEDS.map(() => pasayHash);
-        const ranks  = OFFICER_SEEDS.map((o: any) => o.rank_title || '');
-        const subs   = OFFICER_SEEDS.map((o: any) => o.sub_station || 'MAIN');
+        const ranks  = OFFICER_SEEDS.map((o) => o.rank_title || '');
+        const subs   = OFFICER_SEEDS.map((o) => o.sub_station || 'MAIN');
         await pool.query(
           `INSERT INTO officers (badge_number, full_name, email, password_hash, role, is_active, rank_title, sub_station, duty_status)
            SELECT b, n, e, h, 'OFFICER', TRUE, r, s, 'OFF_DUTY'

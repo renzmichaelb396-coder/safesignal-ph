@@ -3,7 +3,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/index.ts": {
-      "includeFiles": "node_modules/sql.js/dist/**"
+      "includeFiles": "{node_modules/sql.js/dist/**,seed-data.json}"
     }
   },
   "rewrites": [
