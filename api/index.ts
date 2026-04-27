@@ -238,10 +238,9 @@ async function initDb(): Promise<void> {
       const countRes = await pool.query("SELECT COUNT(*) FROM officers WHERE badge_number NOT LIKE 'PNP-%'");
       const existingCount = parseInt(countRes.rows[0].count, 10);
       if (existingCount < 50) {
-        const seedPath = path.join(__dirname, '../seed-data.json');
-        const OFFICER_SEEDS: Array<{badge:string;full_name:string;rank_title:string;sub_station:string}> =
-          JSON.parse(fs.readFileSync(seedPath, 'utf8'));
-        console.log('[SafeSignal] Seeding', OFFICER_SEEDS.length, 'PNP officers...');
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const OFFICER_SEEDS: Array<{badge:string;full_name:string;rank_title:string;sub_station:string}> = require('../seed-data.json');
+        console.log('[SS]seeds=' + OFFICER_SEEDS.length);
         const pasayHash = await bcrypt.hash('Pasay@2026', 10);
         const badges = OFFICER_SEEDS.map((o) => o.badge);
         const names  = OFFICER_SEEDS.map((o) => o.full_name);
@@ -261,8 +260,8 @@ async function initDb(): Promise<void> {
         );
         console.log('[SafeSignal] Officer seeding complete:', OFFICER_SEEDS.length, 'records');
       }
-    } catch (seedErr) {
-      console.error('[SafeSignal] Officer seed error (non-fatal):', seedErr);
+    } catch (seedErr: any) {
+      console.error('[SS]E=' + String(seedErr?.message||seedErr).slice(0,20));
     }
 
         seeded = true;
