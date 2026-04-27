@@ -386,7 +386,7 @@ export default function Officers() {
                           {drilldownData.all.length.toLocaleString()} officers assigned
                           {' · '}
                           <span style={{ color: '#4ade80' }}>{drilldownData.all.filter(o => o.duty_status === 'ON_DUTY').length}</span> on duty
-                          {' · '}
+                          {', · '}
                           <span style={{ color: '#f85149' }}>{drilldownData.all.filter(o => !o.is_active).length} inactive accounts</span>
                         </p>
                       </div>
@@ -402,10 +402,11 @@ export default function Officers() {
                     {/* Search bar */}
                     <div style={{ padding: '12px 20px', borderBottom: '1px solid #30363d', display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ flex: 1, position: 'relative' }}>
-                        <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#8b949e', fontSize: '13px', pointerEvents: 'none' }}>🔍</span>
+                        <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#8b949e', fontSize: '13px', pointerEvents: 'none' }}>🔍<</span>
                         <input
                           type="text"
-                          placeholder="Search by name, badge, email, or rank…"
+                          placeholder="Search by name, badge, email, or rank…
++
                           value={stationSearch}
                           onChange={(e) => { setStationSearch(e.target.value); setDrilldownPage(1); }}
                           style={{ ...baseInput, paddingLeft: '32px' }}
@@ -436,7 +437,7 @@ export default function Officers() {
 
                     {/* Officer rows */}
                     {drilldownData.filtered.length === 0 ? (
-                      <div style={{ padding: '48px 20px', textAlign: 'center', color: '#8b949e', fontSize: '13px' }}>
+                      <div style={{ padding: '48px 20px', textAlign: 'cen', color: '#8b949e', fontSize: '13px' }}>
                         {stationSearch ? `No officers match "${stationSearch}"` : 'No officers assigned to this station.'}
                       </div>
                     ) : (
@@ -545,69 +546,150 @@ export default function Officers() {
                   onBlur={blurGray}
                 >
                   <option value="">All Stations</option>
-    ��ܝY�X��][ۜ˛X\
+                  {sortedSubstations.map((s) => (
+                    <option key={s.sub_station} value={s.sub_station}>{SS_LABELS[s.sub_station] || `Sub-station ${s.sub_station}`}</option>
+                  ))}
+                </select>
+              )}
+              {/* Role filter */}
+              <select
+                value={listRoleFilter}
+                onChange={(e) => setListRoleFilter(e.target.value)}
+                style={{ ...baseInput, flex: '0 1 140px', width: 'auto', padding: '7px 10px', fontSize: '12px', cursor: 'pointer' }}
+                onFocus={focusGold}
+                onBlur={blurGray}
+              >
+                <option value="">All Roles</option>
+                <option value="OFFICER">Officer</option>
+                <option value="DISPATCHER">Dispatcher</option>
+                <option value="STATION_ADMIN">Admin</option>
+              </select>
+              {/* Status filter */}
+              <select
+                value={listStatusFilter}
+                onChange={(e) => setListStatusFilter(e.target.value)}
+                style={{ ...baseInput, flex: '0 1 150px', width: 'auto', padding: '7px 10px', fontSize: '12px', cursor: 'pointer' }}
+                onFocus={focusGold}
+                onBlur={blurGray}
+              >
+                <option value="">All Status</option>
+                <option value="on_duty">On Duty</option>
+                <option value="off_duty">Off Duty</option>
+                <option value="active">Account Active</option>
+                <option value="inactive">Account Inactive</option>
+              </select>
+              {/* Clear filters */}
+              {hasFilters && (
+                <button
+                  onClick={() => { setListSearch(''); setListStationFilter(''); setListRoleFilter(''); setListStatusFilter(''); }}
+                  style={{ padding: '7px 12px', fontSize: '11px', background: 'none', border: '1px solid #30363d', borderRadius: '6px', color: '#8b949e', cursor: 'pointer', whiteSpace: 'nowrap' as const }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#f85149'; e.currentTarget.style.color = '#f85149'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#30363d'; e.currentTarget.style.color = '#8b949e'; }}
+                >
+                  ✕ Clear
+                </button>
+              )}
+              {/* Count */}
+              <span style={{ fontSize: '12px', color: '#8b949e', whiteSpace: 'nowrap' as const, marginLeft: 'auto' }}>
+                {filteredListOfficers.length.toLocaleString()} / {officers.length.toLocaleString()}
+              </span>
+            </div>
 
-�HO�
-��[ۈ�^O^�˜�X���][۟H�[YO^�˜�X���][۟O�����P�S��˜�X���][ۗH�X�\�][ۈ	�˜�X���][۟XO��[ۏ��
-J_B���[X���
-_B��ʈ��H�[\�
-��B��[X���[YO^�\���Q�[\�B�ې�[��O^�JHO��]\���Q�[\�K�\��]��[YJ_B��[O^������\�R[�]�^�	�HM	��Y�	�]]��Y[�Έ	��L	��۝�^�N�	�L�	��\��܎�	��[�\��_B�ۑ���\�^ٛ��\���B�ې�\�^؛\�ܘ^_B����[ۈ�[YOH���[��\���[ۏ���[ۈ�[YOH�ё�P�T���ٙ�X�\���[ۏ���[ۈ�[YOH�T�U�T���\�]�\���[ۏ���[ۈ�[YOH��USӗ�QRS���YZ[���[ۏ����[X����ʈ�]\��[\�
-��B��[X���[YO^�\��]\њ[\�B�ې�[��O^�JHO��]\��]\њ[\�K�\��]��[YJ_B��[O^������\�R[�]�^�	�HML	��Y�	�]]��Y[�Έ	��L	��۝�^�N�	�L�	��\��܎�	��[�\��_B�ۑ���\�^ٛ��\���B�ې�\�^؛\�ܘ^_B����[ۈ�[YOH���[�]\���[ۏ���[ۈ�[YOH�ۗ�]H��ۈ]O��[ۏ���[ۈ�[YOH�ٙ��]H��ٙ�]O��[ۏ���[ۈ�[YOH�X�]�H��X���[�X�]�O��[ۏ���[ۈ�[YOH�[�X�]�H��X���[�[�X�]�O��[ۏ����[X����ʈ�X\��[\��
-��B��\њ[\��	��
-��]ۂ�ې�X��^�
-HO���]\��X\��
-	��N��]\��][ۑ�[\�	��N��]\���Q�[\�	��N��]\��]\њ[\�	��N�_B��[O^��Y[�Έ	��L�	��۝�^�N�	�L\	��X��ܛ�[��	ۛۙI��ܙ\��	�\��Y��͌�	��ܙ\��Y]\Έ	͜	���܎�	���MYI��\��܎�	��[�\���]T�X�N�	ۛ�ܘ\	�\��ۜ�_B�ۓ[�\�Q[�\�^�JHO��K��\��[�\��]��[K��ܙ\���܈H	�َ
-LMI��K��\��[�\��]��[K���܈H	�َ
-LMI��_B�ۓ[�\�SX]�O^�JHO��K��\��[�\��]��[K��ܙ\���܈H	���͌�	��K��\��[�\��]��[K���܈H	���MYI��_B���8�%H�X\��؝]ۏ��
-_B��ʈ��[�
-��B��[��[O^���۝�^�N�	�L�	���܎�	���MYI��]T�X�N�	ۛ�ܘ\	�\��ۜ�X\��[�Y��	�]]��_O��ٚ[\�Y\�ٙ�X�\�˛[������[T��[��
-_H��ٙ�X�\�˛[������[T��[��
-_B���[����]�����\��܈	��
-�]��[O^��X\��[��	̌�	�Y[�Έ	�L�M�	��X��ܛ�[���܎�	ܙؘJ�K
-���JI��ܙ\��	�\��Yَ
-LMI��ܙ\��Y]\Έ	͜	���܎�	�َ
-LMI��۝�^�N�	�L�	�_O���\��ܟB��]���
-_B����Y[��	��
-��[O^����܎�	���MYI�^[Yێ�	��[�\��X\��[���	�	��۝�^�N�	�M	�_O��Y[��ٙ�X�\���)����
-_B���[�Y[��	���[\�Y\�ٙ�X�\�˛[��OOH	��
-�]��[O^��Y[�Έ	͌�	�^[Yێ�	��[�\����܎�	���MYI�_O���[O^���۝�^�N�	��	�X\��[��	�L�	�_O�'�k�����[O^���۝�^�N�	�M	��۝�ZY��
-�X\��[��	�
-	���܎�	��M�Y���_O���ٙ�X�\�˛[��OOH�	ӛ�ٙ�X�\��Y]	��	ӛ��\�[��B�����[O^���۝�^�N�	�L�	�X\��[��_O���ٙ�X�\�˛[��OOH�	�Y[�\��\��ٙ�X�\���]�\�Y	��	��HY�\�[��[�\��X\��܈�[\���B�����]���
-_B���[�Y[��	���[\�Y\�ٙ�X�\�˛[���	��
-�]��[O^���^�H_O��ٚ[\�Y\�ٙ�X�\�˛X\
+            {error && (
+              <div style={{ margin: '20px 24px 0', padding: '12px 16px', backgroundColor: 'rgba(248,81,73,0.1)', border: '1px solid #f85149', borderRadius: '6px', color: '#f85149', fontSize: '13px' }}>
+                {error}
+              </div>
+            )}
 
-ٙ�X�\�HO��ۜ���P��܈H�]��P��܊ٙ�X�\����JN�ۜ�\�ۑ]HHٙ�X�\��]W��]\�OOH	�ӗ�UI��ۜ��][ۓX�[H���P�S��ٙ�X�\���X���][ۈ	�PRS��Hٙ�X�\���X���][ۈ	�XZ[���]\��
-�]���^O^�ٙ�X�\��YB��[O^��Y[�Έ	�M�	��ܙ\����N�	�\��Y��͌�	�\�^N�	ٛ^	��\�Y�P�۝[��	��X�KX�]�Y[��[Yے][\Έ	��[�\���\�	�L�	��[��][ێ�	ؘX��ܛ�[��M\���^ܘ\�	�ܘ\	�_B�ۓ[�\�Q[�\�^�JHO��K��\��[�\��]��[K��X��ܛ�[���܈H	��M�X�����_B�ۓ[�\�SX]�O^�JHO��K��\��[�\��]��[K��X��ܛ�[���܈H	��[��\�[�	��_B����ʈY�8�%]�]\�
-�[���
-��B�]��[O^��\�^N�	ٛ^	��\�	�L�	�[Yے][\Έ	��[�\���^�	�HH��	�Z[��Y�_O��]��[O^���Y�	�	�ZY��	�	��ܙ\��Y]\Έ	�L	I��X��ܛ�[���܎�	�ٙ��L
-��\�^N�	ٛ^	�[Yے][\Έ	��[�\���\�Y�P�۝[��	��[�\���۝�^�N�	�M	��۝�ZY��
-���܎�	��LLM���^��[�Έ_O����][�]X[�ٙ�X�\���[ۘ[YJ_B��]���]��[O^��Z[��Y�_O���[O^��X\��[��	��	��۝�ZY��
-��۝�^�N�	�M	���܎�	��M�Y���_O���ٙ�X�\���[���]H	���[��[O^���۝�^�N�	�L�	���܎�	���MYI�X\��[��Y��	�\	�_O��ٙ�X�\���[���]_O��[��B��ٙ�X�\���[ۘ[Y_B�����[O^��X\��[��	�
-�	��۝�^�N�	�L�	���܎�	���MYI��]T�X�N�	ۛ�ܘ\	�ݙ\���Έ	�Y[��^ݙ\���Έ	�[\�\��_O���ٙ�X�\���Y�W۝[X�\�^�ٙ�X�\��[XZ[�0��	�ٙ�X�\��[XZ[X�	��B����]��[O^��\�^N�	ٛ^	��\�	͜	��^ܘ\�	�ܘ\	�_O���[��[O^��Y[�Έ	��	��۝�^�N�	�L	��۝�ZY��
-��X��ܛ�[���܎���P��܋�����܎���P��܋�^�ܙ\��Y]\Έ	��	�^�[�ٛܛN�	�\\��\�I�\��ۜ�_O����]��SX�[
-ٙ�X�\����J_B���[����[��[O^��Y[�Έ	��	��۝�^�N�	�L	��۝�ZY��
-��X��ܛ�[���܎�	��LLM����܎�	���MYI��ܙ\��Y]\Έ	��	��ܙ\��	�\��Y��͌�	�_O����][ۓX�[B���[����]����]����]�����ʈ�Y�8�%�]\�[�
-����H
-��B�]��[O^��\�^N�	ٛ^	�[Yے][\Έ	��[�\���\�	�	��^��[�Έ�^ܘ\�	�ܘ\	�_O���ʈ]H�]\�
-��B�]��[O^��\�^N�	ٛ^	�[Yے][\Έ	��[�\���\�	�\	�Y[�Έ	�\L	��X��ܛ�[���܎�\�ۑ]H�	ܙؘJ
-����L��
-I��	ܙؘJL
-�LML��
-I��ܙ\��Y]\Έ	�	�_O���[��[O^���Y�	��	�ZY��	��	��ܙ\��Y]\Έ	�L	I�\�^N�	�[�[�KX������X��ܛ�[���܎�\�ۑ]H�	��YN	��	�͘�̎	�_Hς��[��[O^���۝�^�N�	�L\	��۝�ZY��
-���܎�\�ۑ]H�	��YN	��	�͘�̎	�^�[�ٛܛN�	�\\��\�I�\��ۜ�_O���\�ۑ]H�	�ۈ]I��	�ٙ�]I�B���[����]����ʈX���[�X�]�H
-��B�]��[O^��\�^N�	ٛ^	�[Yے][\Έ	��[�\���\�	�\	�Y[�Έ	�\L	��X��ܛ�[���܎�ٙ�X�\��\��X�]�H�	ܙؘJ
-͋M�K�
-I��	ܙؘJMM�MM�MM��
-I��ܙ\��Y]\Έ	�	�_O���[��[O^���Y�	��	�ZY��	��	��ܙ\��Y]\Έ	�L	I�\�^N�	�[�[�KX������X��ܛ�[���܎�ٙ�X�\��\��X�]�H�	���Y�L	��	��YNYNYI�_Hς��[��[O^���۝�^�N�	�L\	��۝�ZY��
-���܎�ٙ�X�\��\��X�]�H�	���Y�L	��	��YNYNYI�^�[�ٛܛN�	�\\��\�I�\��ۜ�_O���ٙ�X�\��\��X�]�H�	�X�]�I��	�[�X�]�I�B���[����]����ʈ���H�]ۈ
-��B��]ۂ�ې�X��^�
-HO�[�U���PX�]�Jٙ�X�\��Yٙ�X�\��\��X�]�J_B�\�X�Y^�X�[ۓ�Y[��OOHٙ�X�\��YB��[O^��Y[�Έ	͜L�	��۝�^�N�	�L\	��۝�ZY��
-���܎�	��M�Y����X��ܛ�[���܎�	���͌�	��ܙ\��	�\��Y��͌�	��ܙ\��Y]\Έ	�	��\��܎�X�[ۓ�Y[��OOHٙ�X�\��Y�	ۛ�X[��Y	��	��[�\���X�]N�X�[ۓ�Y[��OOHٙ�X�\��Y����K^�[�ٛܛN�	�\\��\�I�\��ۜ��]T�X�N�	ۛ�ܘ\	�\��ۜ�_B�ۓ[�\�Q[�\�^�JHO��Y�
-X�[ۓ�Y[��OOHٙ�X�\��Y
-H�K��\��[�\��]��[K��ܙ\���܈H	�ٙ��L
-���K��\��[�\��]��[K���܈H	�ٙ��L
-���H_B�ۓ[�\�SX]�O^�JHO��K��\��[�\��]��[K��ܙ\���܈H	���͌�	��K��\��[�\��]��[K���܈H	��M�Y����_B����X�[ۓ�Y[��OOHٙ�X�\��Y�	��)���ٙ�X�\��\��X�]�H�	�XX�]�]I��	�X�]�]I�B�؝]ۏ���]����]���
-NJ_B��]���
-_B��]���
-_B���]����\�]�^[�]��
-NB
+            {loading && (
+              <p style={{ color: '#8b949e', textAlign: 'center', marginTop: '48px', fontSize: '14px' }}>Loading officers…</p>
+            )}
+
+            {!loading && filteredListOfficers.length === 0 && (
+              <div style={{ padding: '60px 24px', textAlign: 'center', color: '#8b949e' }}>
+                <p style={{ fontSize: '30px', margin: '0 0 12px 0' }}>👮</p>
+                <p style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: '#e6edf3' }}>
+                  {officers.length === 0 ? 'No officers yet' : 'No results'}
+                </p>
+                <p style={{ fontSize: '12px', margin: 0 }}>
+                  {officers.length === 0 ? 'Add your first officer to get started' : 'Try adjusting your search or filters'}
+                </p>
+              </div>
+            )}
+
+            {!loading && filteredListOfficers.length > 0 && (
+              <div style={{ flex: 1 }}>
+                {filteredListOfficers.map((officer) => {
+                  const roleColor = getRoleColor(officer.role);
+                  const isOnDuty = officer.duty_status === 'ON_DUTY';
+                  const stationLabel = SS_LABELS[officer.sub_station || 'MAIN'] || officer.sub_station || 'Main';
+                  return (
+                    <div
+                      key={officer.id}
+                      style={{ padding: '14px 24px', borderBottom: '1px solid #30363d', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', transition: 'background 0.15s', flexWrap: 'wrap' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#161b22'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                    >
+                      {/* Left — avatar + info */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flex: '1 1 260px', minWidth: 0 }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#ffc107', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, color: '#0d1117', flexShrink: 0 }}>
+                          {getInitials(officer.full_name)}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ margin: '0 0 3px 0', fontWeight: 600, fontSize: '14px', color: '#e6edf3' }}>
+                            {officer.rank_title && <span style={{ fontSize: '12px', color: '#8b949e', marginRight: '5px' }}>{officer.rank_title}</span>}
+                            {officer.full_name}
+                          </p>
+                          <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: '#8b949e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {officer.badge_number}{officer.email ? ` · ${officer.email}` : ''}
+                          </p>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ padding: '3px 8px', fontSize: '10px', fontWeight: 700, backgroundColor: roleColor.bg, color: roleColor.text, borderRadius: '3px', textTransform: 'uppercase' as const }}>
+                              {getRoleLabel(officer.role)}
+                            </span>
+                            <span style={{ padding: '3px 8px', fontSize: '10px', fontWeight: 600, backgroundColor: '#0d1117', color: '#8b949e', borderRadius: '3px', border: '1px solid #30363d' }}>
+                              {stationLabel}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right — status pills + toggle */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+                        {/* Duty status */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', backgroundColor: isOnDuty ? 'rgba(74,222,128,0.08)' : 'rgba(107,114,128,0.08)', borderRadius: '4px' }}>
+                          <span style={{ width: '7px', height: '7px', borderRadius: '50%', display: 'inline-block', backgroundColor: isOnDuty ? '#4ade80' : '#6b7280' }} />
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: isOnDuty ? '#4ade80' : '#6b7280', textTransform: 'uppercase' as const }}>
+                            {isOnDuty ? 'On Duty' : 'Off Duty'}
+                          </span>
+                        </div>
+                        {/* Account active */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', backgroundColor: officer.is_active ? 'rgba(76,175,80,0.08)' : 'rgba(156,156,156,0.08)', borderRadius: '4px' }}>
+                          <span style={{ width: '7px', height: '7px', borderRadius: '50%', display: 'inline-block', backgroundColor: officer.is_active ? '#4caf50' : '#9e9e9e' }} />
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: officer.is_active ? '#4caf50' : '#9e9e9e', textTransform: 'uppercase' as const }}>
+                            {officer.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        {/* Toggle button */}
+                        <button
+                          onClick={() => handleToggleActive(officer.id, officer.is_active)}
+                          disabled={actionLoading === officer.id}
+                          style={{ padding: '6px 12px', fontSize: '11px', fontWeight: 600, color: '#e6edf3', backgroundColor: '#30363d', border: '1px solid #30363d', borderRadius: '4px', cursor: actionLoading === officer.id ? 'not-allowed' : 'pointer', opacity: actionLoading === officer.id ? 0.6 : 1, textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const }}
+                          onMouseEnter={(e) => { if (actionLoading !== officer.id) { e.currentTarget.style.borderColor = '#ffc107'; e.currentTarget.style.color = '#ffc107'; } }}
+                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#30363d'; e.currentTarget.style.color = '#e6edf3'; }}
+                        >
+                          {actionLoading === officer.id ? '…' : officer.is_active ? 'Deactivate' : 'Activate'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
+    </DispatchLayout>
+  );
+}
