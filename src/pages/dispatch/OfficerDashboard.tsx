@@ -553,22 +553,7 @@ export default function OfficerDashboard() {
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#ffc107' }}>{officerName}</div>
-            <div style={{ marginTop: 4, marginBottom: 4 }}>
-              <button
-                onClick={toggleDutyStatus}
-                disabled={dutyLoading}
-                title="Toggle on/off duty status"
-                style={{
-                  background: dutyStatus === 'ON_DUTY' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-                  border: `1px solid ${dutyStatus === 'ON_DUTY' ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)'}`,
-                  borderRadius: 20, color: dutyStatus === 'ON_DUTY' ? '#4ade80' : '#f87171',
-                  fontSize: 11, fontWeight: 700, padding: '3px 10px', cursor: dutyLoading ? 'not-allowed' : 'pointer',
-                  letterSpacing: 0.5, textTransform: 'uppercase' as const, opacity: dutyLoading ? 0.6 : 1,
-                }}
-              >
-                {dutyLoading ? '...' : dutyStatus === 'ON_DUTY' ? '🟢 On Duty' : '🔴 Off Duty'}
-              </button>
-            </div>
+            <div style={{ marginTop: 6, marginBottom: 4 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => {
@@ -620,6 +605,40 @@ export default function OfficerDashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Duty Status Toggle — large tap target for field use */}
+      <div style={{ maxWidth: 540, margin: '0 auto', padding: '10px 16px 0' }}>
+        <button
+          onClick={toggleDutyStatus}
+          disabled={dutyLoading}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '14px 20px',
+            borderRadius: 12,
+            border: `2px solid ${dutyStatus === 'ON_DUTY' ? 'rgba(34,197,94,0.6)' : 'rgba(239,68,68,0.6)'}`,
+            background: dutyStatus === 'ON_DUTY' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+            cursor: dutyLoading ? 'not-allowed' : 'pointer',
+            opacity: dutyLoading ? 0.7 : 1,
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 28 }}>{dutyStatus === 'ON_DUTY' ? '🟢' : '🔴'}</span>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: dutyStatus === 'ON_DUTY' ? '#4ade80' : '#f87171', letterSpacing: 0.5 }}>
+                {dutyLoading ? 'Updating…' : dutyStatus === 'ON_DUTY' ? 'ON DUTY' : 'OFF DUTY'}
+              </div>
+              <div style={{ fontSize: 12, color: '#8b949e', marginTop: 1 }}>
+                {dutyLoading ? 'Please wait' : dutyStatus === 'ON_DUTY' ? 'Tap to go off duty' : 'Tap to go on duty'}
+              </div>
+            </div>
+          </div>
+          <div style={{ fontSize: 20, color: dutyStatus === 'ON_DUTY' ? '#4ade80' : '#f87171', opacity: 0.7 }}>⇄</div>
+        </button>
       </div>
 
       {/* Map */}
