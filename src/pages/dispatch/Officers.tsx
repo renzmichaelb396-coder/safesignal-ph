@@ -9,10 +9,36 @@ interface Officer {
   email: string;
   role: 'DISPATCHER' | 'STATION_ADMIN' | 'OFFICER';
   is_active: boolean;
+  duty_status?: string;
+  sub_station?: string;
+  rank_title?: string;
 }
+
+interface Substation {
+  sub_station: string;
+  total: string;
+  on_duty: string;
+  off_duty: string;
+}
+
+const SS_LABELS: Record<string, string> = {
+  MAIN: 'Main Station',
+  '1': 'Sub-station 1',
+  '2': 'Sub-station 2',
+  '3': 'Sub-station 3',
+  '4': 'Sub-station 4',
+  '5': 'Sub-station 5',
+  '6': 'Sub-station 6',
+  '7': 'Sub-station 7',
+  '8': 'Sub-station 8',
+  '9': 'Sub-station 9',
+  '10': 'Sub-station 10',
+};
 
 export default function Officers() {
   const [officers, setOfficers] = useState<Officer[]>([]);
+  const [substations, setSubstations] = useState<Substation[]>([]);
+  const [view, setView] = useState<'board' | 'list'>('board');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -28,15 +54,19 @@ export default function Officers() {
   });
 
   useEffect(() => {
-    fetchOfficers();
+    fetchAll();
   }, []);
 
-  const fetchOfficers = async () => {
+  const fetchAll = async () => {
     try {
       setLoading(true);
       setError('');
-      const response = await dispatchApi.getOfficers();
-      setOfficers(response.officers || []);
+      const [officersRes, substationsRes] = await Promise.all([
+        dispatchApi.getOfficers(),
+        (dispatchApi as any).getSubstations().catch(() => ({ substations: [] })),
+      ]);
+      setOfficers(officersRes.officers || []);
+      setSubstations(substationsRes.substations || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load officers');
       setOfficers([]);
@@ -44,6 +74,8 @@ export default function Officers() {
       setLoading(false);
     }
   };
+
+  const fetchOfficers = fetchAll;
 
   const handleAddOfficer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,40 +143,39 @@ export default function Officers() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          gap: '12px',
+          flexWrap: 'wrap' as const,
         }}
       >
         <div>
-          <h1 style={{ margin: '0 0 8px 0', fontSize: '24px', fontWeight: 600, color: 'var(--ph-gold, #ffc107)' }}>
+          <h1 style={{ margin: '0 0 4px 0', fontSize: '24px', fontWeight: 600, color: 'var(--ph-gold, #ffc107)' }}>
             Officers
           </h1>
           <p style={{ margin: 0, fontSize: '13px', color: 'var(--dispatch-border, #8b949e)' }}>
-            {officers.length} officer{officers.length !== 1 ? 's' : ''}
+            {officers.length.toLocaleString()} total
+            {substations.length > 0 && (
+              <> &bull; {substations.reduce((s, x) => s + parseInt(x.on_duty, 10), 0)} on duty</>
+            )}
           </p>
         </div>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          style={{
-            padding: '10px 16px',
-            fontSize: '13px',
-            fontWeight: 600,
-            color: '#0d1117',
-            backgroundColor: 'var(--ph-gold, #ffc107)',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            textTransform: 'uppercase',
-            whiteSpace: 'nowrap',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffb300';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--ph-gold, #ffc107)';
-          }}
-        >
-          {showAddForm ? 'Cancel' : 'Add Officer'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' as const }}>
+          <div style={{ display: 'flex', border: '1px solid var(--dispatch-border, #30363d)', borderRadius: '6px', overflow: 'hidden' }}>
+            <button onClick={() => setView('board')} style={{ padding: '8px 14px', fontSize: '12px', fontWeight: 600, background: view === 'board' ? 'var(--ph-gold, #ffc107)' : 'transparent', color: view === 'board' ? '#0d1117' : '#8b949e', border: 'none', cursor: 'pointer', textTransform: 'uppercase' as const }}>
+              Board
+            </button>
+            <button onClick={() => setView('list')} style={{ padding: '8px 14px', fontSize: '12px', fontWeight: 600, background: view === 'list' ? 'var(--ph-gold, #ffc107)' : 'transparent', color: view === 'list' ? '#0d1117' : '#8b949e', border: 'none', cursor: 'pointer', textTransform: 'uppercase' as const }}>
+              List
+            </button>
+          </div>
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            style={{ padding: '10px 16px', fontSize: '13px', fontWeight: 600, color: '#0d1117', backgroundColor: 'var(--ph-gold, #ffc107)', border: 'none', borderRadius: '6px', cursor: 'pointer', transition: 'all 0.2s', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ffb300'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--ph-gold, #ffc107)'; }}
+          >
+            {showAddForm ? 'Cancel' : 'Add Officer'}
+          </button>
+        </div>
       </div>
 
       {/* Add Form */}
@@ -401,8 +432,49 @@ export default function Officers() {
         </form>
       )}
 
-      {/* Content */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      {/* Sub-station Board View */}
+      {view === 'board' && (
+        <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+          {loading && <p style={{ color: '#8b949e', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>Loading station board...</p>}
+          {error && <div style={{ padding: '16px', background: 'rgba(248,81,73,0.1)', border: '1px solid #f85149', borderRadius: '6px', color: '#f85149', fontSize: '13px', marginBottom: '16px' }}>{error}</div>}
+          {!loading && substations.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+              {[...substations].sort((a, b) => { if (a.sub_station === 'MAIN') return -1; if (b.sub_station === 'MAIN') return 1; return parseInt(a.sub_station, 10) - parseInt(b.sub_station, 10); }).map((ss) => {
+                const total = parseInt(ss.total, 10);
+                const onDuty = parseInt(ss.on_duty, 10);
+                const offDuty = parseInt(ss.off_duty, 10);
+                const dutyPct = total > 0 ? Math.round((onDuty / total) * 100) : 0;
+                const label = SS_LABELS[ss.sub_station] || 'Sub-station ' + ss.sub_station;
+                return (
+                  <div key={ss.sub_station} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: '10px', padding: '20px', display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#ffc107', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>{label}</p>
+                        <p style={{ margin: '4px 0 0', fontSize: '28px', fontWeight: 700, color: '#e6edf3' }}>{total.toLocaleString()}</p>
+                        <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#8b949e' }}>Total officers</p>
+                      </div>
+                      <div style={{ textAlign: 'right' as const }}>
+                        <p style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#4ade80' }}>{onDuty}</p>
+                        <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#8b949e' }}>On duty</p>
+                        <p style={{ margin: '6px 0 0', fontSize: '18px', fontWeight: 700, color: '#6b7280' }}>{offDuty}</p>
+                        <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#8b949e' }}>Off duty</p>
+                      </div>
+                    </div>
+                    <div style={{ height: '4px', background: '#30363d', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: dutyPct + '%', background: onDuty > 0 ? '#4ade80' : '#30363d', borderRadius: '2px', transition: 'width 0.5s ease' }} />
+                    </div>
+                    <p style={{ margin: 0, fontSize: '11px', color: '#8b949e' }}>{dutyPct}% on duty</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {!loading && substations.length === 0 && !error && <p style={{ color: '#8b949e', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>No sub-station data available.</p>}
+        </div>
+      )}
+
+      {/* List Content */}
+      {view === 'list' && <div style={{ flex: 1, overflow: 'auto' }}>
         {error && (
           <div
             style={{
@@ -576,7 +648,7 @@ export default function Officers() {
             })}
           </div>
         )}
-      </div>
+      </div>}
     </div>
     </DispatchLayout>
   );
