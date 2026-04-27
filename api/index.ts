@@ -23,8 +23,6 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '10mb' }));
-// Ensure DB is fully initialized before handling any request (blocks until seeding completes)
-app.use(async (_req: any, _res: any, next: any) => { await initDb().catch(() => {}); next(); });
 app.use(express.urlencoded({ extended: true }));
 
 // ── Database ──────────────────────────────────────────────────────────────────
@@ -87,14 +85,14 @@ async function initDb(): Promise<void> {
         const ghostId = ghost.rows[0].id;
         const real = await pool.query(`SELECT id FROM officers WHERE badge_number = 'PNP-002'`);
         const realId = real.rows.length > 0 ? real.rows[0].id : null;
-        await pool.query(`UPDATE officers SET email = 'ghost-002b@removed.local', is_active = 0 WHERE id = $1`, [ghostId]);
+        await pool.query(`UPDATE officers SET email = 'ghost-002b@removed.local', is_active = FALSE WHERE id = $1`, [ghostId]);
         if (realId) {
           await pool.query(`UPDATE sos_alerts SET assigned_officer_id = $1 WHERE assigned_officer_id = $2`, [realId, ghostId]);
         }
         console.log('[SafeSignal] PNP-002B ghost neutralized');
       }
       const officerFixHash = await bcrypt.hash('password123', 10);
-      await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer@pasay.safesignal.ph', password_hash = $1, is_active = 1 WHERE badge_number = 'PNP-002'`, [officerFixHash]);
+      await pool.query(`UPDATE officers SET role = 'OFFICER', email = 'officer@pasay.safesignal.ph', password_hash = $1, is_active = TRUE WHERE badge_number = 'PNP-002'`, [officerFixHash]);
       console.log('[SafeSignal] PNP-002 force-corrected');
     } catch (fixErr) {
       console.error('[SafeSignal] PNP-002 fix error:', fixErr);
@@ -238,30 +236,20 @@ async function initDb(): Promise<void> {
       const countRes = await pool.query("SELECT COUNT(*) FROM officers WHERE badge_number NOT LIKE 'PNP-%'");
       const existingCount = parseInt(countRes.rows[0].count, 10);
       if (existingCount < 50) {
-        let seedRaw: string | null = null;
-        let foundPath = '';
-        for (const tryPath of [
-          path.join(__dirname, '../seed-data.json'),
-          path.join(__dirname, 'seed-data.json'),
-          path.join(process.cwd(), 'seed-data.json'),
-          '/var/task/seed-data.json',
-        ]) {
-          try { seedRaw = fs.readFileSync(tryPath, 'utf8'); foundPath = tryPath; break; } catch {}
-        }
-        if (!seedRaw) throw new Error('seed-data.json not found');
-        console.log('[SS]path=' + foundPath.slice(-25));
-        const OFFICER_SEEDS: Array<{badge:string;full_name:string;rank_title:string;sub_station:string}> = JSON.parse(seedRaw);
-        console.log('[SS]seeds=' + OFFICER_SEEDS.length);
+        const seedPath = path.join(__dirname, '../seed-data.json');
+        const OFFICER_SEEDS: Array<{badge:string;full_name:string;rank_title:string;sub_station:string}> =
+          JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+        console.log('[SafeSignal] Seeding', OFFICER_SEEDS.length, 'PNP officers...');
         const pasayHash = await bcrypt.hash('Pasay@2026', 10);
         const badges = OFFICER_SEEDS.map((o) => o.badge);
         const names  = OFFICER_SEEDS.map((o) => o.full_name);
-        const emails = OFFICER_SEEDS.map((_o, i) => `seed${String(i + 1).padStart(5, '0')}@pasay.safesignal.ph`);
+        const emails = OFFICER_SEEDS.map((o) => o.badge.replace(/[^a-z0-9]/gi, '').toLowerCase() + '@pasay.safesignal.ph');
         const hashes = OFFICER_SEEDS.map(() => pasayHash);
         const ranks  = OFFICER_SEEDS.map((o) => o.rank_title || '');
         const subs   = OFFICER_SEEDS.map((o) => o.sub_station || 'MAIN');
         await pool.query(
-          `INSERT INTO officers (badge_number, full_name, email, password_hash, role, rank_title, sub_station, duty_status)
-           SELECT b, n, e, h, 'OFFICER', r, s, 'OFF_DUTY'
+          `INSERT INTO officers (badge_number, full_name, email, password_hash, role, is_active, rank_title, sub_station, duty_status)
+           SELECT b, n, e, h, 'OFFICER', 1, r, s, 'OFF_DUTY'
            FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[]) AS t(b,n,e,h,r,s)
            ON CONFLICT (badge_number) DO UPDATE SET
              full_name = EXCLUDED.full_name,
@@ -271,8 +259,8 @@ async function initDb(): Promise<void> {
         );
         console.log('[SafeSignal] Officer seeding complete:', OFFICER_SEEDS.length, 'records');
       }
-    } catch (seedErr: any) {
-      console.error('[SS]E=' + String(seedErr?.message||seedErr).slice(0,20));
+    } catch (seedErr) {
+      console.error('[SafeSignal] Officer seed error (non-fatal):', seedErr);
     }
 
         seeded = true;
@@ -1250,14 +1238,14 @@ app.post('/api/citizen/sos', requireCitizenAuth, async (req: any, res: any) => {
 
       // Level 1: ON_DUTY officers of nearest sub-station
       const subResult = await pool.query(
-        `SELECT id FROM officers WHERE role = 'OFFICER' AND is_active::INT = 1 AND duty_status = 'ON_DUTY' AND COALESCE(sub_station, 'MAIN') = $1`,
+        `SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = TRUE AND duty_status = 'ON_DUTY' AND COALESCE(sub_station, 'MAIN') = $1`,
         [nearestSS]
       );
       let pushTargetIds: number[] = subResult.rows.map((o: any) => Number(o.id));
 
       if (pushTargetIds.length === 0) {
         // Level 2: all ON_DUTY officers station-wide
-        const allOnDuty = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active::INT = 1 AND duty_status = 'ON_DUTY'`);
+        const allOnDuty = await pool.query(`SELECT id FROM officers WHERE role = 'OFFICER' AND is_active = TRUE AND duty_status = 'ON_DUTY'`);
         pushTargetIds = allOnDuty.rows.map((o: any) => Number(o.id));
       }
 
