@@ -44,6 +44,8 @@ export default function Officers() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [selectedStation, setSelectedStation] = useState<string | null>(null);
+  const [stationSearch, setStationSearch] = useState('');
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -63,7 +65,7 @@ export default function Officers() {
       setError('');
       const [officersRes, substationsRes] = await Promise.all([
         dispatchApi.getOfficers(),
-        (dispatchApi as any).getSubstations().catch(() => ({ substations: [] })),
+        dispatchApi.getSubstations().catch(() => ({ substations: [] })),
       ]);
       setOfficers(officersRes.officers || []);
       setSubstations(substationsRes.substations || []);
@@ -159,17 +161,42 @@ export default function Officers() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' as const }}>
+          {/* View toggle */}
           <div style={{ display: 'flex', border: '1px solid var(--dispatch-border, #30363d)', borderRadius: '6px', overflow: 'hidden' }}>
-            <button onClick={() => setView('board')} style={{ padding: '8px 14px', fontSize: '12px', fontWeight: 600, background: view === 'board' ? 'var(--ph-gold, #ffc107)' : 'transparent', color: view === 'board' ? '#0d1117' : '#8b949e', border: 'none', cursor: 'pointer', textTransform: 'uppercase' as const }}>
-              Board
-            </button>
-            <button onClick={() => setView('list')} style={{ padding: '8px 14px', fontSize: '12px', fontWeight: 600, background: view === 'list' ? 'var(--ph-gold, #ffc107)' : 'transparent', color: view === 'list' ? '#0d1117' : '#8b949e', border: 'none', cursor: 'pointer', textTransform: 'uppercase' as const }}>
-              List
-            </button>
+            <button
+              onClick={() => setView('board')}
+              style={{
+                padding: '8px 14px', fontSize: '12px', fontWeight: 600,
+                background: view === 'board' ? 'var(--ph-gold, #ffc107)' : 'transparent',
+                color: view === 'board' ? '#0d1117' : '#8b949e',
+                border: 'none', cursor: 'pointer', textTransform: 'uppercase' as const,
+              }}
+            >⊞ Board</button>
+            <button
+              onClick={() => setView('list')}
+              style={{
+                padding: '8px 14px', fontSize: '12px', fontWeight: 600,
+                background: view === 'list' ? 'var(--ph-gold, #ffc107)' : 'transparent',
+                color: view === 'list' ? '#0d1117' : '#8b949e',
+                border: 'none', cursor: 'pointer', textTransform: 'uppercase' as const,
+              }}
+            >≡ List</button>
           </div>
           <button
             onClick={() => setShowAddForm(!showAddForm)}
-            style={{ padding: '10px 16px', fontSize: '13px', fontWeight: 600, color: '#0d1117', backgroundColor: 'var(--ph-gold, #ffc107)', border: 'none', borderRadius: '6px', cursor: 'pointer', transition: 'all 0.2s', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const }}
+            style={{
+              padding: '10px 16px',
+              fontSize: '13px',
+              fontWeight: 600,
+              color: '#0d1117',
+              backgroundColor: 'var(--ph-gold, #ffc107)',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              textTransform: 'uppercase' as const,
+              whiteSpace: 'nowrap' as const,
+            }}
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ffb300'; }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--ph-gold, #ffc107)'; }}
           >
@@ -435,41 +462,153 @@ export default function Officers() {
       {/* Sub-station Board View */}
       {view === 'board' && (
         <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
-          {loading && <p style={{ color: '#8b949e', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>Loading station board...</p>}
-          {error && <div style={{ padding: '16px', background: 'rgba(248,81,73,0.1)', border: '1px solid #f85149', borderRadius: '6px', color: '#f85149', fontSize: '13px', marginBottom: '16px' }}>{error}</div>}
+          {loading && (
+            <p style={{ color: '#8b949e', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>Loading station board...</p>
+          )}
+          {error && (
+            <div style={{ padding: '16px', backgroundColor: 'rgba(248,81,73,0.1)', border: '1px solid #f85149', borderRadius: '6px', color: '#f85149', fontSize: '13px', marginBottom: '16px' }}>{error}</div>
+          )}
           {!loading && substations.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
-              {[...substations].sort((a, b) => { if (a.sub_station === 'MAIN') return -1; if (b.sub_station === 'MAIN') return 1; return parseInt(a.sub_station, 10) - parseInt(b.sub_station, 10); }).map((ss) => {
-                const total = parseInt(ss.total, 10);
-                const onDuty = parseInt(ss.on_duty, 10);
-                const offDuty = parseInt(ss.off_duty, 10);
-                const dutyPct = total > 0 ? Math.round((onDuty / total) * 100) : 0;
-                const label = SS_LABELS[ss.sub_station] || 'Sub-station ' + ss.sub_station;
-                return (
-                  <div key={ss.sub_station} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: '10px', padding: '20px', display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#ffc107', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>{label}</p>
-                        <p style={{ margin: '4px 0 0', fontSize: '28px', fontWeight: 700, color: '#e6edf3' }}>{total.toLocaleString()}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#8b949e' }}>Total officers</p>
+              {/* Sort: MAIN first, then numerically */}
+              {[...substations]
+                .sort((a, b) => {
+                  if (a.sub_station === 'MAIN') return -1;
+                  if (b.sub_station === 'MAIN') return 1;
+                  return parseInt(a.sub_station, 10) - parseInt(b.sub_station, 10);
+                })
+                .map((ss) => {
+                  const total = parseInt(ss.total, 10);
+                  const onDuty = parseInt(ss.on_duty, 10);
+                  const offDuty = parseInt(ss.off_duty, 10);
+                  const dutyPct = total > 0 ? Math.round((onDuty / total) * 100) : 0;
+                  const label = SS_LABELS[ss.sub_station] || `Sub-station ${ss.sub_station}`;
+                  return (
+                    <div
+                      key={ss.sub_station}
+                      onClick={() => { setSelectedStation(ss.sub_station); setStationSearch(''); }}
+                      onMouseEnter={(e) => { e.currentTarget.style.border = '1px solid #ffc107'; e.currentTarget.style.boxShadow = '0 0 0 1px rgba(255,193,7,0.2)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.border = selectedStation === ss.sub_station ? '1px solid #ffc107' : '1px solid #30363d'; e.currentTarget.style.boxShadow = 'none'; }}
+                      style={{
+                        background: '#161b22',
+                        border: selectedStation === ss.sub_station ? '1px solid #ffc107' : '1px solid #30363d',
+                        borderRadius: '10px',
+                        padding: '20px',
+                        display: 'flex',
+                        flexDirection: 'column' as const,
+                        gap: '12px',
+                        cursor: 'pointer',
+                        transition: 'border 0.15s, box-shadow 0.15s',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#ffc107', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>{label}</p>
+                          <p style={{ margin: '4px 0 0', fontSize: '28px', fontWeight: 700, color: '#e6edf3' }}>{total.toLocaleString()}</p>
+                          <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#8b949e' }}>Total officers</p>
+                        </div>
+                        <div style={{ textAlign: 'right' as const }}>
+                          <p style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#4ade80' }}>{onDuty}</p>
+                          <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#8b949e' }}>On duty</p>
+                          <p style={{ margin: '6px 0 0', fontSize: '18px', fontWeight: 700, color: '#6b7280' }}>{offDuty}</p>
+                          <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#8b949e' }}>Off duty</p>
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'right' as const }}>
-                        <p style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#4ade80' }}>{onDuty}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#8b949e' }}>On duty</p>
-                        <p style={{ margin: '6px 0 0', fontSize: '18px', fontWeight: 700, color: '#6b7280' }}>{offDuty}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#8b949e' }}>Off duty</p>
+                      {/* Progress bar */}
+                      <div style={{ height: '4px', background: '#30363d', borderRadius: '2px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${dutyPct}%`, background: onDuty > 0 ? '#4ade80' : '#30363d', borderRadius: '2px', transition: 'width 0.5s ease' }} />
                       </div>
+                      <p style={{ margin: 0, fontSize: '11px', color: '#8b949e' }}>{dutyPct}% on duty</p>
                     </div>
-                    <div style={{ height: '4px', background: '#30363d', borderRadius: '2px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: dutyPct + '%', background: onDuty > 0 ? '#4ade80' : '#30363d', borderRadius: '2px', transition: 'width 0.5s ease' }} />
-                    </div>
-                    <p style={{ margin: 0, fontSize: '11px', color: '#8b949e' }}>{dutyPct}% on duty</p>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           )}
-          {!loading && substations.length === 0 && !error && <p style={{ color: '#8b949e', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>No sub-station data available.</p>}
+          {!loading && substations.length === 0 && !error && (
+            <p style={{ color: '#8b949e', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>No sub-station data available.</p>
+          )}
+
+          {/* Station drilldown panel */}
+          {selectedStation !== null && (() => {
+            const stationLabel = SS_LABELS[selectedStation] || `Sub-station ${selectedStation}`;
+            const stationOfficers = officers.filter((o) => (o.sub_station || 'MAIN') === selectedStation);
+            const query = stationSearch.trim().toLowerCase();
+            const filtered = query
+              ? stationOfficers.filter((o) =>
+                  o.full_name.toLowerCase().includes(query) ||
+                  o.badge_number.toLowerCase().includes(query) ||
+                  (o.email || '').toLowerCase().includes(query)
+                )
+              : stationOfficers;
+            return (
+              <div style={{ marginTop: '24px', background: '#161b22', border: '1px solid #ffc107', borderRadius: '10px', overflow: 'hidden' }}>
+                {/* Panel header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #30363d', background: 'rgba(255,193,7,0.05)' }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#ffc107', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{stationLabel}</p>
+                    <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#8b949e' }}>{stationOfficers.length} officer{stationOfficers.length !== 1 ? 's' : ''} assigned</p>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSelectedStation(null); }}
+                    style={{ background: 'none', border: '1px solid #30363d', borderRadius: '6px', color: '#8b949e', fontSize: '18px', lineHeight: 1, cursor: 'pointer', padding: '4px 10px' }}
+                    title="Close"
+                  >×</button>
+                </div>
+                {/* Search input */}
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid #30363d' }}>
+                  <input
+                    type="text"
+                    placeholder="Search by name, badge, or email…"
+                    value={stationSearch}
+                    onChange={(e) => setStationSearch(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', fontSize: '13px', backgroundColor: '#0d1117', border: '1px solid #30363d', borderRadius: '6px', color: '#e6edf3', boxSizing: 'border-box', outline: 'none' }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = '#ffc107'; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = '#30363d'; }}
+                    autoFocus
+                  />
+                </div>
+                {/* Officer rows */}
+                {filtered.length === 0 ? (
+                  <div style={{ padding: '32px 20px', textAlign: 'center', color: '#8b949e', fontSize: '13px' }}>
+                    {query ? 'No officers match your search.' : 'No officers assigned to this station.'}
+                  </div>
+                ) : (
+                  <div>
+                    {filtered.map((officer) => {
+                      const rc = getRoleColor(officer.role);
+                      return (
+                        <div
+                          key={officer.id}
+                          style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 20px', borderBottom: '1px solid #21262d' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#0d1117'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          {/* Avatar */}
+                          <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#ffc107', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: '#0d1117', flexShrink: 0 }}>
+                            {getInitials(officer.full_name)}
+                          </div>
+                          {/* Info */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 600, color: '#e6edf3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{officer.full_name}</p>
+                            <p style={{ margin: 0, fontSize: '11px', color: '#8b949e' }}>{officer.badge_number} · {officer.email}</p>
+                          </div>
+                          {/* Role badge */}
+                          <span style={{ padding: '3px 7px', fontSize: '10px', fontWeight: 700, backgroundColor: rc.bg, color: rc.text, borderRadius: '3px', textTransform: 'uppercase', flexShrink: 0 }}>
+                            {officer.role === 'STATION_ADMIN' ? 'Admin' : officer.role === 'OFFICER' ? 'Officer' : 'Dispatcher'}
+                          </span>
+                          {/* Active dot */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: officer.is_active ? '#4ade80' : '#6b7280', display: 'inline-block' }} />
+                            <span style={{ fontSize: '10px', color: officer.is_active ? '#4ade80' : '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>{officer.is_active ? 'Active' : 'Off'}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -578,7 +717,7 @@ export default function Officers() {
                       <span
                         style={{
                           display: 'inline-block',
-                          padding: '4px 8px',
+                                   padding: '4px 8px',
                           fontSize: '10px',
                           fontWeight: 700,
                           backgroundColor: roleColor.bg,
