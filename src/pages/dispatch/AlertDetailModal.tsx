@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { dispatchApi, formatElapsed } from '../../lib/api';
 
 interface Alert {
@@ -51,6 +51,9 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
   const [selectedOfficerId, setSelectedOfficerId] = useState('');
   const [reverseGeoAddress, setReverseGeoAddress] = useState('');
   const [assignSuccess, setAssignSuccess] = useState(false);
+  const [officerSearch, setOfficerSearch] = useState('');
+  const [showOfficerList, setShowOfficerList] = useState(false);
+  const officerSearchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     dispatchApi.getOfficers().then((data: any) => {
@@ -86,6 +89,25 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
         .catch(() => {});
     }
   }, [alert.location?.lat, alert.location?.lng]);
+
+  // Close officer dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (officerSearchRef.current && !officerSearchRef.current.contains(e.target as Node)) {
+        setShowOfficerList(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOfficer = officers.find((o: any) => String(o.id) === selectedOfficerId) || null;
+  const filteredOfficers = officerSearch.trim() === ''
+    ? officers
+    : officers.filter((o: any) =>
+        o.full_name.toLowerCase().includes(officerSearch.toLowerCase()) ||
+        o.badge_number.toLowerCase().includes(officerSearch.toLowerCase())
+      );
 
   const handleAssignOfficer = async () => {
     if (!selectedOfficerId) return;
@@ -418,22 +440,83 @@ export default function AlertDetailModal({ alert, onClose, onUpdate }: AlertDeta
                 );
               })()}
               <p style={{ margin: '0 0 12px', fontSize: '11px', fontWeight: 700, color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assign Officer</p>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <select value={selectedOfficerId} onChange={(e) => setSelectedOfficerId(e.target.value)} style={{ flex: 1, padding: '10px 12px', fontSize: '13px', backgroundColor: '#161b22', border: '1px solid #30363d', borderRadius: '6px', color: '#e6edf3', cursor: 'pointer' }}>
-                  <option value="">{'\u2014'} Select officer {'\u2014'}</option>
-                  {officers.map((o: any, i: number) => {
-                    const dist = alert.location && o.officer_lat != null
-                      ? haversineKm(alert.location.lat, alert.location.lng, o.officer_lat, o.officer_lng)
-                      : null;
-                    const isNearest = i === 0 && dist != null;
-                    return (
-                      <option key={o.id} value={o.id}>
-                        {isNearest ? '\uD83D\uDCCD ' : ''}{o.full_name} ({o.badge_number}){dist != null ? ` — ${dist.toFixed(2)}km` : ''}
-                      </option>
-                    );
-                  })}
-                </select>
-                <button onClick={handleAssignOfficer} disabled={!selectedOfficerId || actionLoading} style={{ padding: '10px 20px', fontSize: '12px', fontWeight: 600, color: '#161b22', backgroundColor: '#ffc107', border: 'none', borderRadius: '6px', cursor: !selectedOfficerId || actionLoading ? 'not-allowed' : 'pointer', opacity: !selectedOfficerId || actionLoading ? 0.5 : 1, whiteSpace: 'nowrap' }}>Assign</button>
+              {/* Searchable Officer Combobox */}
+              <div ref={officerSearchRef} style={{ position: 'relative' }}>
+                {/* Selected officer chip */}
+                {selectedOfficer && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 12px', backgroundColor: 'rgba(255,193,7,0.08)', border: '1px solid rgba(255,193,7,0.4)', borderRadius: 6 }}>
+                    <span style={{ fontSize: 16, color: '#ffc107' }}>&#10003;</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#e6edf3' }}>{selectedOfficer.full_name}</span>
+                      <span style={{ fontSize: 11, color: '#8b949e', marginLeft: 6 }}>{selectedOfficer.badge_number}</span>
+                      {alert.location && selectedOfficer.officer_lat != null && (
+                        <span style={{ fontSize: 11, color: '#58a6ff', marginLeft: 6 }}>
+                          {haversineKm(alert.location.lat, alert.location.lng, selectedOfficer.officer_lat, selectedOfficer.officer_lng).toFixed(2)} km
+                        </span>
+                      )}
+                    </div>
+                    <button onClick={() => { setSelectedOfficerId(''); setOfficerSearch(''); }} style={{ background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer', fontSize: 18, padding: 0, lineHeight: 1 }}>&#215;</button>
+                  </div>
+                )}
+                {/* Search input + Assign button row */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1, position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8b949e', pointerEvents: 'none' }}>&#128269;</span>
+                    <input
+                      type="text"
+                      value={officerSearch}
+                      onChange={e => { setOfficerSearch(e.target.value); setShowOfficerList(true); }}
+                      onFocus={() => setShowOfficerList(true)}
+                      placeholder={selectedOfficer ? 'Change officer...' : 'Search by name or badge...'}
+                      style={{ width: '100%', padding: '10px 12px 10px 32px', fontSize: 13, backgroundColor: '#161b22', border: '1px solid #30363d', borderRadius: 6, color: '#e6edf3', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleAssignOfficer}
+                    disabled={!selectedOfficerId || actionLoading}
+                    style={{ padding: '10px 20px', fontSize: 12, fontWeight: 600, color: '#161b22', backgroundColor: '#ffc107', border: 'none', borderRadius: 6, cursor: !selectedOfficerId || actionLoading ? 'not-allowed' : 'pointer', opacity: !selectedOfficerId || actionLoading ? 0.5 : 1, whiteSpace: 'nowrap' }}
+                  >Assign</button>
+                </div>
+                {/* Dropdown list */}
+                {showOfficerList && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, backgroundColor: '#161b22', border: '1px solid #30363d', borderRadius: 8, zIndex: 999, maxHeight: 260, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.6)' }}>
+                    {filteredOfficers.length === 0 ? (
+                      <div style={{ padding: '14px 16px', color: '#8b949e', fontSize: 13, textAlign: 'center' }}>No officers found</div>
+                    ) : filteredOfficers.map((o: any, i: number) => {
+                      const dist = alert.location && o.officer_lat != null
+                        ? haversineKm(alert.location.lat, alert.location.lng, o.officer_lat, o.officer_lng)
+                        : null;
+                      const isNearest = i === 0 && dist != null;
+                      const isSelected = String(o.id) === selectedOfficerId;
+                      const isOnDuty = o.is_active && o.role === 'OFFICER';
+                      return (
+                        <div
+                          key={o.id}
+                          onClick={() => { setSelectedOfficerId(String(o.id)); setOfficerSearch(''); setShowOfficerList(false); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', backgroundColor: isSelected ? 'rgba(255,193,7,0.1)' : 'transparent', borderBottom: i < filteredOfficers.length - 1 ? '1px solid #21262d' : 'none' }}
+                          onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.backgroundColor = 'rgba(255,255,255,0.04)'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.backgroundColor = isSelected ? 'rgba(255,193,7,0.1)' : 'transparent'; }}
+                        >
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: isOnDuty ? '#2196f3' : '#444', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                            {o.full_name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: '#e6edf3' }}>{o.full_name}</span>
+                              {isNearest && <span style={{ fontSize: 10, padding: '1px 5px', backgroundColor: 'rgba(59,130,246,0.2)', color: '#58a6ff', borderRadius: 4, fontWeight: 700 }}>NEAREST</span>}
+                              {isSelected && <span style={{ fontSize: 11, color: '#ffc107' }}>&#10003;</span>}
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 11, color: '#8b949e' }}>{o.badge_number}</span>
+                              <span style={{ fontSize: 11, color: isOnDuty ? '#3fb950' : '#8b949e' }}>&#9679; {isOnDuty ? 'On duty' : 'Off duty'}</span>
+                              {dist != null && <span style={{ fontSize: 11, color: '#58a6ff' }}>{dist.toFixed(2)} km away</span>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               {assignSuccess && (
                 <div style={{ marginTop: '8px', padding: '8px 12px', backgroundColor: 'rgba(63,185,80,0.12)', border: '1px solid #3fb950', borderRadius: '6px', color: '#3fb950', fontSize: '12px', fontWeight: 600 }}>

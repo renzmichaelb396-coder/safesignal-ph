@@ -16,7 +16,7 @@ export default function Dashboard() {
   const [clock, setClock] = useState('');
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<any>(null);
-  const markersRef = useRef<Map<number, any>>(new Map());
+  const markersRef = useRef<Map<number, { marker: any; dot: HTMLDivElement; label: HTMLDivElement }>>(new Map());
   const officerMarkersRef = useRef<Map<number, any>>(new Map());
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevAlertIdsRef = useRef<Set<number>>(new Set());
@@ -351,9 +351,9 @@ export default function Dashboard() {
     if (!maplibregl) return;
 
     // Remove stale markers for resolved/cancelled alerts
-    for (const [id, marker] of Array.from(markersRef.current.entries())) {
+    for (const [id, data] of Array.from(markersRef.current.entries())) {
       if (!alertList.find(a => a.id === id)) {
-        marker.remove();
+        data.marker.remove();
         markersRef.current.delete(id);
       }
     }
@@ -361,44 +361,63 @@ export default function Dashboard() {
     let newestActive: any = null;
 
     for (const alert of alertList) {
+      const firstName = alert.full_name.split(' ')[0];
       const initials = getInitials(alert.full_name);
 
-      let color = '#6b7280';
-      let size = 20;
+      let color = '#E63946';
+      let size = 36;
       let pulseClass = '';
+      let opacity = 1;
 
       if (!['ACTIVE','ACKNOWLEDGED','EN_ROUTE','ON_SCENE'].includes(alert.status)) continue;
-      // Citizen markers are ALWAYS red — officers are always blue
+
       if (alert.status === 'ACTIVE' && alert.is_suspicious) {
-        color = '#E63946'; size = 24; pulseClass = 'pin-suspicious';
+        color = '#E63946'; size = 40; pulseClass = 'pin-suspicious';
       } else if (alert.status === 'ACTIVE') {
-        color = '#E63946'; size = 24; pulseClass = 'pin-active';
+        color = '#E63946'; size = 40; pulseClass = 'pin-active';
       } else if (alert.status === 'ACKNOWLEDGED') {
-        color = '#E63946'; size = 24;
+        color = '#c0392b'; size = 36;
       } else if (alert.status === 'EN_ROUTE') {
-        color = '#E63946'; size = 22;
+        color = '#e67e22'; size = 34; opacity = 0.92;
       } else if (alert.status === 'ON_SCENE') {
-        color = '#E63946'; size = 22;
+        color = '#27ae60'; size = 34; opacity = 0.92;
       }
 
       if (markersRef.current.has(alert.id)) {
-        const marker = markersRef.current.get(alert.id);
+        // UPDATE PATH: only touch inner elements — NEVER touch wrapper (MapLibre owns its transform)
+        const { marker, dot, label } = markersRef.current.get(alert.id);
         if (alert.lat != null && alert.lng != null) marker.setLngLat([alert.lng, alert.lat]);
-        const existingEl = marker.getElement();
-        existingEl.className = pulseClass;
-        existingEl.style.cssText = `width:${size}px;height:${size}px;background:${color};border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.6);cursor:pointer`;
-        existingEl.textContent = initials;
+        dot.className = pulseClass;
+        dot.style.width = `${size}px`;
+        dot.style.height = `${size}px`;
+        dot.style.background = color;
+        dot.style.opacity = String(opacity);
+        dot.textContent = initials;
+        label.textContent = firstName;
       } else {
+        // CREATE PATH: wrapper (MapLibre positions this) > dot + label (we style these)
         if (alert.lat == null || alert.lng == null) continue;
-        const el = document.createElement('div');
-        el.className = pulseClass;
-        el.style.cssText = `width:${size}px;height:${size}px;background:${color};border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.6);cursor:pointer`;
-        el.textContent = initials;
-        const marker = new maplibregl.Marker({ element: el })
+
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer';
+
+        const dot = document.createElement('div');
+        dot.className = pulseClass;
+        dot.style.cssText = `width:${size}px;height:${size}px;background:${color};border-radius:50%;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;box-shadow:0 3px 10px rgba(0,0,0,0.7);opacity:${opacity};flex-shrink:0`;
+        dot.textContent = initials;
+
+        const label = document.createElement('div');
+        label.style.cssText = 'margin-top:3px;padding:2px 6px;background:rgba(20,0,0,0.82);border-radius:4px;font-size:10px;font-weight:700;color:#fff;white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;pointer-events:none';
+        label.textContent = firstName;
+
+        wrapper.appendChild(dot);
+        wrapper.appendChild(label);
+
+        const marker = new maplibregl.Marker({ element: wrapper, anchor: 'top' })
           .setLngLat([alert.lng, alert.lat])
           .addTo(leafletMapRef.current);
-        el.addEventListener('click', () => panToAlert(alert));
-        markersRef.current.set(alert.id, marker);
+        wrapper.addEventListener('click', () => panToAlert(alert));
+        markersRef.current.set(alert.id, { marker, dot, label });
       }
 
       if (alert.status === 'ACTIVE' && (!newestActive || alert.triggered_at > newestActive.triggered_at)) {
