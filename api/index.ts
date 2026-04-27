@@ -124,22 +124,26 @@ async function initDb(): Promise<void> {
       // officer_locations — 3 sequential column adds
       pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS heading FLOAT`)
         .then(() => pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ON_DUTY'`))
-        .then(() => pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS updated_at BIGINT`)),
+        .then(() => pool.query(`ALTER TABLE officer_locations ADD COLUMN IF NOT EXISTS updated_at BIGINT`))
+        .catch(e => console.warn('[SafeSignal] migration warning (officer_locations):', e.message)),
       // citizens — column adds then type migrations, all sequential on same table
       pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_type TEXT`)
         .then(() => pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_number TEXT`))
         .then(() => pool.query(`ALTER TABLE citizens ADD COLUMN IF NOT EXISTS gov_id_photo TEXT`))
         .then(() => pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='citizens' AND column_name='is_suspended' AND data_type='integer') THEN ALTER TABLE citizens ALTER COLUMN is_suspended TYPE BOOLEAN USING (is_suspended::integer != 0); END IF; END $$`))
-        .then(() => pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='citizens' AND column_name='verified' AND data_type='integer') THEN ALTER TABLE citizens ALTER COLUMN verified TYPE BOOLEAN USING (verified::integer != 0); END IF; END $$`)),
+        .then(() => pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='citizens' AND column_name='verified' AND data_type='integer') THEN ALTER TABLE citizens ALTER COLUMN verified TYPE BOOLEAN USING (verified::integer != 0); END IF; END $$`))
+        .catch(e => console.warn('[SafeSignal] migration warning (citizens):', e.message)),
       // sos_alerts — column adds sequential on same table
-      pool.query(`ALTER TABLE sos_alerts ADD COLUMN IF NOT EXISTS incident_photo TEXT`),
+      pool.query(`ALTER TABLE sos_alerts ADD COLUMN IF NOT EXISTS incident_photo TEXT`)
+        .catch(e => console.warn('[SafeSignal] migration warning (sos_alerts):', e.message)),
       // officers — duty_status, phone, and is_active INT→BOOL migration
       pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS duty_status TEXT DEFAULT 'ON_DUTY'`)
         .then(() => pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS phone TEXT`))
         .then(() => pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS sub_station TEXT DEFAULT 'MAIN'`))
         .then(() => pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS rank_title TEXT DEFAULT ''`))
         .then(() => pool.query(`ALTER TABLE officers ADD COLUMN IF NOT EXISTS duty_updated_at BIGINT DEFAULT 0`))
-        .then(() => pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='officers' AND column_name='is_active' AND data_type='integer') THEN ALTER TABLE officers ALTER COLUMN is_active TYPE BOOLEAN USING (is_active::integer != 0); END IF; END $$`)),
+        .then(() => pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='officers' AND column_name='is_active' AND data_type='integer') THEN ALTER TABLE officers ALTER COLUMN is_active TYPE BOOLEAN USING (is_active::integer != 0); END IF; END $$`))
+        .catch(e => console.warn('[SafeSignal] migration warning (officers):', e.message)),
     ]);
     // ── Phase 6: indexes (all idempotent, run in parallel) ────────────────────
     await Promise.all([
