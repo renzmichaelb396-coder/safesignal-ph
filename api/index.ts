@@ -4,7 +4,7 @@ import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { OFFICER_SEEDS } from './seed-data';
+import { OFFICER_SEEDS } from '../seed-data';
 import webpush from 'web-push';
 
 // VAPID keys for Web Push (set in Vercel env vars)
