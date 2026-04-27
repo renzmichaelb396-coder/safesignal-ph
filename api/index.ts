@@ -238,8 +238,19 @@ async function initDb(): Promise<void> {
       const countRes = await pool.query("SELECT COUNT(*) FROM officers WHERE badge_number NOT LIKE 'PNP-%'");
       const existingCount = parseInt(countRes.rows[0].count, 10);
       if (existingCount < 50) {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const OFFICER_SEEDS: Array<{badge:string;full_name:string;rank_title:string;sub_station:string}> = require('../seed-data.json');
+        let seedRaw: string | null = null;
+        let foundPath = '';
+        for (const tryPath of [
+          path.join(__dirname, '../seed-data.json'),
+          path.join(__dirname, 'seed-data.json'),
+          path.join(process.cwd(), 'seed-data.json'),
+          '/var/task/seed-data.json',
+        ]) {
+          try { seedRaw = fs.readFileSync(tryPath, 'utf8'); foundPath = tryPath; break; } catch {}
+        }
+        if (!seedRaw) throw new Error('seed-data.json not found');
+        console.log('[SS]path=' + foundPath.slice(-25));
+        const OFFICER_SEEDS: Array<{badge:string;full_name:string;rank_title:string;sub_station:string}> = JSON.parse(seedRaw);
         console.log('[SS]seeds=' + OFFICER_SEEDS.length);
         const pasayHash = await bcrypt.hash('Pasay@2026', 10);
         const badges = OFFICER_SEEDS.map((o) => o.badge);
