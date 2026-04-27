@@ -1501,8 +1501,8 @@ app.get('/api/dispatch/substations', requireOfficerAuth, async (req: any, res: a
       `SELECT
          COALESCE(sub_station, 'MAIN') as sub_station,
          COUNT(*)::text as total,
-         SUM(CASE WHEN duty_status = 'ON_DUTY' AND is_active = TRUE THEN 1 ELSE 0 END)::text as on_duty,
-         SUM(CASE WHEN (duty_status IS NULL OR duty_status = 'OFF_DUTY') OR is_active = FALSE THEN 1 ELSE 0 END)::text as off_duty
+         SUM(CASE WHEN duty_status = 'ON_DUTY' AND is_active::INT = 1 THEN 1 ELSE 0 END)::text as on_duty,
+         SUM(CASE WHEN (duty_status IS NULL OR duty_status = 'OFF_DUTY') OR is_active::INT = 0 THEN 1 ELSE 0 END)::text as off_duty
        FROM officers
        WHERE role = 'OFFICER'
        GROUP BY COALESCE(sub_station, 'MAIN')
