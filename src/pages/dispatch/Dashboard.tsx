@@ -290,23 +290,27 @@ export default function Dashboard() {
 
         const nameLabel = document.createElement('div');
         nameLabel.style.cssText = 'background:rgba(29,78,216,0.97);color:#fff;font-size:11px;font-weight:800;padding:2px 10px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,0.7);margin-top:5px;max-width:140px;overflow:hidden;text-overflow:ellipsis;border:1px solid rgba(255,255,255,0.3);letter-spacing:0.02em';
-        nameLabel.textContent = ofc.full_name || ofc.badge_number;
+        // Show badge number first so dispatcher can immediately identify the officer
+        nameLabel.textContent = (ofc.badge_number ? ofc.badge_number + ' · ' : '') + (ofc.full_name || '');
 
         wrapper.appendChild(dotWrap);
         wrapper.appendChild(nameLabel);
         wrapper.title = ofc.full_name + ' · ' + ofc.badge_number;
 
-        // Click popup — shows full contact card for dispatcher to call
-        const phoneDisplay = ofc.phone ? `<a href="tel:${ofc.phone}" style="color:#93c5fd;font-weight:700;text-decoration:none;">${ofc.phone}</a>` : '<span style="color:#6b7280;font-style:italic">No phone on file</span>';
+        // Click popup — contact card for dispatcher with phone call button
         const dutyColor = ofc.duty_status === 'OFF_DUTY' ? '#f87171' : '#4ade80';
         const dutyLabel = ofc.duty_status === 'OFF_DUTY' ? '🔴 Off Duty' : '🟢 On Duty';
+        const phoneHtml = ofc.phone
+          ? `<a href="tel:${ofc.phone}" style="display:block;margin-top:8px;padding:8px 12px;background:#1d4ed8;color:#fff;font-weight:700;font-size:13px;text-decoration:none;border-radius:6px;text-align:center;">📞 Call ${ofc.phone}</a>`
+          : `<div style="margin-top:8px;font-size:11px;color:#6b7280;font-style:italic">No phone on file</div>`;
         const popup = new maplibregl.Popup({ offset: 52, closeButton: true, className: 'officer-popup' })
           .setHTML(`
-            <div style="background:#0f172a;color:#f1f5f9;padding:12px 14px;border-radius:8px;min-width:180px;font-family:sans-serif;border:1px solid rgba(59,130,246,0.4);box-shadow:0 4px 20px rgba(0,0,0,0.8);">
-              <div style="font-size:13px;font-weight:800;margin-bottom:4px;">${ofc.full_name || 'Unknown'}</div>
-              <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">Badge: <b style="color:#e2e8f0">${ofc.badge_number}</b></div>
-              <div style="font-size:11px;margin-bottom:6px;">📞 ${phoneDisplay}</div>
-              <div style="font-size:11px;color:${dutyColor};font-weight:700;">${dutyLabel}</div>
+            <div style="background:#0f172a;color:#f1f5f9;padding:14px 16px;border-radius:8px;min-width:200px;font-family:sans-serif;border:1px solid rgba(59,130,246,0.5);box-shadow:0 4px 24px rgba(0,0,0,0.9);">
+              <div style="font-size:15px;font-weight:900;margin-bottom:2px;color:#fff;">${ofc.full_name || 'Unknown'}</div>
+              <div style="font-size:12px;color:#93c5fd;font-weight:700;margin-bottom:4px;">🪪 ${ofc.badge_number || '—'}</div>
+              <div style="font-size:11px;color:${dutyColor};font-weight:700;margin-bottom:2px;">${dutyLabel}</div>
+              ${ofc.sub_station ? `<div style="font-size:10px;color:#64748b;margin-bottom:4px;">Station: ${ofc.sub_station}</div>` : ''}
+              ${phoneHtml}
             </div>
           `);
 
