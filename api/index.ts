@@ -172,11 +172,21 @@ async function initDb(): Promise<void> {
     ];
     for (const officer of officers) {
       const passwordHash = await bcrypt.hash('password123', 10);
-      await pool.query(`
-        INSERT INTO officers (station_id, badge_number, email, full_name, role, password_hash, is_active, phone)
-        VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7)
-        ON CONFLICT (badge_number) DO UPDATE SET phone = EXCLUDED.phone, full_name = EXCLUDED.full_name
-      `, [stationId, officer.badge, officer.email, officer.full_name, officer.role, passwordHash, officer.phone]);
+      try {
+        // Try BOOLEAN literal first (column is BOOL)
+        await pool.query(`
+          INSERT INTO officers (station_id, badge_number, email, full_name, role, password_hash, is_active, phone)
+          VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7)
+          ON CONFLICT (badge_number) DO UPDATE SET phone = EXCLUDED.phone, full_name = EXCLUDED.full_name
+        `, [stationId, officer.badge, officer.email, officer.full_name, officer.role, passwordHash, officer.phone]);
+      } catch {
+        // Fallback: is_active is INT column — use 1
+        await pool.query(`
+          INSERT INTO officers (station_id, badge_number, email, full_name, role, password_hash, is_active, phone)
+          VALUES ($1, $2, $3, $4, $5, $6, 1, $7)
+          ON CONFLICT (badge_number) DO UPDATE SET phone = EXCLUDED.phone, full_name = EXCLUDED.full_name
+        `, [stationId, officer.badge, officer.email, officer.full_name, officer.role, passwordHash, officer.phone]);
+      }
       console.log('[SafeSignal] Upserted officer:', officer.badge);
     }
     // Seed demo citizen account — always reset to verified/active on cold start
