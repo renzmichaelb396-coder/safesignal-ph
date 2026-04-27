@@ -251,7 +251,7 @@ async function initDb(): Promise<void> {
         const subs   = OFFICER_SEEDS.map((o) => o.sub_station || 'MAIN');
         await pool.query(
           `INSERT INTO officers (badge_number, full_name, email, password_hash, role, is_active, rank_title, sub_station, duty_status)
-           SELECT b, n, e, h, 'OFFICER', 1, r, s, 'OFF_DUTY'
+           SELECT b, n, e, h, 'OFFICER', true, r, s, 'OFF_DUTY'
            FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[]) AS t(b,n,e,h,r,s)
            ON CONFLICT (badge_number) DO UPDATE SET
              full_name = EXCLUDED.full_name,
