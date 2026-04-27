@@ -405,8 +405,7 @@ export default function Officers() {
                         <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#8b949e', fontSize: '13px', pointerEvents: 'none' }}>🔍</span>
                         <input
                           type="text"
-                          placeholder="Search by name, badge, email, or rank…
-+
+                          placeholder="Search by name, badge, email, or rank..."
                           value={stationSearch}
                           onChange={(e) => { setStationSearch(e.target.value); setDrilldownPage(1); }}
                           style={{ ...baseInput, paddingLeft: '32px' }}
